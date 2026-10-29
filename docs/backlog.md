@@ -39,8 +39,8 @@
 范围：入口迁入 `cmd/<name>/`，配置示例迁入 `configs/`，进程集成测试与共享契约数据归入
 `test/`；同步模板初始化与恢复、构建发布、MCP 检查和文档，保留 CLI 机器接口行为。
 
-当前进展：已选定迁移方案，正在确认
-[目录迁移设计](superpowers/specs/2026-10-29-project-layout-design.md)，尚未开始代码实施。
+当前进展：[目录迁移设计](superpowers/specs/2026-10-29-project-layout-design.md)已确认，
+[实施计划](superpowers/plans/2026-10-29-project-layout-plan.md)待审阅并选择执行方式，尚未开始代码实施。
 
 验收：原模板和改名后的项目均可构建、测试和发布；初始化幂等且目录改名可恢复；历史契约
 比较继续有效；源码入口变更有迁移说明，六目标发布包内容完整。
