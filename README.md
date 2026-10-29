@@ -47,14 +47,14 @@ mise run check
 ```sh
 mise run doctor
 mise run build
-mise exec -- go run . greet --name Codex
-mise exec -- go run . greet --name Codex --json
+mise exec -- go run ./cmd/go-cli-starter greet --name Codex
+mise exec -- go run ./cmd/go-cli-starter greet --name Codex --json
 ```
 
-发布产物本身不依赖 mise 或 Go。源码安装入口是仓库根目录：
+发布产物本身不依赖 mise 或 Go。源码安装入口是 `cmd/go-cli-starter`：
 
 ```sh
-go install github.com/zhYou/go-cli-starter@latest
+go install github.com/zhYou/go-cli-starter/cmd/go-cli-starter@latest
 ```
 
 ## 给智能体调用
@@ -138,7 +138,7 @@ RTK 和 superpowers 使用用户目录中的安装。模板不复制全局技能
 | `mise run release:check` | 验证当前仓库的发布配置和 SCM 信息，需要 remote |
 | `mise run release:snapshot` | 本地构建全部发布压缩包，不发布 |
 
-根目录入口负责信号和退出；`internal/cli` 组织命令，`internal/config` 加载配置，`internal/greeting` 演示业务逻辑；`internal/scaffold` 和 `tools` 提供初始化与开发任务。
+`cmd/<name>` 入口负责信号和退出；`internal/cli` 组织命令，`internal/config` 加载配置，`internal/greeting` 演示业务逻辑；`internal/scaffold` 和 `tools` 提供初始化与开发任务。
 
 `check` 在临时仓库中验证发布配置，无需为内部工具配置 remote。真正发布或运行 `release:check` 前，为目标项目设置自己的 GitHub origin。
 

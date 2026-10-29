@@ -12,7 +12,7 @@
 
 **设计：** [已确认的目录迁移设计](../specs/2026-10-29-project-layout-design.md)。
 
-**状态：** 设计已确认；本计划待审阅，尚未开始代码实施。
+**状态：** 设计与计划已确认，用户选择本会话直接执行；任务 1—3 已完成。
 
 ## 全局约束
 
@@ -144,26 +144,26 @@
 `Initializer.identity` 的签名，改为委托入口发现。
 新增 `verifyCommandInstall(root string, project scaffold.Project) error` 于 `tools/dev/template.go`。
 
-- [ ] 写 `TestInitializeMovesCommandDirectory`：模块 `example.com/team/repository`、名称
+- [x] 写 `TestInitializeMovesCommandDirectory`：模块 `example.com/team/repository`、名称
   `my-cli`，初始化后 `Inspect` 返回目标身份，`cmd/my-cli` 存在且原目录消失，导入与内容已替换。
   写 `TestInitializeSameNameDoesNotMove`：仅改模块，目录保持，重复调用变更为空。
   更新原有幂等性、来源字节稳定、不同身份拒绝、权限和锁测试的 fixture 到命令目录布局。
-- [ ] 运行 `mise exec -- go test ./internal/scaffold -run 'TestInitializeMoves|TestInitializeSameName'`，
+- [x] 运行 `mise exec -- go test ./internal/scaffold -run 'TestInitializeMoves|TestInitializeSameName'`，
   确认当前初始化尚未接通新入口和目录移动。
-- [ ] 接通 `Identity` 与 `Initialize`：恢复仍早于身份读取；生成受管内容变更及可选移动后
+- [x] 接通 `Identity` 与 `Initialize`：恢复仍早于身份读取；生成受管内容变更及可选移动后
   统一调用 `apply`。把入口文件白名单改为原模板命令路径，用原模板常量构造路径；
   同名初始化不创建移动记录。旧根布局缺少命令入口时给出明确中文迁移提示。
-- [ ] 移动实际入口及信号测试，同步 fixture 中的 `main.go` 路径和故障拦截点。
+- [x] 移动实际入口及信号测试，同步 fixture 中的 `main.go` 路径和故障拦截点。
   来源核验的 `HEAD:main.go` 改为原模板命令路径；写 `TestOriginUsesCommandEntry`，
   用临时 Git 仓库确认可信模板提交被记录，派生仓库身份或来源不符时仍为 `unknown`。
-- [ ] 将 `build`、模板中的 build/list/schema、MCP 诊断和进程测试的构建目标改为
+- [x] 将 `build`、模板中的 build/list/schema、MCP 诊断和进程测试的构建目标改为
   `"./" + project.CommandPath`；GoReleaser `main` 改为 `./cmd/go-cli-starter`。
   在模板副本初始化后重新 `Inspect`，不能继续使用初始化前路径。
-- [ ] 实现 `verifyCommandInstall`：独立临时目录作为该子进程的 `GOBIN`，执行
+- [x] 实现 `verifyCommandInstall`：独立临时目录作为该子进程的 `GOBIN`，执行
   `go install ./cmd/<name>`，验证 `<name>`（Windows 为 `<name>.exe`）存在并运行其 schema。
   从 `verifyTemplate` 调用此函数；更新模板构建 fixture 与元数据测试。README 使用新源码
   运行和安装入口，AGENTS 改为“程序入口”，受管清单增加本计划及新增应用标识引用。
-- [ ] gopls 诊断无错误后运行 `mise exec -- go test ./internal/scaffold ./tools/dev ./internal/cli ./cmd/go-cli-starter`、
+- [x] gopls 诊断无错误后运行 `mise exec -- go test ./internal/scaffold ./tools/dev ./internal/cli ./cmd/go-cli-starter`、
   `mise run build`、`mise run template:check`、`mise run mcp:check`；期望全部退出 0。
   仅暂存本任务文件，提交 `refactor: 将程序入口迁入 cmd 并统一路径使用`。
 

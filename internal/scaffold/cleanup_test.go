@@ -17,7 +17,7 @@ type cleanupFaultFS struct {
 }
 
 func (f *cleanupFaultFS) Rename(a, b string) error {
-	if f.rollback && !f.failedApply && b == filepath.Join(f.root, "main.go") {
+	if f.rollback && !f.failedApply && b == filepath.Join(f.root, "cmd", TemplateName, "main.go") {
 		f.failedApply = true
 		return errors.New("模拟应用失败")
 	}
