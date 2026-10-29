@@ -71,11 +71,11 @@
 **输入：** 任务 3 的 `*validation.Validator`。
 **输出：** 保留 `config.Load(Options)(Config,error)`；Options 增加可选 Context 和 Validator；内部 `readYAML(io.Reader)(map[string]any,error)` 只返回实际存在且有效的值。
 
-- [ ] 引入 koanf/core 与 confmap。写 `TestExplicitDefaultOverridesEnvironment`：环境 debug、显式 warn 得 warn；未 Changed 的 warn 不覆盖环境。增加空环境、空文档、null、未知键、多文档、重复键、错误类型和两次调用隔离表测试，保留旧行为断言。
-- [ ] 执行 `mise exec -- go test ./internal/config ./internal/cli -run 'TestExplicitDefault|TestStrictYAML|TestConfiguration'`，记录兼容基线；已有实现满足的用例保持通过，不为配置库替换人为制造失败。
-- [ ] 用 yaml/v3 严格解码并保留字段存在性；koanf 分四层 Load(confmap)：默认、文件、非空环境、显式覆盖，最后按 yaml 字段标签解码有类型 Config 并调用 validator。禁止弱类型转换掩盖错误，null 的处理沿用旧解码语义。
-- [ ] 执行 `mise exec -- go test ./internal/config ./internal/cli`、`mise run template:check`；确认损坏配置不阻断发现命令。
-- [ ] 提交 `refactor: 使用 koanf 保持严格配置覆盖规则`。
+- [x] 引入 koanf/core 与 confmap。写 `TestExplicitDefaultOverridesEnvironment`：环境 debug、显式 warn 得 warn；未 Changed 的 warn 不覆盖环境。增加空环境、空文档、null、未知键、多文档、重复键、错误类型和两次调用隔离表测试，保留旧行为断言。
+- [x] 执行 `mise exec -- go test ./internal/config ./internal/cli -run 'TestExplicitDefault|TestStrictYAML|TestConfiguration'`，记录兼容基线；已有实现满足的用例保持通过，不为配置库替换人为制造失败。
+- [x] 用 yaml/v3 严格解码并保留字段存在性；koanf 分四层 Load(confmap)：默认、文件、非空环境、显式覆盖，最后按 yaml 字段标签解码有类型 Config 并调用 validator。禁止弱类型转换掩盖错误，null 的处理沿用旧解码语义。
+- [x] 执行 `mise exec -- go test ./internal/config ./internal/cli`、`mise run template:check`；确认损坏配置不阻断发现命令。
+- [x] 提交 `refactor: 使用 koanf 保持严格配置覆盖规则`。
 
 ### Task 5: 每次调用的 zap 日志
 

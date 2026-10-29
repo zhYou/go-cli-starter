@@ -114,6 +114,7 @@ func newRoot(opts Options) *cobra.Command {
 		}
 		cfg, err := config.Load(config.Options{
 			AppName: opts.Name, Path: configPath, UserConfigDir: opts.ConfigDir,
+			Context: cmd.Context(), Validator: validator,
 			LookupEnv: opts.LookupEnv, LogLevel: override,
 		})
 		if err != nil {

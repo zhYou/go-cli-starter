@@ -52,3 +52,5 @@ check 不改写源码，但会写 Go 缓存、临时测试文件和 bin 下的�
 结果经 writeJSON/writeText 完整渲染后写出。执行和序列化失败保持 stdout 为空；底层写入失败可能已有部分字节，调用者应先检查退出码。
 
 业务选项通过 `validate` 与 `label` 标签声明规则，CLI Args 和业务入口调用同一个 Validate 方法。`validation.New` 的可选注册 callback 在实例使用前配置自定义和条件规则；不要在并发调用后修改注册。
+
+配置由严格 YAML 解码和 koanf 分层合并；环境变量为空时忽略，YAML null 沿用默认值，显式选项仅在 Changed 时覆盖。禁止弱类型转换。

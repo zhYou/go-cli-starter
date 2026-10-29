@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"testing"
@@ -61,5 +62,41 @@ func TestLoadsDefaultUserConfiguration(t *testing.T) {
 	cfg, err := Load(Options{AppName: "mycli", UserConfigDir: dir, LookupEnv: func(string) (string, bool) { return "", false }})
 	if err != nil || cfg.LogLevel != "debug" {
 		t.Fatalf("cfg=%+v err=%v", cfg, err)
+	}
+}
+
+func TestExplicitDefaultOverridesEnvironment(t *testing.T) {
+	dir := t.TempDir()
+	warn := "warn"
+	for _, override := range []*string{nil, &warn} {
+		cfg, err := Load(Options{AppName: "my-cli", UserConfigDir: dir, LogLevel: override, LookupEnv: func(string) (string, bool) { return "debug", true }})
+		require.NoError(t, err)
+		want := "debug"
+		if override != nil {
+			want = "warn"
+		}
+		require.Equal(t, want, cfg.LogLevel)
+	}
+}
+func TestStrictYAML(t *testing.T) {
+	for _, tc := range []struct {
+		text  string
+		valid bool
+		want  string
+	}{
+		{"", true, "warn"}, {"null\n", true, "warn"}, {"log_level: null\n", true, "warn"}, {"log_level: INFO\n", true, "info"},
+		{"unknown: x", false, ""}, {"log_level: warn\n---\n", false, ""}, {"log_level: warn\nlog_level: error", false, ""}, {"log_level: [debug]", false, ""}, {"log_level: 123", false, ""},
+	} {
+		t.Run(tc.text, func(t *testing.T) {
+			p := filepath.Join(t.TempDir(), "config.yaml")
+			require.NoError(t, os.WriteFile(p, []byte(tc.text), 0600))
+			cfg, err := Load(Options{Path: p, LookupEnv: func(string) (string, bool) { return "", true }})
+			if tc.valid {
+				require.NoError(t, err)
+				require.Equal(t, tc.want, cfg.LogLevel)
+			} else {
+				require.Error(t, err)
+			}
+		})
 	}
 }
