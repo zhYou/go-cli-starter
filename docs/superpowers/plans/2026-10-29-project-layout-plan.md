@@ -67,7 +67,7 @@
 `CommandPath` 是使用 `/` 的相对路径，例如 `cmd/my-cli`，不含 `./`；Go 命令调用处添加 `./`。
 当前 `Identity` 暂不切换，任务 3 统一接线，保持本任务独立可测试。
 
-- [ ] 写测试辅助 `projectFixture(t *testing.T, module, name string) string`，创建临时
+- [x] 写测试辅助 `projectFixture(t *testing.T, module, name string) string`，创建临时
   `go.mod` 与 `cmd/<name>/main.go`，入口含 `package main`、`appName` 常量和无参数主函数。
   写 `TestInspectCommandProject`，核心断言如下：
 
@@ -78,15 +78,15 @@
   require.Equal(t, Project{"example.com/team/repository", "my-cli", "cmd/my-cli"}, project)
   ```
 
-- [ ] 写 `TestInspectRejectsAmbiguousOrInvalidEntry` 表测试：无入口、两个合法入口、目录与
+- [x] 写 `TestInspectRejectsAmbiguousOrInvalidEntry` 表测试：无入口、两个合法入口、目录与
   `appName` 不符、无效名称、语法错误、非 main 包、无主函数均 `require.Error(t, err)`。
   写 `TestInspectRejectsSymlink`：真实符号链接指向外部入口时失败；系统不支持创建链接才跳过。
-- [ ] 运行 `mise exec -- go test ./internal/scaffold -run 'TestInspect'`，确认因入口发现接口缺失失败。
-- [ ] 在 `project.go` 实现上述接口，复用 `safePath` 与 `validName`，静态解析 `go.mod` 和 Go AST；
+- [x] 运行 `mise exec -- go test ./internal/scaffold -run 'TestInspect'`，确认因入口发现接口缺失失败。
+- [x] 在 `project.go` 实现上述接口，复用 `safePath` 与 `validName`，静态解析 `go.mod` 和 Go AST；
   只扫描 `cmd` 的直接子目录，不执行项目代码，不按模块末段推测名称。
   不增加根目录入口回退，也不依赖 `.template-origin.json` 存在。
-- [ ] gopls 诊断无错误后运行上述测试及 `mise exec -- go test ./internal/scaffold`，期望全部 PASS。
-- [ ] 仅暂存本任务文件，提交 `feat: 统一识别命令入口与项目身份`。
+- [x] gopls 诊断无错误后运行上述测试及 `mise exec -- go test ./internal/scaffold`，期望全部 PASS。
+- [x] 仅暂存本任务文件，提交 `feat: 统一识别命令入口与项目身份`。
 
 ### Task 2：让命令目录移动进入恢复事务
 
@@ -103,33 +103,33 @@
 `transactionPath(root string, tx transaction, relative string) (string, error)`。
 任务 3 之前，既有初始化调用传入 nil，现有根入口测试仍应通过。
 
-- [ ] 新建测试辅助
+- [x] 新建测试辅助
   `commandTransactionFixture(t *testing.T) (*Initializer, string, []change, *commandMove)`：
   使用内存文件系统，创建原模板模块、`cmd/<原模板名>/main.go` 和 `main_test.go`，目标名称为
   `my-cli`，变更包含入口及模块内容。写 `TestCommandMoveTransaction`，调用 `apply` 后断言
   `afero.Exists(fs, root+"/cmd/my-cli/main.go")` 为 true、原目录不存在，权限保持，返回最终路径。
-- [ ] 写 `TestCommandMovePreflightProtectsUserFiles`：目标目录预存在、源目录含额外文件、
+- [x] 写 `TestCommandMovePreflightProtectsUserFiles`：目标目录预存在、源目录含额外文件、
   符号链接、非普通文件时失败，断言 `require.Equal(t, before, after)` 覆盖所有原始受管字节。
   写 `TestCommandMoveRecovery`，用现有 `faultFS` 在移动前、移动已完成但尚未写提交日志时、
   持久提交后及清理中断时分别注入错误或 panic；恢复后检查目录位置、内容、权限与日志清理。
-- [ ] 写 `TestCommandMoveRecoveryRejectsExternalChanges`：源和目标同时存在、两者均缺失、
+- [x] 写 `TestCommandMoveRecoveryRejectsExternalChanges`：源和目标同时存在、两者均缺失、
   人工修改（包括内容原本不需要替换的 `main_test.go`）、未知文件、目录链接、参数冲突、
   篡改移动路径均失败，并保留 journal。
   写 `TestCommandMoveCancellation`：移动前取消回滚；移动完成后检测到取消则在提交前回滚。
   写 `TestRecoveryRejectsV1Journal`：格式 1 返回包含“原版本”的中文提示，日志与目标字节不变。
-- [ ] 运行 `mise exec -- go test ./internal/scaffold -run 'TestCommandMove|TestRecoveryRejectsV1Journal'`，
+- [x] 运行 `mise exec -- go test ./internal/scaffold -run 'TestCommandMove|TestRecoveryRejectsV1Journal'`，
   确认失败来自缺少目录事务能力。
-- [ ] 实现格式 2：预检通过后保存备份与日志；`prepare` 为命令目录全部受管文件记录摘要和
+- [x] 实现格式 2：预检通过后保存备份与日志；`prepare` 为命令目录全部受管文件记录摘要和
   备份，包括不需要替换内容的文件。任务 2 先将命令入口与测试路径加入受管清单，
   根入口路径由任务 3 移除。应用全部源路径内容，再移动目录，检查取消后保存提交终态。
   `transactionPath` 根据目录实际位置映射日志中的原路径；恢复不调用
   `Inspect`，以免事务中间态被身份一致性检查阻断。移动路径只允许原模板命令目录到目标名称。
   对有移动和无移动的事务分别验证目录状态；`prepared` 与回滚终态必须在源位置，
   `committed` 必须在目标位置，`applying` 允许源或目标单独存在。
-- [ ] 实现回滚先移回目录、再恢复内容，提交后仅清理；每次操作前校验文件摘要和目录成员。
+- [x] 实现回滚先移回目录、再恢复内容，提交后仅清理；每次操作前校验文件摘要和目录成员。
   保留现有字段存在性、备份摘要、来源文件新增、路径限制、部分清理重试和系统锁的检查。
   返回移动后文件的绝对路径，目录移动也以目标目录绝对路径加入结果；无移动时保持现有规则。
-- [ ] gopls 诊断无错误后运行 `mise exec -- go test ./internal/scaffold`，期望全部 PASS；
+- [x] gopls 诊断无错误后运行 `mise exec -- go test ./internal/scaffold`，期望全部 PASS；
   仅暂存本任务文件，提交 `feat: 支持初始化命令目录的可恢复改名`。
 
 ### Task 3：迁移唯一入口并接通初始化和开发任务

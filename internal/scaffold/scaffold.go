@@ -23,6 +23,7 @@ const TemplateName = "go-cli-starter"
 // 模板只管理这些文件中的应用标识。
 // 初始化项目时保留本实现及其测试夹具，避免改动初始化基准。
 var managedFiles = []string{
+	"cmd/" + TemplateName + "/main.go", "cmd/" + TemplateName + "/main_test.go",
 	"go.mod", "main.go", "internal/cli/cli.go",
 	"internal/cli/errors.go",
 	"main_test.go",
@@ -157,7 +158,7 @@ func (original *Initializer) Initialize(ctx context.Context, root, module, name 
 	if len(changes) == 0 {
 		return []string{}, nil
 	}
-	return i.apply(ctx, root, module, name, changes)
+	return i.apply(ctx, root, module, name, changes, nil)
 }
 
 // Identity 读取模块路径和可执行文件名，不执行项目代码。
