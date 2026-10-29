@@ -68,3 +68,5 @@ check 不改写源码，但会写 Go 缓存、临时测试文件和 bin 下的�
 工具升级后更新 mise.toml、mise.lock、Go 声明、README 当前工具表及 CI 引导版本，再运行 versions:check。二进制工具校验六平台归档；Go 后端锁定同一模块来源版本，跨平台本地编译，不生成虚假的平台归档记录。Renovate 配置需由仓库管理员启用；受信任执行权限不足时维护者自行补齐六平台锁，检查不会放宽。
 
 发布使用固定 Syft 对六个本地归档生成 SPDX JSON，配置关闭 enrichment、远程许可证查询和更新检查；GoReleaser 在 SBOM 后生成最终 checksums.txt。release:verify 校验实际文件，不上传证明。发布证明只在受信任 release job 生成。
+
+提交 PR 时使用仓库模板记录实际行为、兼容记录和验证。安全报告及维护责任按[维护清单](maintenance.md)配置；托管权限和平台功能须由管理员实际启用。

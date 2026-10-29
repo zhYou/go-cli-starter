@@ -174,3 +174,5 @@ gh attestation verify <asset> --repo <owner/repo>
 将占位符替换为实际资产与目标仓库。每个 `<archive>.spdx.json` 的 name 对应归档，packages 列出分析到的依赖；它描述最终构建依赖，不等于源码许可证合规结论。
 `mise run release:snapshot` 与 `mise run release:verify` 仅在本地构建和验证，不生成或上传远端证明。
 私有仓库须先确认套餐和组织策略支持 artifact attestations。证明失败会使 release workflow 失败；若资产已发布，重试时使用已发布的原始字节生成证明，不能重新构建或覆盖资产。
+
+维护者从[维护清单](docs/maintenance.md)配置审查、安全报告、依赖更新和托管发布；开发扩展见[开发说明](docs/development.md)，机器接口变更见[兼容性规则](docs/compatibility.md)。

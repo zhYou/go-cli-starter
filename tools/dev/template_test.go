@@ -40,6 +40,10 @@ func TestTemplateMetadataAndGuidesSurviveRename(t *testing.T) {
 	for name, data := range map[string]string{"go.mod": "module " + scaffold.TemplateModule + "\n\ngo 1.27.0\n", "main.go": "package main\nconst appName = \"" + scaffold.TemplateName + "\"\nfunc main(){}\n", ".template-version": "0.1.0\n"} {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(data), 0600))
 	}
+	for _, name := range []string{"SECURITY.md", ".github/PULL_REQUEST_TEMPLATE.md", ".github/CODEOWNERS.example", "docs/maintenance.md"} {
+		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0755))
+		require.NoError(t, copyFile(filepath.Join("../..", name), filepath.Join(dir, name)))
+	}
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "docs"), 0755))
 	require.NoError(t, copyFile("../../docs/template-upgrades.md", filepath.Join(dir, "docs/template-upgrades.md")))
 	_, err := scaffold.Initialize(dir, "example.com/copied/tool", "copied")

@@ -134,7 +134,7 @@ func checkVersions(root string) error {
 	}
 	goVersion := versions.Tools["go"]
 	if module.Go == nil || module.Toolchain == nil || module.Toolchain.Name != "go"+goVersion || semver.Compare("v"+module.Go.Version, "v"+goVersion) > 0 || semver.MajorMinor("v"+module.Go.Version) != semver.MajorMinor("v"+goVersion) {
-		return fmt.Errorf("Go 模块最低版本、工具链与 mise 不一致")
+		return fmt.Errorf("模块最低 Go 版本、工具链与 mise 不一致")
 	}
 	data, err = os.ReadFile(filepath.Join(root, "README.md"))
 	if err != nil {

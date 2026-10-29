@@ -74,12 +74,12 @@
 **输入：** 前十四项的真实任务名、验证结果、模板元数据和迁移说明。
 **输出：** 可复制的维护清单，关联 BL-004 至 BL-016 的实际交付与 PR。
 
-- [ ] 写 PR 模板，要求说明机器接口变化、兼容记录、验证及无法执行的检查；复用开发说明，不建立第二份待办状态表。
-- [ ] 写安全报告和维护责任说明，清楚标识目标维护者需填写的私密报告地址与责任人。提供 CODEOWNERS.example，只有维护者填写后才能启用；不写固定个人账号、凭据或用户目录。
-- [ ] 写托管配置清单：必需检查、审查、分支/标签规则、Renovate 启用及锁文件更新权限、来源证明的仓库前提。明确哪些是配置文件，哪些仍需管理员在平台启用。
-- [ ] 验证本地 Markdown 链接和副本标识；扩展已有 `TestTemplateMetadataAndGuidesSurviveRename` 集成场景覆盖新文件，避免为静态措辞增加镜像测试。所有包含目标应用标识的新文件进入受管白名单，来源身份和历史记录按语义保留。
-- [ ] 执行 `mise run fmt`、`mise run check`、`mise run test:race`、`mise run template:check`、`mise run mcp:check`、`mise run vuln`、`mise run release:snapshot`、`mise run release:verify`；确认 `codex mcp list`。未执行的平台及远端证明列为未验证，不声称通过。
-- [ ] 按十三项逐一核对设计验收，更新对应待办日期、状态及实际 PR；只有全项交付才将本轮标记完成。提交 `docs: 补齐维护入口与工程化验收说明`，按选定工作流完成整分支审查。
+- [x] 写 PR 模板，要求说明机器接口变化、兼容记录、验证及无法执行的检查；复用开发说明，不建立第二份待办状态表。
+- [x] 写安全报告和维护责任说明，清楚标识目标维护者需填写的私密报告地址与责任人。提供 CODEOWNERS.example，只有维护者填写后才能启用；不写固定个人账号、凭据或用户目录。
+- [x] 写托管配置清单：必需检查、审查、分支/标签规则、Renovate 启用及锁文件更新权限、来源证明的仓库前提。明确哪些是配置文件，哪些仍需管理员在平台启用。
+- [x] 验证本地 Markdown 链接和副本标识；扩展已有 `TestTemplateMetadataAndGuidesSurviveRename` 集成场景覆盖新文件，避免为静态措辞增加镜像测试。所有包含目标应用标识的新文件进入受管白名单，来源身份和历史记录按语义保留。
+- [x] 执行 `mise run fmt`、`mise run check`、`mise run test:race`、`mise run template:check`、`mise run mcp:check`、`mise run vuln`、`mise run release:snapshot`、`mise run release:verify`；确认 `codex mcp list`。未执行的平台及远端证明列为未验证，不声称通过。
+- [x] 按十三项逐一核对设计验收，更新对应待办日期、状态及实际 PR；只有全项交付才将本轮标记完成。提交 `docs: 补齐维护入口与工程化验收说明`，按选定工作流完成整分支审查。
 
 参考：[GoReleaser SBOM](https://goreleaser.com/customization/sbom/)、
 [发布来源证明](https://goreleaser.com/customization/publish/attestations/)、
