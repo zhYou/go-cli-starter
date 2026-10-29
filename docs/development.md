@@ -56,3 +56,5 @@ check 不改写源码，但会写 Go 缓存、临时测试文件和 bin 下的�
 配置由严格 YAML 解码和 koanf 分层合并；环境变量为空时忽略，YAML null 沿用默认值，显式选项仅在 Changed 时覆盖。禁止弱类型转换。
 
 每次调用创建独立 zap logger，默认 warn，诊断写 stderr；logger 不关闭调用者 writer，也不替换全局实例。
+
+命令使用独立构造函数，依赖由 Options.Dependencies 显式注入；装配复制依赖并补默认值，每次调用不共享选项、配置或日志。测试可替换加载器、业务函数与 logger 工厂。

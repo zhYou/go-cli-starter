@@ -95,8 +95,8 @@
 **输入：** 任务 1—5 的错误、输出、校验、加载和日志接口。
 **输出：** `Dependencies{LoadConfig func(config.Options)(config.Config,error), Validator *validation.Validator, Greet func(context.Context,greeting.Options)(greeting.Result,error), NewLogger func(io.Writer,string)(*zap.Logger,error)}`；Options 增加 `Dependencies *Dependencies`；`newGreetCommand(Options,*invocation)*cobra.Command`、`newVersionCommand(Options,*invocation)*cobra.Command`。invocation 持有本次输出模式、已初始化依赖和 logger。
 
-- [ ] 写 `TestTwoInvocationsDoNotShareDependencies`：两个 root 的 flag、level 和业务替身独立；`TestInvalidArgsNeverLoadConfigOrRunBusiness`：错误参数的调用计数均为 0；`TestDiscoveryNeverLoadsConfiguration`：四类发现入口加载次数为 0。
-- [ ] 执行 `mise exec -- go test ./internal/cli -run 'TestTwoInvocations|TestInvalidArgsNever|TestDiscoveryNever'`，确认缺少注入能力导致失败。
-- [ ] 从 defaults/newRoot 拆出依赖装配和命令工厂；复制传入依赖再补默认值，避免修改调用者对象。保留 NewRoot 和 Run 对外签名，根构造只注册命令和公共准备流程。
-- [ ] 运行 `mise exec -- go test ./internal/cli ./internal/config ./internal/greeting ./internal/logging ./internal/validation ./internal/apperror`，再执行 `mise run fmt`、`mise run check`、`mise run test:race`。
-- [ ] 核对 BL-011/012/013/014 的完整验收，提交 `refactor: 拆分命令构造并显式注入依赖`，按实际交付更新待办和 PR。
+- [x] 写 `TestTwoInvocationsDoNotShareDependencies`：两个 root 的 flag、level 和业务替身独立；`TestInvalidArgsNeverLoadConfigOrRunBusiness`：错误参数的调用计数均为 0；`TestDiscoveryNeverLoadsConfiguration`：四类发现入口加载次数为 0。
+- [x] 执行 `mise exec -- go test ./internal/cli -run 'TestTwoInvocations|TestInvalidArgsNever|TestDiscoveryNever'`，确认缺少注入能力导致失败。
+- [x] 从 defaults/newRoot 拆出依赖装配和命令工厂；复制传入依赖再补默认值，避免修改调用者对象。保留 NewRoot 和 Run 对外签名，根构造只注册命令和公共准备流程。
+- [x] 运行 `mise exec -- go test ./internal/cli ./internal/config ./internal/greeting ./internal/logging ./internal/validation ./internal/apperror`，再执行 `mise run fmt`、`mise run check`、`mise run test:race`。
+- [x] 核对 BL-011/012/013/014 的完整验收，提交 `refactor: 拆分命令构造并显式注入依赖`，按实际交付更新待办和 PR。
