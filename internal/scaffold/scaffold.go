@@ -25,6 +25,9 @@ const TemplateName = "go-cli-starter"
 var managedFiles = []string{
 	"go.mod", "main.go", "internal/cli/cli.go",
 	"internal/cli/errors.go",
+	"internal/greeting/greeting.go",
+	"internal/greeting/greeting_test.go",
+	"internal/validation/validation.go",
 	"internal/cli/output_test.go",
 	"internal/cli/errors_test.go",
 	"internal/apperror/error_test.go", "tools/init/main.go",

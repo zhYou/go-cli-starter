@@ -59,11 +59,11 @@
 **输入：** `apperror.Usage`；总览中的 validator 版本。
 **输出：** `validation.New() *Validator`、`(*Validator).Struct(context.Context,any) error`；`greeting.New(*validation.Validator) *Service`、`(*Service).Run(context.Context,Options)(Result,error)`、`Options.Validate(context.Context,*validation.Validator) error`。
 
-- [ ] 引入 validator，写 `TestGreetingDirectCallRejectsWhitespace`：空、空白姓名均产生 Usage；合法姓名保持原值且结果兼容。写 `TestValidationChineseFields`：字段提示能定位 `--name`，自定义条件通过 Go callback 报告。取消原因链可识别。
-- [ ] 执行 `mise exec -- go test ./internal/validation ./internal/greeting`，确认缺失校验和服务构造导致失败。
-- [ ] 实现每次构造的校验器，使用 `WithRequiredStructEnabled`；姓名使用 required/notblank，显示名由字段标签提供。注册在使用前结束。业务 Service 和 CLI Args 调用同一 Options.Validate；保留包函数 Run 为创建本地依赖的兼容入口，CLI 注入共享的 Service.Run。
-- [ ] 执行 `mise exec -- go test ./internal/validation ./internal/greeting ./internal/cli`；确认无效参数在配置加载或业务执行前失败，直接业务调用同样受保护。
-- [ ] 更新添加业务命令的示例及受管白名单，`mise run template:check` 后提交 `feat: 统一业务选项校验与中文提示`。
+- [x] 引入 validator，写 `TestGreetingDirectCallRejectsWhitespace`：空、空白姓名均产生 Usage；合法姓名保持原值且结果兼容。写 `TestValidationChineseFields`：字段提示能定位 `--name`，自定义条件通过 Go callback 报告。取消原因链可识别。
+- [x] 执行 `mise exec -- go test ./internal/validation ./internal/greeting`，确认缺失校验和服务构造导致失败。
+- [x] 实现每次构造的校验器，使用 `WithRequiredStructEnabled`；姓名使用 required/notblank，显示名由字段标签提供。注册在使用前结束。业务 Service 和 CLI Args 调用同一 Options.Validate；保留包函数 Run 为创建本地依赖的兼容入口，CLI 注入共享的 Service.Run。
+- [x] 执行 `mise exec -- go test ./internal/validation ./internal/greeting ./internal/cli`；确认无效参数在配置加载或业务执行前失败，直接业务调用同样受保护。
+- [x] 更新添加业务命令的示例及受管白名单，`mise run template:check` 后提交 `feat: 统一业务选项校验与中文提示`。
 
 ### Task 4: 严格配置接入 koanf
 

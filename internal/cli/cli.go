@@ -13,6 +13,7 @@ import (
 	"github.com/zhYou/go-cli-starter/internal/apperror"
 	"github.com/zhYou/go-cli-starter/internal/config"
 	"github.com/zhYou/go-cli-starter/internal/greeting"
+	"github.com/zhYou/go-cli-starter/internal/validation"
 )
 
 // Options 提供进程依赖；每次调用均创建新的命令树。
@@ -80,6 +81,8 @@ func defaults(opts Options) Options {
 }
 
 func newRoot(opts Options) *cobra.Command {
+	validator := validation.New()
+	service := greeting.New(validator)
 	var asJSON bool
 	var configPath, logLevel string
 	logger := slog.New(slog.NewTextHandler(opts.ErrOut, &slog.HandlerOptions{Level: slog.LevelWarn}))
@@ -132,13 +135,10 @@ func newRoot(opts Options) *cobra.Command {
 			if err := noArgs(cmd, args); err != nil {
 				return err
 			}
-			if strings.TrimSpace(name) == "" {
-				return errors.New("必须提供 --name，且姓名不能为空白")
-			}
-			return nil
+			return (greeting.Options{Name: name}).Validate(cmd.Context(), validator)
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			result, err := greeting.Run(cmd.Context(), greeting.Options{Name: name})
+			result, err := service.Run(cmd.Context(), greeting.Options{Name: name})
 			if err != nil {
 				return err
 			}
