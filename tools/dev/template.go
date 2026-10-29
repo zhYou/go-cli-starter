@@ -29,7 +29,7 @@ func verifyTemplate() error {
 		return fmt.Errorf("列出模板文件失败（请在 Git 仓库中运行）：%w", err)
 	}
 	for _, name := range strings.Split(string(files), "\x00") {
-		if name == "" {
+		if name == "" || name == ".template-init.lock" || strings.HasPrefix(name, ".template-init/") {
 			continue
 		}
 		if err := copyFile(filepath.Join(root, name), filepath.Join(dir, name)); err != nil {

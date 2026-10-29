@@ -1,16 +1,16 @@
 // Package scaffold 重命名模板，不遍历或修改用户文件。
-// 此包仅依赖标准库。
 package scaffold
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"github.com/spf13/afero"
 	"go/ast"
 	"go/format"
 	"go/parser"
 	"go/token"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -57,6 +57,14 @@ type change struct {
 
 // Initialize 修改原始模板的标识；标识已匹配时不做修改。
 func Initialize(root, module, name string) ([]string, error) {
+	return (&Initializer{}).Initialize(context.Background(), root, module, name)
+}
+func (original *Initializer) Initialize(ctx context.Context, root, module, name string) ([]string, error) {
+	copy := original.defaults()
+	i := &copy
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if !validName.MatchString(name) {
 		return nil, errors.New("名称必须以小写字母开头，且只能包含小写字母、数字或连字符")
 	}
@@ -68,18 +76,33 @@ func Initialize(root, module, name string) ([]string, error) {
 			return nil, errors.New("无效的 Go 模块路径片段")
 		}
 	}
-	if err := validateModulePath(module); err != nil {
+	if err := i.validateModule(ctx, module); err != nil {
 		return nil, err
 	}
-	root, err := filepath.EvalSymlinks(root)
-	if err != nil {
-		return nil, err
+	var err error
+	if _, ok := i.FS.(*afero.OsFs); ok {
+		root, err = filepath.EvalSymlinks(root)
+		if err != nil {
+			return nil, err
+		}
 	}
 	root, err = filepath.Abs(root)
 	if err != nil {
 		return nil, err
 	}
-	currentModule, currentName, err := Identity(root)
+	lockPath, err := i.safePath(root, ".template-init.lock")
+	if err != nil {
+		return nil, err
+	}
+	unlock, err := i.Lock(lockPath)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = unlock() }()
+	if err := i.recover(root, module, name); err != nil {
+		return nil, err
+	}
+	currentModule, currentName, err := i.identity(root)
 	if err != nil {
 		return nil, err
 	}
@@ -93,22 +116,21 @@ func Initialize(root, module, name string) ([]string, error) {
 	var changes []change
 	// 写入文件前先检查所有目标路径。
 	for _, relative := range managedFiles {
-		path := filepath.Join(root, filepath.FromSlash(relative))
-		info, err := os.Lstat(path)
+		path, err := i.safePath(root, relative)
+		if err != nil {
+			return nil, err
+		}
+		info, err := i.FS.Stat(path)
 		if errors.Is(err, os.ErrNotExist) {
 			continue
 		}
 		if err != nil {
 			return nil, err
 		}
-		resolved, err := filepath.EvalSymlinks(path)
-		if err != nil {
-			return nil, err
+		if !info.Mode().IsRegular() {
+			return nil, fmt.Errorf("拒绝修改非常规文件 %q", relative)
 		}
-		if !info.Mode().IsRegular() || resolved != path {
-			return nil, fmt.Errorf("拒绝修改非常规文件或包含符号链接的模板路径 %q", relative)
-		}
-		data, err := os.ReadFile(path)
+		data, err := afero.ReadFile(i.FS, path)
 		if err != nil {
 			return nil, err
 		}
@@ -124,23 +146,18 @@ func Initialize(root, module, name string) ([]string, error) {
 			changes = append(changes, change{path, updatedData, info.Mode().Perm()})
 		}
 	}
-	changed := make([]string, 0, len(changes))
-	for _, item := range changes {
-		if err := atomicWrite(item); err != nil {
-			return changed, fmt.Errorf("初始化 %s 失败：%w", item.path, err)
-		}
-		relative, err := filepath.Rel(root, item.path)
-		if err != nil {
-			return changed, err
-		}
-		changed = append(changed, filepath.ToSlash(relative))
+	if len(changes) == 0 {
+		return []string{}, nil
 	}
-	return changed, nil
+	return i.apply(ctx, root, module, name, changes)
 }
 
 // Identity 读取模块路径和可执行文件名，不执行项目代码。
 func Identity(root string) (string, string, error) {
-	data, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	return (&Initializer{FS: afero.NewOsFs()}).identity(root)
+}
+func (i *Initializer) identity(root string) (string, string, error) {
+	data, err := afero.ReadFile(i.FS, filepath.Join(root, "go.mod"))
 	if err != nil {
 		return "", "", err
 	}
@@ -152,7 +169,11 @@ func Identity(root string) (string, string, error) {
 			break
 		}
 	}
-	file, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root, "main.go"), nil, 0)
+	source, err := afero.ReadFile(i.FS, filepath.Join(root, "main.go"))
+	if err != nil {
+		return "", "", err
+	}
+	file, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root, "main.go"), source, 0)
 	if err != nil {
 		return "", "", err
 	}
@@ -176,41 +197,4 @@ func Identity(root string) (string, string, error) {
 		return "", "", errors.New("无法从模板中找到模块路径或 appName")
 	}
 	return module, name, nil
-}
-
-func atomicWrite(item change) error {
-	file, err := os.CreateTemp(filepath.Dir(item.path), ".template-init-*")
-	if err != nil {
-		return err
-	}
-	defer func() { _ = os.Remove(file.Name()) }()
-	if err := file.Chmod(item.mode); err != nil {
-		_ = file.Close()
-		return err
-	}
-	if _, err := file.Write(item.data); err != nil {
-		_ = file.Close()
-		return err
-	}
-	if err := file.Close(); err != nil {
-		return err
-	}
-	return os.Rename(file.Name(), item.path)
-}
-
-// 通过已安装的 Go 工具检查版本后缀和各平台的路径规则。
-// 修改项目文件前即删除用于检查的临时模块。
-func validateModulePath(module string) error {
-	dir, err := os.MkdirTemp("", "cli-module-check-*")
-	if err != nil {
-		return err
-	}
-	defer func() { _ = os.RemoveAll(dir) }()
-	cmd := exec.Command("go", "mod", "init", module)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GOWORK=off")
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("无效的 Go 模块路径：%w：%s", err, strings.TrimSpace(string(output)))
-	}
-	return nil
 }

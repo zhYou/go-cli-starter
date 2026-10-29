@@ -34,14 +34,14 @@
 **输入：** 现有 Identity、参数规则和受管白名单；Afero 与 flock 的总览版本。
 **输出：** `Initializer{FS afero.Fs, RunCommand func(context.Context,string,...string)([]byte,error), Lock func(string)(func()error,error)}`；`(*Initializer).Initialize(ctx context.Context,root,module,name string)([]string,error)`；保留包函数 `Initialize(root,module,name string)([]string,error)`，装配真实依赖后调用。模块路径预检使用 `go -C <临时目录> mod init <模块>`，真实 runner 固定 `GOWORK=off`。
 
-- [ ] 引入 Afero 和 flock；写故障文件系统包装器，仅包装必要 Write/Rename/Chmod/Remove 操作，不给生产程序增加测试开关。
-- [ ] 写上述四个恢复/并发重点测试，断言第 N 次写入失败后旧文件逐字恢复；恢复前检查原/目标摘要，摘要不符必须错误且用户文件不变。使用受控子进程真实持锁/退出，确认进程结束后锁自动释放。
-- [ ] 执行 `mise exec -- go test ./internal/scaffold -run 'TestConcurrentInitialization|TestRecoverBeforeIdentity|TestRecoveryRejects|TestRollbackFailure'`，确认当前逐文件写入和身份检查顺序不能满足新要求。
-- [ ] 实现 `.template-init.lock` 的非阻塞 OS 锁和 `.template-init/` 恢复目录。先成功取得锁，再读取旧事务；仅目录排他创建不能证明旧进程已停止。锁文件保留并忽略，避免删除锁文件导致两把锁并存。
-- [ ] 实现 format_version=1 的 journal，包含目标/原身份、阶段、文件相对路径、mode、before/after SHA-256 和备份位置。阶段为 prepared/applying/committed；预先准备全部数据和备份，journal 完整写好才改目标。对原本不存在的文件记录存在性，回滚时删除新建文件而非恢复空文件。
-- [ ] 普通失败回滚；崩溃后相同参数在身份检查前恢复，确认全部目标仍匹配 before/after 后回滚并重做。prepared 不应有受管写入；committed 只清理现场；记录损坏、参数冲突或人工修改则停止。使用同目录临时文件替换单文件，不承诺全文件系统断电原子性。
-- [ ] 对真实路径与 journal 路径保留根目录、白名单、Lstat/EvalSymlinks 检查；Afero 内存测试不能替代这些检查。同步 Go 注释中“仅标准库”的旧表述，并从模板复制和发布中排除恢复目录及锁。
-- [ ] 执行 `mise exec -- go test ./internal/scaffold ./tools/init ./tools/dev`、`mise run template:check`、`mise run test:race`，三平台 CI 保留真实 FS 测试；提交 `feat: 为模板初始化增加互斥与失败恢复`。
+- [x] 引入 Afero 和 flock；写故障文件系统包装器，仅包装必要 Write/Rename/Chmod/Remove 操作，不给生产程序增加测试开关。
+- [x] 写上述四个恢复/并发重点测试，断言第 N 次写入失败后旧文件逐字恢复；恢复前检查原/目标摘要，摘要不符必须错误且用户文件不变。使用受控子进程真实持锁/退出，确认进程结束后锁自动释放。
+- [x] 执行 `mise exec -- go test ./internal/scaffold -run 'TestConcurrentInitialization|TestRecoverBeforeIdentity|TestRecoveryRejects|TestRollbackFailure'`，确认当前逐文件写入和身份检查顺序不能满足新要求。
+- [x] 实现 `.template-init.lock` 的非阻塞 OS 锁和 `.template-init/` 恢复目录。先成功取得锁，再读取旧事务；仅目录排他创建不能证明旧进程已停止。锁文件保留并忽略，避免删除锁文件导致两把锁并存。
+- [x] 实现 format_version=1 的 journal，包含目标/原身份、阶段、文件相对路径、mode、before/after SHA-256 和备份位置。阶段为 prepared/applying/committed；预先准备全部数据和备份，journal 完整写好才改目标。对原本不存在的文件记录存在性，回滚时删除新建文件而非恢复空文件。
+- [x] 普通失败回滚；崩溃后相同参数在身份检查前恢复，确认全部目标仍匹配 before/after 后回滚并重做。prepared 不应有受管写入；committed 只清理现场；记录损坏、参数冲突或人工修改则停止。使用同目录临时文件替换单文件，不承诺全文件系统断电原子性。
+- [x] 对真实路径与 journal 路径保留根目录、白名单、Lstat/EvalSymlinks 检查；Afero 内存测试不能替代这些检查。同步 Go 注释中“仅标准库”的旧表述，并从模板复制和发布中排除恢复目录及锁。
+- [x] 执行 `mise exec -- go test ./internal/scaffold ./tools/init ./tools/dev`、`mise run template:check`、`mise run test:race`，三平台 CI 保留真实 FS 测试；提交 `feat: 为模板初始化增加互斥与失败恢复`。
 
 ### Task 11: 模板来源、版本与迁移
 

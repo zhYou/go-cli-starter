@@ -1,4 +1,4 @@
-// Command init 重命名模板的新副本，仅依赖标准库和项目自身代码。
+// Command init 重命名模板的新副本。
 package main
 
 import (
