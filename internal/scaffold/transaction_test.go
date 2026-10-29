@@ -26,7 +26,8 @@ func (f faultFS) Rename(a, b string) error {
 }
 func memoryInitializer(t *testing.T) (*Initializer, string) {
 	fs := afero.NewMemMapFs()
-	root := filepath.FromSlash("/repo")
+	root, err := filepath.Abs(filepath.Join(t.TempDir(), "repo"))
+	require.NoError(t, err)
 	require.NoError(t, fs.MkdirAll(root, 0755))
 	for n, s := range map[string]string{"go.mod": "module " + TemplateModule + "\n\ngo 1.27.0\n", "main.go": "package main\nconst appName = \"" + TemplateName + "\"\nfunc main(){}\n", "README.md": TemplateName} {
 		require.NoError(t, afero.WriteFile(fs, filepath.Join(root, n), []byte(s), 0600))

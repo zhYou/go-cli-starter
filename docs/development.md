@@ -59,7 +59,7 @@ check 不改写源码，但会写 Go 缓存、临时测试文件和 bin 下的�
 
 命令使用独立构造函数，依赖由 Options.Dependencies 显式注入；装配复制依赖并补默认值，每次调用不共享选项、配置或日志。测试可替换加载器、业务函数与 logger 工厂。
 
-有类型的结果通过 registerResult 注册到本次命令树，使用 google/jsonschema-go 生成 Draft 2020-12。特殊编码与递归类型须显式覆盖并验证实际 JSON；format 不提供语义校验，业务约束交给 validator。
+有类型的结果通过 registerResult 注册到本次命令树，使用 google/jsonschema-go 生成 Draft 2020-12。json.Marshaler、encoding.TextMarshaler、字节切片、json string 标签和递归类型须显式覆盖并验证实际 JSON；format 不提供语义校验，业务约束交给 validator。
 
 进程测试构建真实二进制，用 testscript 验证 0/1/2、输出流与损坏配置下的发现命令。根入口测试等待就绪后发 Unix 中断，检查真实退出 130；Windows 使用注入 notify 的受控取消，辅助分支只在测试代码中。
 
@@ -70,3 +70,5 @@ check 不改写源码，但会写 Go 缓存、临时测试文件和 bin 下的�
 发布使用固定 Syft 对六个本地归档生成 SPDX JSON，配置关闭 enrichment、远程许可证查询和更新检查；GoReleaser 在 SBOM 后生成最终 checksums.txt。release:verify 校验实际文件，不上传证明。发布证明只在受信任 release job 生成。
 
 提交 PR 时使用仓库模板记录实际行为、兼容记录和验证。安全报告及维护责任按[维护清单](maintenance.md)配置；托管权限和平台功能须由管理员实际启用。
+
+提交完成或回滚完成后先持久记录终态，再逐个清理备份，最后删除 journal。清理中断可继续；仅剩空恢复目录时安全移除，未知内容仍保留并报错。

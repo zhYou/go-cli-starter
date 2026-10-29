@@ -33,44 +33,120 @@ func Normalize(data []byte) ([]byte, error) {
 	}
 	return json.MarshalIndent(normalize(value), "", "  ")
 }
+
+// normalize 只在命令元数据与 Schema 注解的语境中移除人类说明。
 func normalize(value any) any {
-	switch v := value.(type) {
-	case map[string]any:
+	root, ok := value.(map[string]any)
+	if !ok {
+		return value
+	}
+	if schema, ok := root["schema"].(map[string]any); ok {
+		root["schema"] = normalizeCommand(schema)
+	} else if _, ok := root["commands"]; ok {
+		return normalizeCommand(root)
+	}
+	return root
+}
+func normalizeCommand(command map[string]any) any {
+	out := map[string]any{}
+	for key, value := range command {
+		switch key {
+		case "description", "examples", "use":
+			continue
+		case "commands":
+			out[key] = normalizeNamed(value, "path", normalizeCommand)
+		case "flags":
+			out[key] = normalizeNamed(value, "name", func(flag map[string]any) any {
+				copy := map[string]any{}
+				for key, value := range flag {
+					if key != "description" {
+						copy[key] = value
+					}
+				}
+				return copy
+			})
+		case "result_schema":
+			out[key] = normalizeSchema(value)
+		default:
+			out[key] = value
+		}
+	}
+	return out
+}
+func normalizeNamed(value any, key string, visit func(map[string]any) any) any {
+	switch items := value.(type) {
+	case []any:
+		if len(items) == 0 {
+			return items
+		}
 		out := map[string]any{}
-		for k, item := range v {
-			if k == "description" || k == "examples" || k == "use" {
-				continue
+		for _, item := range items {
+			object, ok := item.(map[string]any)
+			if !ok {
+				return value
 			}
-			out[k] = normalize(item)
+			name, ok := object[key].(string)
+			if !ok {
+				return value
+			}
+			if _, exists := out[name]; exists {
+				return value
+			}
+			out[name] = visit(object)
 		}
 		return out
-	case []any:
-		if len(v) > 0 {
-			if first, ok := v[0].(map[string]any); ok {
-				key := ""
-				if _, ok := first["path"]; ok {
-					key = "path"
-				} else if _, ok := first["name"]; ok {
-					key = "name"
-				}
-				if key != "" {
-					out := map[string]any{}
-					for _, item := range v {
-						object := item.(map[string]any)
-						out[object[key].(string)] = normalize(item)
-					}
-					return out
-				}
+	case map[string]any:
+		out := map[string]any{}
+		for name, item := range items {
+			object, ok := item.(map[string]any)
+			if !ok {
+				return value
 			}
-		}
-		out := make([]any, len(v))
-		for i, item := range v {
-			out[i] = normalize(item)
+			out[name] = visit(object)
 		}
 		return out
 	}
 	return value
 }
+func normalizeSchema(value any) any {
+	schema, ok := value.(map[string]any)
+	if !ok {
+		return value
+	}
+	out := map[string]any{}
+	for key, value := range schema {
+		switch key {
+		case "description", "examples":
+			continue
+		case "properties", "patternProperties", "$defs", "definitions", "dependentSchemas", "dependencies":
+			if children, ok := value.(map[string]any); ok {
+				mapped := map[string]any{}
+				for name, child := range children {
+					mapped[name] = normalizeSchema(child)
+				}
+				out[key] = mapped
+			} else {
+				out[key] = value
+			}
+		case "additionalProperties", "unevaluatedProperties", "propertyNames", "items", "contains", "if", "then", "else", "not", "contentSchema", "additionalItems", "unevaluatedItems":
+			out[key] = normalizeSchema(value)
+		case "prefixItems", "allOf", "anyOf", "oneOf":
+			if children, ok := value.([]any); ok {
+				mapped := make([]any, len(children))
+				for index, child := range children {
+					mapped[index] = normalizeSchema(child)
+				}
+				out[key] = mapped
+			} else {
+				out[key] = value
+			}
+		default:
+			out[key] = value
+		}
+	}
+	return out
+}
+
 func Diff(before, after []byte) ([]Change, error) {
 	var a, b any
 	if err := json.Unmarshal(before, &a); err != nil {
@@ -108,7 +184,7 @@ func Diff(before, after []byte) ([]Change, error) {
 		kind := "changed"
 		if !oldOK {
 			kind = "added"
-		} else if !newOK || strings.HasSuffix(path, "/type") || strings.HasSuffix(path, "/types") || strings.Contains(path, "/results/") || strings.HasSuffix(path, "/required") {
+		} else if !newOK || strings.Contains(path, "/exit_codes/") || strings.HasSuffix(path, "/exit_codes") || strings.HasSuffix(path, "/type") || strings.HasSuffix(path, "/types") || strings.Contains(path, "/results/") || strings.HasSuffix(path, "/required") {
 			kind = "breaking"
 		}
 		if !oldOK {

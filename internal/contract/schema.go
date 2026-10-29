@@ -2,10 +2,12 @@
 package contract
 
 import (
+	"encoding"
 	"encoding/json"
 	"fmt"
 	"github.com/google/jsonschema-go/jsonschema"
 	"reflect"
+	"slices"
 	"strings"
 )
 
@@ -45,8 +47,12 @@ func checkEncoding(t reflect.Type, seen map[reflect.Type]bool) error {
 	}
 	seen[t] = true
 	marshaler := reflect.TypeFor[json.Marshaler]()
-	if t.Implements(marshaler) || reflect.PointerTo(t).Implements(marshaler) {
+	textMarshaler := reflect.TypeFor[encoding.TextMarshaler]()
+	if t.Implements(marshaler) || reflect.PointerTo(t).Implements(marshaler) || t.Implements(textMarshaler) || reflect.PointerTo(t).Implements(textMarshaler) {
 		return fmt.Errorf("类型 %s 使用自定义 JSON 编码，需要显式结果结构", t)
+	}
+	if t.Kind() == reflect.Slice && t.Elem().Kind() == reflect.Uint8 {
+		return fmt.Errorf("字节切片使用 base64 JSON 编码，需要显式结果结构")
 	}
 	switch t.Kind() {
 	case reflect.Pointer, reflect.Slice, reflect.Array, reflect.Map:
@@ -54,6 +60,9 @@ func checkEncoding(t reflect.Type, seen map[reflect.Type]bool) error {
 	case reflect.Struct:
 		for field := range t.Fields() {
 			if field.IsExported() && strings.Split(field.Tag.Get("json"), ",")[0] != "-" {
+				if slices.Contains(strings.Split(field.Tag.Get("json"), ","), "string") {
+					return fmt.Errorf("字段 %s 使用 JSON string 编码选项，需要显式结果结构", field.Name)
+				}
 				if err := checkEncoding(field.Type, seen); err != nil {
 					return err
 				}
