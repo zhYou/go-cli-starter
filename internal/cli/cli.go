@@ -6,14 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/zhYou/go-cli-starter/internal/apperror"
 	"github.com/zhYou/go-cli-starter/internal/config"
 	"github.com/zhYou/go-cli-starter/internal/greeting"
+	"github.com/zhYou/go-cli-starter/internal/logging"
 	"github.com/zhYou/go-cli-starter/internal/validation"
+	"go.uber.org/zap"
 )
 
 // Options 提供进程依赖；每次调用均创建新的命令树。
@@ -85,7 +86,7 @@ func newRoot(opts Options) *cobra.Command {
 	service := greeting.New(validator)
 	var asJSON bool
 	var configPath, logLevel string
-	logger := slog.New(slog.NewTextHandler(opts.ErrOut, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	logger, _ := logging.New(opts.ErrOut, "warn")
 	root := &cobra.Command{
 		Use:           opts.Name,
 		Short:         "供用户和自动化工具使用的 CLI 模板",
@@ -120,11 +121,10 @@ func newRoot(opts Options) *cobra.Command {
 		if err != nil {
 			return apperror.Wrap(apperror.Configuration, "读取配置失败", err)
 		}
-		var level slog.Level
-		if err := level.UnmarshalText([]byte(cfg.LogLevel)); err != nil {
+		logger, err = logging.New(opts.ErrOut, cfg.LogLevel)
+		if err != nil {
 			return apperror.Wrap(apperror.Configuration, "日志配置无效", err)
 		}
-		logger = slog.New(slog.NewTextHandler(opts.ErrOut, &slog.HandlerOptions{Level: level}))
 		return nil
 	}
 	var name string
@@ -143,7 +143,7 @@ func newRoot(opts Options) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			logger.DebugContext(cmd.Context(), "已生成问候语", "name", name)
+			logger.Debug("已生成问候语", zap.String("name", name))
 			if asJSON {
 				return writeJSON(cmd.OutOrStdout(), result)
 			}

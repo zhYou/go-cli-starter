@@ -83,11 +83,11 @@
 **输入：** 任务 4 的有效日志级别和调用者 ErrOut。
 **输出：** `logging.New(io.Writer,string)(*zap.Logger,error)`；无全局状态、无 Close 所有权；console 编码，四个现有等级。
 
-- [ ] 引入 zap，写 `TestLogLevelsAndSinkOwnership`：warn 屏蔽 debug、debug 可见，Sync 不关闭外部 writer；`TestDebugLogsDoNotPolluteJSON` 保持 stdout 是一个有效 JSON 文档；未知级别返回错误。
-- [ ] 执行 `mise exec -- go test ./internal/logging ./internal/cli -run 'TestLogLevels|TestDebugLogs'`，确认新日志行为先失败。
-- [ ] 用 zapcore 创建 console core，封装调用者 writer 的无缓冲、非拥有式 Sync；配置加载后构造 logger。使用注入实例记录中文消息，保留稳定字段，不调用 zap.ReplaceGlobals。
-- [ ] 执行 `mise exec -- go test ./internal/logging ./internal/cli`，确认无 `slog` 全局状态或新日志格式选项。
-- [ ] 更新日志说明及受管清单，提交 `refactor: 使用独立 zap logger 输出诊断`。
+- [x] 引入 zap，写 `TestLogLevelsAndSinkOwnership`：warn 屏蔽 debug、debug 可见，Sync 不关闭外部 writer；`TestDebugLogsDoNotPolluteJSON` 保持 stdout 是一个有效 JSON 文档；未知级别返回错误。
+- [x] 执行 `mise exec -- go test ./internal/logging ./internal/cli -run 'TestLogLevels|TestDebugLogs'`，确认新日志行为先失败。
+- [x] 用 zapcore 创建 console core，封装调用者 writer 的无缓冲、非拥有式 Sync；配置加载后构造 logger。使用注入实例记录中文消息，保留稳定字段，不调用 zap.ReplaceGlobals。
+- [x] 执行 `mise exec -- go test ./internal/logging ./internal/cli`，确认无 `slog` 全局状态或新日志格式选项。
+- [x] 更新日志说明及受管清单，提交 `refactor: 使用独立 zap logger 输出诊断`。
 
 ### Task 6: 命令构造与依赖装配
 
