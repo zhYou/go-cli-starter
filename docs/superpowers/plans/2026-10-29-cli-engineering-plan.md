@@ -107,7 +107,7 @@ Testify、go-cmp、testscript、mise、GoReleaser、govulncheck、Syft、Renovat
 
 ## 实施记录（2026-10-29）
 
-十五项任务已按子计划完成，BL-004 至 BL-016 的实现和验证均已交付；PR 尚未创建。
+十五项任务已按子计划完成，BL-004 至 BL-016 的实现和验证均已交付；关联 [PR #1](https://github.com/zhYou/go-cli-starter/pull/1)。
 独立整分支审查发现一项数据丢失风险和五项重要问题，已在一次修复中处理：
 
 - 恢复日志必需字段与原文件存在性一致，矛盾日志在修改前拒绝。
