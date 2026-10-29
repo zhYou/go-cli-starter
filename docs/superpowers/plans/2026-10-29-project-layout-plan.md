@@ -12,7 +12,7 @@
 
 **设计：** [已确认的目录迁移设计](../specs/2026-10-29-project-layout-design.md)。
 
-**状态：** 设计与计划已确认，用户选择本会话直接执行；任务 1—3 已完成。
+**状态：** 设计与计划已确认，用户选择本会话直接执行；任务 1—4 已完成。
 
 ## 全局约束
 
@@ -180,26 +180,26 @@
 `test/testdata/contracts/v1.json`，`initialContractFile` 为
 `test/testdata/contracts/initial.json`，`legacyContractFile` 为 `testdata/contracts/v1.json`。
 
-- [ ] 写 `TestReadContractBaseAcrossLayoutMigration`：临时 Git 仓库分别提交仅旧路径、
+- [x] 写 `TestReadContractBaseAcrossLayoutMigration`：临时 Git 仓库分别提交仅旧路径、
   仅新路径、两者同时存在且内容不同、两者均缺失四类基准；断言返回旧/新/新/initial 字节，
   只有最后一种 `require.True(t, initial)`，其余 `require.False(t, initial)`。
   fixture 使用临时仓库的本地 `git -c user.name=... -c user.email=... commit`，不改用户配置。
-- [ ] 写 `TestReadContractBaseRejectsInvalidHistory`：无效 ref、以 `-` 起始的 ref、
+- [x] 写 `TestReadContractBaseRejectsInvalidHistory`：无效 ref、以 `-` 起始的 ref、
   非 Git 目录、已取消 context 导致 Git 执行失败、快照为目录或符号链接均返回错误。写
   `TestInvalidNewContractDoesNotFallback`：新路径内容损坏或类型不合法，旧路径有效，
   `checkContract` 仍失败。测试用 `t.Chdir` 隔离当前目录，不调用 `t.Parallel`。
-- [ ] 运行 `mise exec -- go test ./tools/dev -run 'TestReadContractBase|TestInvalidNewContract'`，
+- [x] 运行 `mise exec -- go test ./tools/dev -run 'TestReadContractBase|TestInvalidNewContract'`，
   确认历史路径读取能力缺失。
-- [ ] 实现 `readContractBase`：先把 ref 解析为确定的 commit，再用 `git ls-tree -z` 判断
+- [x] 实现 `readContractBase`：先把 ref 解析为确定的 commit，再用 `git ls-tree -z` 判断
   两个精确路径的存在性和普通文件类型，优先新路径；按确定的 SHA 读取 blob。
   任何 Git 故障都返回错误；内容损坏交由契约解析失败，不尝试旧路径。
   接入 `checkContract`，保留现有变更记录过滤与校验；`contract:update` 仅写新路径。
-- [ ] 原样移动两份快照；将进程测试改为 `package integration`，保留任务 3 的动态入口构建，
+- [x] 原样移动两份快照；将进程测试改为 `package integration`，保留任务 3 的动态入口构建，
   脚本内容与退出码断言保持原样。更新受管清单的进程测试路径和当前兼容性文档。
-- [ ] gopls 诊断无错误后运行 `mise exec -- go test ./tools/dev ./internal/contract ./test/integration`、
+- [x] gopls 诊断无错误后运行 `mise exec -- go test ./tools/dev ./internal/contract ./test/integration`、
   `mise run contract:check`、`mise run contract:check -- --against 5d03813`；期望全部退出 0。
   比较迁移前后两份快照的字节，确认没有刷新内容。
-- [ ] 仅暂存本任务文件，提交 `refactor: 集中集成测试并保留历史契约比较`。
+- [x] 仅暂存本任务文件，提交 `refactor: 集中集成测试并保留历史契约比较`。
 
 ### Task 5：迁移配置、验证发布归档并完成文档
 
