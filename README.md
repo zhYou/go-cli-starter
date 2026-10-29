@@ -25,13 +25,18 @@ mise run check
 
 [安装 mise](https://mise.jdx.dev/getting-started.html)。已有 mise 按其安装方式升级；独立安装的版本可运行 `mise self-update`。
 
+<!-- tool-versions:start -->
+
 | 工具 | 固定版本 |
 | --- | --- |
 | mise（本地最低版本、CI 固定版本） | 2026.10.21 |
 | Go | 1.27.3 |
+| Go 模块最低版本 | 1.27.0 |
 | gopls | 0.24.0 |
 | golangci-lint | 2.15.0 |
 | GoReleaser | 2.19.0 |
+
+<!-- tool-versions:end -->
 
 有官方 LTS 时使用最新 LTS 补丁版，否则使用最新稳定版；核验后锁定具体版本。本地和 CI 读取相同配置。Go 没有单独的 LTS 渠道，模板采用 1.27 系列，模块最低版本为 1.27.0。
 

@@ -12,6 +12,7 @@ require (
 	github.com/google/jsonschema-go v0.4.3
 	github.com/knadh/koanf/providers/confmap v1.0.1
 	github.com/knadh/koanf/v2 v2.4.1
+	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/rogpeppe/go-internal v1.16.0
 	github.com/spf13/afero v1.15.0
 	github.com/spf13/cobra v1.10.2

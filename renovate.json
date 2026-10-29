@@ -1,0 +1,12 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "enabledManagers": ["gomod", "github-actions", "mise"],
+  "rangeStrategy": "pin",
+  "ignoreUnstable": true,
+  "automerge": false,
+  "packageRules": [
+    {"matchManagers": ["mise"], "groupName": "开发工具链"},
+    {"matchManagers": ["gomod"], "matchDepNames": ["go", "toolchain"], "groupName": "Go 工具链"}
+  ]
+}

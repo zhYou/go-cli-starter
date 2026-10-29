@@ -63,7 +63,7 @@ run = "go run ./tools/dev template-check"
 
 [tasks.check]
 description = "运行与 CI 相同的源码检查"
-depends = ["fmt:check", "mod:check", "test", "vet", "lint", "build", "template:check", "contract:check"]
+depends = ["fmt:check", "mod:check", "test", "vet", "lint", "build", "template:check", "contract:check", "versions:check"]
 
 [tasks.init]
 description = "重命名原始模板：mise run init --module github.com/acme/mycli --name mycli"
@@ -84,3 +84,7 @@ run = "go run ./tools/dev contract-check"
 [tasks."contract:update"]
 description = "显式更新机器契约快照，须另写兼容变更记录"
 run = "go run ./tools/dev contract-update"
+
+[tasks."versions:check"]
+description = "检查工具锁、模块、CI 和当前文档版本一致性"
+run = "go run ./tools/dev versions-check"

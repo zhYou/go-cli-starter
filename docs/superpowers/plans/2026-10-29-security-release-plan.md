@@ -35,12 +35,12 @@
 **输入：** mise.toml、mise.lock、go.mod、当前 README 工具表和 CI 引导版本。
 **输出：** `VersionSet{MiseMinimum string,Tools map[string]string,Platforms []string}`；`loadVersions(root string)(VersionSet,error)`、`checkVersions(root string) error`；保持 `doctor(agent bool) error`，从 VersionSet 读取预期值。
 
-- [ ] 引入总览版本的 go-toml/v2 和 x/mod，解析配置与模块元数据；不使用全文字符串包含判断版本。
-- [ ] 写 `TestVersionsRejectSubstringAndMissingPlatform`：go1.27.30 与锁定 go1.27.3 不等，删除 windows-arm64 锁记录失败。写 `TestHistoricalVersionTextIsNotCurrentDeclaration`：历史规格版本不参与当前声明；修改当前受管 README 工具表则失败。
-- [ ] 执行 `mise exec -- go test ./tools/dev -run 'TestVersions|TestHistoricalVersion'`，确认缺失精确检查时失败。
-- [ ] 实现 TOML/Go 模块解析及逐项比较：工具精确版本相等，Go 最低版本 1.27.0 与 toolchain 1.27.3 分别按关系检查，CI mise 引导等于当前最低声明。README 用 tool-versions 起止注释界定受管表，AGENTS 的 mise 最低版本也检查；不扫描历史计划/规格的版本快照。
-- [ ] Doctor 用各工具专用、带边界的版本提取器；新增 `versions:check` 接入 check。Renovate 固定依赖、忽略预发布、关闭自动合并，覆盖 Go、Actions SHA、mise，并分组相关工具链变更；锁文件自动更新受平台权限约束时由维护者按文档补齐，检查照常失败。
-- [ ] 运行 `mise run versions:check`、`mise run doctor`、`mise exec -- go test ./tools/dev`、`mise run mcp:check`、`mise run template:check`，确认受信任会话中 `codex mcp list` 包含 gopls；提交 `feat: 检查工具版本一致性并配置依赖更新`。
+- [x] 引入总览版本的 go-toml/v2 和 x/mod，解析配置与模块元数据；不使用全文字符串包含判断版本。
+- [x] 写 `TestVersionsRejectSubstringAndMissingPlatform`：go1.27.30 与锁定 go1.27.3 不等，删除 windows-arm64 锁记录失败。写 `TestHistoricalVersionTextIsNotCurrentDeclaration`：历史规格版本不参与当前声明；修改当前受管 README 工具表则失败。
+- [x] 执行 `mise exec -- go test ./tools/dev -run 'TestVersions|TestHistoricalVersion'`，确认缺失精确检查时失败。
+- [x] 实现 TOML/Go 模块解析及逐项比较：工具精确版本相等，Go 最低版本 1.27.0 与 toolchain 1.27.3 分别按关系检查，CI mise 引导等于当前最低声明。README 用 tool-versions 起止注释界定受管表，AGENTS 的 mise 最低版本也检查；不扫描历史计划/规格的版本快照。
+- [x] Doctor 用各工具专用、带边界的版本提取器；新增 `versions:check` 接入 check。Renovate 固定依赖、忽略预发布、关闭自动合并，覆盖 Go、Actions SHA、mise，并分组相关工具链变更；锁文件自动更新受平台权限约束时由维护者按文档补齐，检查照常失败。
+- [x] 运行 `mise run versions:check`、`mise run doctor`、`mise exec -- go test ./tools/dev`、`mise run mcp:check`、`mise run template:check`，确认受信任会话中 `codex mcp list` 包含 gopls；提交 `feat: 检查工具版本一致性并配置依赖更新`。
 
 ### Task 13: 独立漏洞扫描与定时 CI
 

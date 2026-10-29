@@ -43,6 +43,8 @@ func runArgs(args []string) error {
 		return fmt.Errorf("任务 %s 不接受额外参数", task)
 	}
 	switch task {
+	case "versions-check":
+		return checkVersions(".")
 	case "contract-update":
 		return updateContract(context.Background())
 	case "build":
@@ -131,14 +133,9 @@ func format(write bool) error {
 }
 
 func doctor(agent bool) error {
-	tools := []struct {
-		name, version string
-		args          []string
-	}{
-		{"go", "go1.27.3", []string{"version"}},
-		{"gopls", "v0.24.0", []string{"version"}},
-		{"golangci-lint", "2.15.0", []string{"version"}},
-		{"goreleaser", "2.19.0", []string{"--version"}},
+	versions, err := loadVersions(".")
+	if err != nil {
+		return err
 	}
 	var problems []error
 	if _, err := exec.LookPath("git"); err != nil {
@@ -146,18 +143,24 @@ func doctor(agent bool) error {
 	} else {
 		fmt.Println("通过：git")
 	}
-	for _, tool := range tools {
-		data, err := exec.Command(tool.name, tool.args...).CombinedOutput()
+	for _, key := range sortedTools(versions) {
+		spec, err := versionTool(key)
 		if err != nil {
-			problems = append(problems, fmt.Errorf("%s 不可用：%w", tool.name, err))
+			problems = append(problems, err)
 			continue
 		}
-		if !strings.Contains(string(data), tool.version) {
-			problems = append(problems, fmt.Errorf("%s 与锁定版本 %s 不符，请运行 mise run setup", tool.name, tool.version))
+		data, err := exec.Command(spec.Name, spec.Args...).CombinedOutput()
+		if err != nil {
+			problems = append(problems, fmt.Errorf("%s 不可用：%w", spec.Name, err))
 			continue
 		}
-		fmt.Printf("通过：%s %s\n", tool.name, tool.version)
+		if err := matchToolVersion(key, string(data), versions.Tools[key]); err != nil {
+			problems = append(problems, err)
+			continue
+		}
+		fmt.Printf("通过：%s %s\n", spec.Name, versions.Tools[key])
 	}
+
 	if agent {
 		for _, name := range []string{"codex", "rtk"} {
 			if _, err := exec.LookPath(name); err != nil {
