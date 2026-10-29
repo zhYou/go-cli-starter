@@ -48,11 +48,11 @@
 **输入：** 任务 12 的 VersionSet；govulncheck 模块 v1.9.0。
 **输出：** `type ToolRunner func(context.Context,string,...string)([]byte,error)`；`checkVulnerabilities(context.Context,ToolRunner) error`，调用 `govulncheck ./...` 并保留失败原因。
 
-- [ ] 写 `TestVulnerabilityCheckFailureModes`：fake runner 对成功返回 nil；漏洞非零、数据库访问失败和找不到可执行文件均返回错误，不能使用“无漏洞”消息掩盖错误。断言实际命令参数为 `govulncheck ./...`。
-- [ ] 执行 `mise exec -- go test ./tools/dev -run TestVulnerabilityCheckFailureModes`，确认缺失任务时失败。
-- [ ] 在 mise 增加精确工具 `go:golang.org/x/vuln/cmd/govulncheck = 1.9.0`，纳入显式 setup 工具列表和 doctor；锁定 linux-x64/linux-arm64/macos-x64/macos-arm64/windows-x64/windows-arm64。真实 runner 使用 exec.CommandContext，取消不会遗留子进程。
-- [ ] 提供 `mise run vuln`，从 check 中保持独立。security workflow 对 PR、main 和每日 `17 3 * * *` 执行；contents: read，不接收发布凭据。文档说明数据库访问、失败处理和定时扫描作用。
-- [ ] 执行 `mise run setup`、`mise run doctor`、`mise run versions:check`、`mise exec -- go test ./tools/dev`、`mise run vuln`；真实网络不可用时记录失败，不以 fake runner 通过替代。提交 `feat: 增加持续漏洞检查与定时扫描`。
+- [x] 写 `TestVulnerabilityCheckFailureModes`：fake runner 对成功返回 nil；漏洞非零、数据库访问失败和找不到可执行文件均返回错误，不能使用“无漏洞”消息掩盖错误。断言实际命令参数为 `govulncheck ./...`。
+- [x] 执行 `mise exec -- go test ./tools/dev -run TestVulnerabilityCheckFailureModes`，确认缺失任务时失败。
+- [x] 在 mise 增加精确工具 `go:golang.org/x/vuln/cmd/govulncheck = 1.9.0`，纳入显式 setup 工具列表和 doctor；锁定 linux-x64/linux-arm64/macos-x64/macos-arm64/windows-x64/windows-arm64。真实 runner 使用 exec.CommandContext，取消不会遗留子进程。
+- [x] 提供 `mise run vuln`，从 check 中保持独立。security workflow 对 PR、main 和每日 `17 3 * * *` 执行；contents: read，不接收发布凭据。文档说明数据库访问、失败处理和定时扫描作用。
+- [x] 执行 `mise run setup`、`mise run doctor`、`mise run versions:check`、`mise exec -- go test ./tools/dev`、`mise run vuln`；真实网络不可用时记录失败，不以 fake runner 通过替代。提交 `feat: 增加持续漏洞检查与定时扫描`。
 
 ### Task 14: SBOM、来源证明与产物校验
 

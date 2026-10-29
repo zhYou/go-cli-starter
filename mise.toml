@@ -5,13 +5,14 @@ task.run_auto_install = false
 
 [tools]
 go = "1.27.3"
+"go:golang.org/x/vuln/cmd/govulncheck" = "1.9.0"
 "go:golang.org/x/tools/gopls" = "0.24.0"
 golangci-lint = "2.15.0"
 goreleaser = "2.19.0"
 
 [tasks.setup]
 description = "安装锁定版本的工具并下载 Go 依赖"
-run = ["mise install --locked go go:golang.org/x/tools/gopls golangci-lint goreleaser", "go mod download"]
+run = ["mise install --locked go go:golang.org/x/tools/gopls golangci-lint goreleaser go:golang.org/x/vuln/cmd/govulncheck", "go mod download"]
 
 [tasks.doctor]
 description = "检查项目工具和锁定版本"
@@ -88,3 +89,7 @@ run = "go run ./tools/dev contract-update"
 [tasks."versions:check"]
 description = "检查工具锁、模块、CI 和当前文档版本一致性"
 run = "go run ./tools/dev versions-check"
+
+[tasks.vuln]
+description = "联网检查受影响的 Go 漏洞，失败保留原因"
+run = "go run ./tools/dev vuln"

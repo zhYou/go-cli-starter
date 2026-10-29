@@ -35,6 +35,7 @@ mise run check
 | gopls | 0.24.0 |
 | golangci-lint | 2.15.0 |
 | GoReleaser | 2.19.0 |
+| govulncheck | 1.9.0 |
 
 <!-- tool-versions:end -->
 
@@ -158,3 +159,5 @@ GoReleaser 使用 workflow 的 `GITHUB_TOKEN` 创建 Release，生成 Linux、ma
 模板没有预选许可证；发布自己的项目时按需要添加许可证文件。
 
 模板版本与后续合并方式见[模板升级](docs/template-upgrades.md)。
+
+`mise run vuln` 独立访问 Go 漏洞数据库，PR、main 和每日定时执行；发现漏洞、数据库不可达或工具缺失均失败。源码 check 不请求漏洞数据库。
