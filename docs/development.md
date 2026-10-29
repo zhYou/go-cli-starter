@@ -1,0 +1,42 @@
+# 开发说明
+
+## 添加命令
+
+1. 参考 greet，创建接收 context 和选项的业务函数，返回带 JSON 标签的结果。
+2. 注册参数，在 Args 阶段检查数量和值，必填参数同时调用 MarkFlagRequired。
+3. 显式传入依赖，避免修改包级配置或日志对象。
+4. 根据 --json 选择输出方式，错误直接返回，由入口统一打印和映射退出码。
+5. 注册根命令，补帮助、示例和行为测试。运行 schema 新命令核对自动生成的说明。
+6. 运行 mise run fmt 和 mise run check。
+
+新增配置字段时同步修改结构、环境变量覆盖、参数覆盖、校验、示例和测试。通过 Changed 检查显式 flag，避免参数默认值覆盖环境或文件配置。
+
+greet 和对应业务包是可删除示例，替换时同步修改测试。帮助、version、completion 和 schema 始终能在配置损坏时使用。
+
+## 修改模板初始化
+
+初始化工具维护文件白名单，不扫描替换整个仓库。新文件包含模块导入、命令名或环境变量前缀时，将它加入白名单。保留初始化实现中的原模板身份及测试 fixture，避免新项目重复初始化时误判。
+
+mise run template:check 使用 Git 文件清单复制项目，跳过被忽略的缓存、产物和本地配置。它验证独立项目的改名、幂等性、测试、构建、schema 和发布配置；在已初始化项目中验证现有身份。
+
+## 更新工具
+
+有官方 LTS 时选择最新 LTS 补丁版，否则选择最新稳定版。核对 Go、gopls 和 golangci-lint 的兼容要求，再同步 mise、Go 模块和工具链、doctor 检查、README、CI 和相关稳定版 Actions。
+
+```sh
+mise lock --platform linux-x64,linux-arm64,macos-x64,macos-arm64,windows-x64,windows-arm64
+mise run setup
+mise run fmt
+mise run check
+mise run test:race
+mise run mcp:check
+mise run release:snapshot
+```
+
+提交工具锁文件。日常 setup 不更新版本或锁文件。RTK、superpowers 和 Codex 使用用户级安装，维护者通过各自官方稳定渠道更新，仓库不修改全局配置。
+
+## 验证与发布
+
+测试使用注入 IO、临时配置目录和可控环境变量，避免读取用户配置或请求业务网络。输出测试检查可解析 JSON 和独立 stderr。
+
+check 不改写源码，但会写 Go 缓存、临时测试文件和 bin 下的产物。fmt 和 setup 是显式修改或安装操作。本地 snapshot 需要 Git 仓库，不需要发布令牌；创建 Release 由目标项目的标签 workflow 完成。

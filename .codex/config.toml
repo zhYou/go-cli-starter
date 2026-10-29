@@ -1,0 +1,8 @@
+# Project settings are loaded after this repository is trusted in Codex.
+# Prepare dependencies with `mise run setup`, then start Codex from the repository.
+[mcp_servers.gopls]
+command = "mise"
+args = ["exec", "--", "gopls", "mcp"]
+startup_timeout_sec = 60
+tool_timeout_sec = 120
+required = false

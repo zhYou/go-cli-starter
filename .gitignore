@@ -29,5 +29,11 @@ go.work.sum
 .env
 
 # Editor/IDE
-# .idea/
+.idea/
 # .vscode/
+
+/bin/
+/dist/
+/.superpowers/
+mise.local.toml
+mise.local.lock
