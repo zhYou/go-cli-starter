@@ -89,7 +89,7 @@ go install github.com/zhYou/go-cli-starter/cmd/go-cli-starter@latest
 
 ## 配置和日志
 
-复制 `config.example.yaml` 到系统用户配置目录下的 `go-cli-starter/config.yaml`，或用 `--config` 显式指定文件。用户配置目录由 Go 的 `os.UserConfigDir()` 决定。
+复制 `configs/config.example.yaml` 到系统用户配置目录下的 `go-cli-starter/config.yaml`，或用 `--config` 显式指定文件。用户配置目录由 Go 的 `os.UserConfigDir()` 决定。
 
 ```yaml
 log_level: warn
@@ -138,7 +138,21 @@ RTK 和 superpowers 使用用户目录中的安装。模板不复制全局技能
 | `mise run release:check` | 验证当前仓库的发布配置和 SCM 信息，需要 remote |
 | `mise run release:snapshot` | 本地构建全部发布压缩包，不发布 |
 
+目录按入口、内部包、配置、测试和工具分工：
+
+```text
+cmd/<name>/                 程序入口与信号测试
+internal/                   CLI、配置、业务与模板初始化
+configs/config.example.yaml 配置示例
+test/integration/           真实进程测试与脚本
+test/testdata/contracts/    机器契约基线
+tools/                     初始化与开发任务
+docs/                      使用、设计和维护说明
+```
+
 `cmd/<name>` 入口负责信号和退出；`internal/cli` 组织命令，`internal/config` 加载配置，`internal/greeting` 演示业务逻辑；`internal/scaffold` 和 `tools` 提供初始化与开发任务。
+
+初始化后的命令目录随 `--name` 改名；模板版本为 0.2.0，已有项目迁移见[模板升级](docs/template-upgrades.md)。发布包仍在根目录提供 `config.example.yaml`。
 
 `check` 在临时仓库中验证发布配置，无需为内部工具配置 remote。真正发布或运行 `release:check` 前，为目标项目设置自己的 GitHub origin。
 

@@ -12,7 +12,7 @@
 
 **设计：** [已确认的目录迁移设计](../specs/2026-10-29-project-layout-design.md)。
 
-**状态：** 设计与计划已确认，用户选择本会话直接执行；任务 1—4 已完成。
+**状态：** 设计与计划已确认，用户选择本会话直接执行；五项实现及本地验收已完成，独立整分支审查待完成。
 
 ## 全局约束
 
@@ -212,30 +212,30 @@
 `validateArchive(path, binary string) error`，支持当前 tar.gz/zip，检查根目录的二进制、
 `README.md` 与非空 `config.example.yaml`。Windows 传入含 `.exe` 的二进制名。
 
-- [ ] 把 `releaseFixture` 改为生成真实 tar.gz/zip，保留现有 SBOM 与摘要构造。
+- [x] 把 `releaseFixture` 改为生成真实 tar.gz/zip，保留现有 SBOM 与摘要构造。
   写 `TestReleaseArchiveContents`：六平台正常归档通过；缺二进制、缺 README、缺配置、
   配置为空、配置仅放在 `configs/`、重复必要文件或损坏归档均失败。
   通过 `checkReleaseSnapshot` 的坏用例重新计算校验和，证明失败来自归档内容检查。
-- [ ] 运行 `mise exec -- go test ./tools/dev -run 'TestReleaseArchive|TestReleaseSnapshot'`，
+- [x] 运行 `mise exec -- go test ./tools/dev -run 'TestReleaseArchive|TestReleaseSnapshot'`，
   确认当前校验不能发现缺失的归档内容。
-- [ ] 用标准库 `archive/tar`、`archive/zip` 与 `compress/gzip` 实现 `validateArchive`，
+- [x] 用标准库 `archive/tar`、`archive/zip` 与 `compress/gzip` 实现 `validateArchive`，
   只读取归档，不解压到磁盘；在现有摘要和目标格式检查后调用。
   必要条目须为根目录普通文件并唯一，保留现有六目标、版本、SPDX 与 SHA-256 检查。
-- [ ] 移动配置，更新受管清单；GoReleaser 映射使用
+- [x] 移动配置，更新受管清单；GoReleaser 映射使用
   `src: configs/config.example.yaml`、`dst: .`、`strip_parent: true`，README 从新源码路径
   介绍复制配置，发布包示例继续使用包根目录文件。单元测试不为纯文件移动增加快照。
-- [ ] 模板版本改为 `0.2.0`，更新 README 目录图及开发说明，增加 0.2.0 人工迁移步骤，
+- [x] 模板版本改为 `0.2.0`，更新 README 目录图及开发说明，增加 0.2.0 人工迁移步骤，
   明确新源码入口、旧事务先由原工具恢复、初始化不等于升级。应用发布版本和机器快照保持原值。
-- [ ] gopls 诊断无错误后依次执行 `mise run fmt`、`mise run check`、`mise run test:race`、
+- [x] gopls 诊断无错误后依次执行 `mise run fmt`、`mise run check`、`mise run test:race`、
   `mise run mcp:check`、`codex mcp list`、`mise run release:snapshot`、`mise run release:verify`。
   `check` 已包含 `template:check`，通过后不重复；确认 MCP 列表包含 gopls。
   解读六目标真实归档，比较包根目录配置与 `configs/config.example.yaml` 字节一致。
-- [ ] 运行 `mise run contract:check -- --against 5d03813` 和 `git diff --check`，检查当前代码与
+- [x] 运行 `mise run contract:check -- --against 5d03813` 和 `git diff --check`，检查当前代码与
   历史基准兼容，当前操作文档没有遗留根入口用法；历史设计、计划和迁移说明中的旧路径保留。
   记录实际 Linux 验证结果，macOS/Windows 运行情况以对应 CI 为准，不声称本机已验证。
-- [ ] 更新 BL-017 状态、日期、验证和实际 PR；没有 PR 时仍写“尚未关联”。
-  完成独立代码审查并处理影响验收的问题后，仅暂存本任务文件，提交
-  `refactor: 迁移配置并验证参考布局的完整交付`；按分支收尾技能处理集成。
+- [x] 更新 BL-017 状态、日期、验证和实际 PR；没有 PR 时仍写“尚未关联”。
+  仅暂存本任务文件，提交
+  `refactor: 迁移配置并验证参考布局的完整交付`；之后执行独立整分支审查，处理影响验收的问题并按分支收尾技能交付。
 
 ## 计划自查
 
@@ -243,4 +243,15 @@
 - 初始化目录移动、格式 2、旧日志提示和失败恢复由任务 2、3 覆盖。
 - 历史契约比较由任务 4 覆盖；配置、六目标发布内容和模板升级由任务 5 覆盖。
 - 五项审查重点均有明确的测试任务；跨任务使用的类型和函数签名已统一。
-- 当前只编写和审阅计划，所有实施复选框保持未勾选；执行方式确定后再开始代码修改。
+- 五项实现均已验证；整分支独立审查和交付状态单独记录如下。
+
+
+## 独立审查与交付记录
+
+- [ ] 独立审查全部实现提交并处理重要问题。
+- [ ] 更新待办状态及最终验证记录，交付隔离工作区。
+
+本地验收：`fmt`、`check`（包含模板初始化、安装和契约检查）、`test:race`、
+`mcp:check`、六目标 `release:snapshot`、`release:verify` 与历史 Git 基准契约比较均通过。
+六目标归档根目录配置与源码字节一致；`codex mcp list` 已确认 gopls。
+本机验证 Linux 运行和六目标交叉构建，macOS/Windows 运行仍由对应 CI 确认。

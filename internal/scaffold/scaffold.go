@@ -41,7 +41,7 @@ var managedFiles = []string{
 	"internal/cli/errors_test.go",
 	"internal/apperror/error_test.go", "tools/init/main.go",
 	"tools/dev/main.go", "tools/dev/template.go", "mise.toml", ".goreleaser.yaml", "README.md", "AGENTS.md",
-	"config.example.yaml", "docs/development.md",
+	"configs/config.example.yaml", "docs/development.md", "docs/template-upgrades.md",
 }
 
 var validName = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)

@@ -33,11 +33,11 @@ func readContractBase(ctx context.Context, ref string) ([]byte, bool, error) {
 		}
 		pair := strings.SplitN(string(entry), "\t", 2)
 		if len(pair) != 2 {
-			return nil, false, fmt.Errorf("Git 基准文件记录无效")
+			return nil, false, fmt.Errorf("基准 Git 文件记录无效")
 		}
 		meta := strings.Fields(pair[0])
 		if len(meta) != 3 {
-			return nil, false, fmt.Errorf("Git 基准文件类型无效")
+			return nil, false, fmt.Errorf("基准 Git 文件类型无效")
 		}
 		modes[pair[1]] = meta[0] + " " + meta[1]
 	}
@@ -47,7 +47,7 @@ func readContractBase(ctx context.Context, ref string) ([]byte, bool, error) {
 			continue
 		}
 		if mode != "100644 blob" && mode != "100755 blob" {
-			return nil, false, fmt.Errorf("Git 基准快照不是普通文件：%s", file)
+			return nil, false, fmt.Errorf("基准 Git 快照不是普通文件：%s", file)
 		}
 		data, err := exec.CommandContext(ctx, "git", "show", commit+":"+file).Output()
 		if err != nil {

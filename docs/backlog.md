@@ -40,7 +40,8 @@
 `test/`；同步模板初始化与恢复、构建发布、MCP 检查和文档，保留 CLI 机器接口行为。
 
 当前进展：[目录迁移设计](superpowers/specs/2026-10-29-project-layout-design.md)已确认，
-[实施计划](superpowers/plans/2026-10-29-project-layout-plan.md)待审阅并选择执行方式，尚未开始代码实施。
+用户选择本会话直接执行[实施计划](superpowers/plans/2026-10-29-project-layout-plan.md)。
+五项实现及本地验收已完成，正在进行独立整分支审查；尚未创建 PR。
 
 验收：原模板和改名后的项目均可构建、测试和发布；初始化幂等且目录改名可恢复；历史契约
 比较继续有效；源码入口变更有迁移说明，六目标发布包内容完整。
