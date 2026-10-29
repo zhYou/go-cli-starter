@@ -57,7 +57,7 @@
 本计划含当前应用路径，任务 3 将本文件加入初始化受管清单；新增 Go 文件若导入原模板模块，
 在所属任务同步加入。历史设计与计划不批量改写，当前操作指南使用迁移后的路径。
 
-### 任务 1：静态识别命令入口
+### Task 1：静态识别命令入口
 
 **文件：** 新建 `internal/scaffold/project.go`、`internal/scaffold/project_test.go`。
 
@@ -88,7 +88,7 @@
 - [ ] gopls 诊断无错误后运行上述测试及 `mise exec -- go test ./internal/scaffold`，期望全部 PASS。
 - [ ] 仅暂存本任务文件，提交 `feat: 统一识别命令入口与项目身份`。
 
-### 任务 2：让命令目录移动进入恢复事务
+### Task 2：让命令目录移动进入恢复事务
 
 **文件：** 新建 `internal/scaffold/command_move.go`、`command_move_test.go`；修改
 `internal/scaffold/transaction.go`、`scaffold.go` 及 `transaction_test.go`、
@@ -132,7 +132,7 @@
 - [ ] gopls 诊断无错误后运行 `mise exec -- go test ./internal/scaffold`，期望全部 PASS；
   仅暂存本任务文件，提交 `feat: 支持初始化命令目录的可恢复改名`。
 
-### 任务 3：迁移唯一入口并接通初始化和开发任务
+### Task 3：迁移唯一入口并接通初始化和开发任务
 
 **文件：** 移动 `main.go`、`main_test.go` 到 `cmd/go-cli-starter/`；修改
 `internal/scaffold/scaffold.go`、`origin.go`、`origin_test.go` 和所有根入口 fixture 与故障注入；
@@ -167,7 +167,7 @@
   `mise run build`、`mise run template:check`、`mise run mcp:check`；期望全部退出 0。
   仅暂存本任务文件，提交 `refactor: 将程序入口迁入 cmd 并统一路径使用`。
 
-### 任务 4：集中集成测试与契约数据，保留历史比较
+### Task 4：集中集成测试与契约数据，保留历史比较
 
 **文件：** 移动 `internal/cli/process_test.go` 及其脚本到 `test/integration/`；
 移动 `testdata/contracts/{initial,v1}.json` 到 `test/testdata/contracts/`；
@@ -201,7 +201,7 @@
   比较迁移前后两份快照的字节，确认没有刷新内容。
 - [ ] 仅暂存本任务文件，提交 `refactor: 集中集成测试并保留历史契约比较`。
 
-### 任务 5：迁移配置、验证发布归档并完成文档
+### Task 5：迁移配置、验证发布归档并完成文档
 
 **文件：** 移动 `config.example.yaml` 到 `configs/config.example.yaml`；修改
 `.goreleaser.yaml`、`.template-version`、`tools/dev/release.go`、`release_test.go`、
