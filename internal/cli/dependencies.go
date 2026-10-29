@@ -18,6 +18,7 @@ type Dependencies struct {
 	NewLogger  func(io.Writer, string) (*zap.Logger, error)
 }
 type invocation struct {
+	results              resultRegistry
 	asJSON               bool
 	configPath, logLevel string
 	deps                 Dependencies

@@ -37,5 +37,8 @@ func newGreetCommand(opts Options, call *invocation) *cobra.Command {
 		panic(err)
 	}
 
+	if err := registerResult[greeting.Result](&call.results, greet, nil); err != nil {
+		panic(err)
+	}
 	return greet
 }

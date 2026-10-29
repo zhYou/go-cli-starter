@@ -58,3 +58,5 @@ check 不改写源码，但会写 Go 缓存、临时测试文件和 bin 下的�
 每次调用创建独立 zap logger，默认 warn，诊断写 stderr；logger 不关闭调用者 writer，也不替换全局实例。
 
 命令使用独立构造函数，依赖由 Options.Dependencies 显式注入；装配复制依赖并补默认值，每次调用不共享选项、配置或日志。测试可替换加载器、业务函数与 logger 工厂。
+
+有类型的结果通过 registerResult 注册到本次命令树，使用 google/jsonschema-go 生成 Draft 2020-12。特殊编码与递归类型须显式覆盖并验证实际 JSON；format 不提供语义校验，业务约束交给 validator。

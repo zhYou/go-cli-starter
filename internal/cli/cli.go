@@ -110,7 +110,7 @@ func newRoot(opts Options) *cobra.Command {
 	root.CompletionOptions.DisableDefaultCmd = true
 	help := newHelpCommand(root)
 	root.SetHelpCommand(help)
-	root.AddCommand(newGreetCommand(opts, call), newVersionCommand(opts, call), newSchemaCommand(root), newCompletionCommand(root))
+	root.AddCommand(newGreetCommand(opts, call), newVersionCommand(opts, call), newSchemaCommand(root, &call.results), newCompletionCommand(root))
 	configureChineseHelp(root)
 	configureChineseHelp(help)
 	protectCommand(root)

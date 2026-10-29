@@ -34,12 +34,12 @@ Draft 2020-12；消费方忽略新增字段，结果对象允许额外属性，�
 **输入：** 第一批命令工厂、writeJSON 和有类型 greeting.Result；version 的匿名结果改为 `versionResult`，字段及 JSON 标签完全保留。
 **输出：** `contract.FromType(reflect.Type,json.RawMessage)(json.RawMessage,error)`，第二参数为可选显式覆盖；`resultRegistry` 保存命令指针对应的类型/覆盖；`registerResult[T any](*resultRegistry,*cobra.Command,json.RawMessage) error`；`newSchemaCommand(*cobra.Command,*resultRegistry)*cobra.Command`。
 
-- [ ] 引入总览锁定的 google/jsonschema-go 和 go-cmp。
-- [ ] 写 `TestResultSchemaMatchesEncoding`：对实际 json.Marshal 结果验证，断言 message 必填、nil 切片允许 null、空切片允许 array、omitempty 可缺省、自定义类型使用显式覆盖；不支持的递归类型无覆盖时明确失败。写 `TestSchemaGenerationDoesNotExecuteCommands`：配置和业务调用数为 0。
-- [ ] 执行 `mise exec -- go test ./internal/contract ./internal/cli -run 'TestResultSchema|TestSchemaGeneration'`，确认新能力缺失时失败。
-- [ ] 实现 FromType：默认严格推导、明确 Draft 2020-12、为 Go struct 对应对象开放 additionalProperties，保留 map 的元素约束；显式覆盖必须先解析验证。注册表属于本次 root，schema 增加 `ResultSchema json.RawMessage` 的 `result_schema,omitempty` 字段；greet/version 注册，帮助/补全/schema 自身不注册结果。
-- [ ] 用 go-cmp 检查规范化结构；额外字段验证可通过，删除 message 或改成数字必须失败；发现入口损坏配置测试继续通过。运行 `mise exec -- go test ./internal/contract ./internal/cli` 和 `mise run template:check`。
-- [ ] 提交 `feat: 从结果类型公开 JSON Schema`。
+- [x] 引入总览锁定的 google/jsonschema-go 和 go-cmp。
+- [x] 写 `TestResultSchemaMatchesEncoding`：对实际 json.Marshal 结果验证，断言 message 必填、nil 切片允许 null、空切片允许 array、omitempty 可缺省、自定义类型使用显式覆盖；不支持的递归类型无覆盖时明确失败。写 `TestSchemaGenerationDoesNotExecuteCommands`：配置和业务调用数为 0。
+- [x] 执行 `mise exec -- go test ./internal/contract ./internal/cli -run 'TestResultSchema|TestSchemaGeneration'`，确认新能力缺失时失败。
+- [x] 实现 FromType：默认严格推导、明确 Draft 2020-12、为 Go struct 对应对象开放 additionalProperties，保留 map 的元素约束；显式覆盖必须先解析验证。注册表属于本次 root，schema 增加 `ResultSchema json.RawMessage` 的 `result_schema,omitempty` 字段；greet/version 注册，帮助/补全/schema 自身不注册结果。
+- [x] 用 go-cmp 检查规范化结构；额外字段验证可通过，删除 message 或改成数字必须失败；发现入口损坏配置测试继续通过。运行 `mise exec -- go test ./internal/contract ./internal/cli` 和 `mise run template:check`。
+- [x] 提交 `feat: 从结果类型公开 JSON Schema`。
 
 ### Task 8: 机器接口基线与变更记录
 

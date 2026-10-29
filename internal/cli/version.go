@@ -12,12 +12,7 @@ func newVersionCommand(opts Options, call *invocation) *cobra.Command {
 		Annotations: map[string]string{"skip-config": "true"},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if call.asJSON {
-				return writeJSON(cmd.OutOrStdout(), struct {
-					Name    string `json:"name"`
-					Version string `json:"version"`
-					Commit  string `json:"commit"`
-					Date    string `json:"date"`
-				}{opts.Name, opts.Version, opts.Commit, opts.Date})
+				return writeJSON(cmd.OutOrStdout(), versionResult{opts.Name, opts.Version, opts.Commit, opts.Date})
 			}
 			return writeText(cmd.OutOrStdout(), func(w io.Writer) error {
 				_, err := fmt.Fprintf(w, "%s 版本 %s（提交 %s，构建时间 %s）\n", opts.Name, opts.Version, opts.Commit, opts.Date)
@@ -26,5 +21,15 @@ func newVersionCommand(opts Options, call *invocation) *cobra.Command {
 		},
 	}
 
+	if err := registerResult[versionResult](&call.results, version, nil); err != nil {
+		panic(err)
+	}
 	return version
+}
+
+type versionResult struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	Commit  string `json:"commit"`
+	Date    string `json:"date"`
 }
