@@ -18,6 +18,22 @@ archives:
         formats: [zip]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files: [README.md, config.example.yaml]
+sboms:
+  - artifacts: archive
+    documents: ["{{ .ArtifactName }}.spdx.json"]
+    cmd: syft
+    args:
+      - scan
+      - "file:$artifact"
+      - --config
+      - ../.syft.yaml
+      - --source-name
+      - "{{ .ArtifactName }}"
+      - --output
+      - "spdx-json=$document"
+    env:
+      - SYFT_CHECK_FOR_APP_UPDATE=false
+      - SYFT_GOLANG_SEARCH_REMOTE_LICENSES=false
 checksum:
   name_template: checksums.txt
 changelog:

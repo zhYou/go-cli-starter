@@ -43,6 +43,8 @@ func runArgs(args []string) error {
 		return fmt.Errorf("任务 %s 不接受额外参数", task)
 	}
 	switch task {
+	case "release-verify":
+		return checkReleaseSnapshot("dist")
 	case "vuln":
 		return checkVulnerabilities(context.Background(), nil)
 	case "versions-check":

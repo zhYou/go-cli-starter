@@ -9,10 +9,11 @@ go = "1.27.3"
 "go:golang.org/x/tools/gopls" = "0.24.0"
 golangci-lint = "2.15.0"
 goreleaser = "2.19.0"
+syft = "1.55.0"
 
 [tasks.setup]
 description = "安装锁定版本的工具并下载 Go 依赖"
-run = ["mise install --locked go go:golang.org/x/tools/gopls golangci-lint goreleaser go:golang.org/x/vuln/cmd/govulncheck", "go mod download"]
+run = ["mise install --locked go go:golang.org/x/tools/gopls golangci-lint goreleaser go:golang.org/x/vuln/cmd/govulncheck syft", "go mod download"]
 
 [tasks.doctor]
 description = "检查项目工具和锁定版本"
@@ -93,3 +94,7 @@ run = "go run ./tools/dev versions-check"
 [tasks.vuln]
 description = "联网检查受影响的 Go 漏洞，失败保留原因"
 run = "go run ./tools/dev vuln"
+
+[tasks."release:verify"]
+description = "验证六目标归档、SPDX 和最终 SHA-256 清单"
+run = "go run ./tools/dev release-verify"

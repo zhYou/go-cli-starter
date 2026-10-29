@@ -27,6 +27,7 @@ jobs:
       - run: mise run test:race
       - run: mise run mcp:check
       - run: mise run release:snapshot
+      - run: mise run release:verify
   platforms:
     strategy:
       fail-fast: false

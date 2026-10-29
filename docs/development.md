@@ -66,3 +66,5 @@ check 不改写源码，但会写 Go 缓存、临时测试文件和 bin 下的�
 初始化持有 `.template-init.lock` 的系统锁；失败时根据 `.template-init/` 日志回滚。相同参数重试会先恢复，不同参数或人工修改会保留现场并报错。不要删除活跃进程的锁文件；锁文件常驻。单文件以同目录临时文件替换，不承诺跨文件或断电原子性。
 
 工具升级后更新 mise.toml、mise.lock、Go 声明、README 当前工具表及 CI 引导版本，再运行 versions:check。二进制工具校验六平台归档；Go 后端锁定同一模块来源版本，跨平台本地编译，不生成虚假的平台归档记录。Renovate 配置需由仓库管理员启用；受信任执行权限不足时维护者自行补齐六平台锁，检查不会放宽。
+
+发布使用固定 Syft 对六个本地归档生成 SPDX JSON，配置关闭 enrichment、远程许可证查询和更新检查；GoReleaser 在 SBOM 后生成最终 checksums.txt。release:verify 校验实际文件，不上传证明。发布证明只在受信任 release job 生成。

@@ -60,13 +60,13 @@
 **输入：** 当前六目标压缩包、checksums.txt、Syft v1.55.0；任务 12 的版本检查。
 **输出：** `checkReleaseSnapshot(dist string) error`、`mise run release:verify`；为每个压缩包生成 `<archive-name>.spdx.json` 并纳入 checksums.txt。
 
-- [ ] 写 `TestReleaseSnapshotRejectsMissingOrMismatchedSBOM`：压缩包缺 SBOM、校验摘要错误、重复/越界路径均失败，六目标完整且正确时通过；fixture 使用已知字节和对应摘要，不请求网络。
-- [ ] 执行 `mise exec -- go test ./tools/dev -run TestReleaseSnapshotRejectsMissingOrMismatchedSBOM`，确认缺失产物验证器时失败。
-- [ ] 将 Syft 作为 mise 独立工具安装，不加入应用 go.mod；官方 v1.55.0 已提供六平台归档。固定版本并纳入 setup/doctor/六平台锁。GoReleaser 使用 archive 级 SBOM、SPDX JSON 和显式本地分析参数，取消默认外部元数据 enrichment；文件命名随目标应用自动变化。
-- [ ] 实现 snapshot 验证器：安全读取校验文件，校验六目标归档及各自 SBOM 的实际 SHA-256，检查 SPDX 版本与根文档结构；对最终文件验证，不能只断言 YAML 中出现 sboms 字段。确保 SBOM 生成先于最终校验清单生成。
-- [ ] 发布 workflow 在 GoReleaser 之后运行 `actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6`（v4.2.2），subject-checksums 指向最终 checksums.txt；release job 只增加所需 id-token/attestations 写权限。证明失败使 workflow 失败；若 Release 已创建，维护者对已发布原始资产重试证明，不重新构建或覆盖字节。
-- [ ] 文档提供 checksum、SPDX 和 `gh attestation verify <asset> --repo <owner/repo>` 步骤，说明私有仓库平台前提与本地 snapshot 边界；所有 Actions 保持完整 SHA 锁定。
-- [ ] 执行 `mise run setup`、`mise run doctor`、`mise run versions:check`、`mise exec -- go test ./tools/dev`、`mise run release:snapshot`、`mise run release:verify`、`mise run template:check`。本地不运行 attestation 上传；记录远端集成尚需受信任 workflow 验证。提交 `feat: 为发布包生成 SBOM 与构建来源证明`。
+- [x] 写 `TestReleaseSnapshotRejectsMissingOrMismatchedSBOM`：压缩包缺 SBOM、校验摘要错误、重复/越界路径均失败，六目标完整且正确时通过；fixture 使用已知字节和对应摘要，不请求网络。
+- [x] 执行 `mise exec -- go test ./tools/dev -run TestReleaseSnapshotRejectsMissingOrMismatchedSBOM`，确认缺失产物验证器时失败。
+- [x] 将 Syft 作为 mise 独立工具安装，不加入应用 go.mod；官方 v1.55.0 已提供六平台归档。固定版本并纳入 setup/doctor/六平台锁。GoReleaser 使用 archive 级 SBOM、SPDX JSON 和显式本地分析参数，取消默认外部元数据 enrichment；文件命名随目标应用自动变化。
+- [x] 实现 snapshot 验证器：安全读取校验文件，校验六目标归档及各自 SBOM 的实际 SHA-256，检查 SPDX 版本与根文档结构；对最终文件验证，不能只断言 YAML 中出现 sboms 字段。确保 SBOM 生成先于最终校验清单生成。
+- [x] 发布 workflow 在 GoReleaser 之后运行 `actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6`（v4.2.2），subject-checksums 指向最终 checksums.txt；release job 只增加所需 id-token/attestations 写权限。证明失败使 workflow 失败；若 Release 已创建，维护者对已发布原始资产重试证明，不重新构建或覆盖字节。
+- [x] 文档提供 checksum、SPDX 和 `gh attestation verify <asset> --repo <owner/repo>` 步骤，说明私有仓库平台前提与本地 snapshot 边界；所有 Actions 保持完整 SHA 锁定。
+- [x] 执行 `mise run setup`、`mise run doctor`、`mise run versions:check`、`mise exec -- go test ./tools/dev`、`mise run release:snapshot`、`mise run release:verify`、`mise run template:check`。本地不运行 attestation 上传；记录远端集成尚需受信任 workflow 验证。提交 `feat: 为发布包生成 SBOM 与构建来源证明`。
 
 ### Task 15: 维护者入口与最终验收
 

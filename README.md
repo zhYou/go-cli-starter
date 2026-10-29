@@ -36,6 +36,7 @@ mise run check
 | golangci-lint | 2.15.0 |
 | GoReleaser | 2.19.0 |
 | govulncheck | 1.9.0 |
+| Syft | 1.55.0 |
 
 <!-- tool-versions:end -->
 
@@ -161,3 +162,15 @@ GoReleaser 使用 workflow 的 `GITHUB_TOKEN` 创建 Release，生成 Linux、ma
 模板版本与后续合并方式见[模板升级](docs/template-upgrades.md)。
 
 `mise run vuln` 独立访问 Go 漏洞数据库，PR、main 和每日定时执行；发现漏洞、数据库不可达或工具缺失均失败。源码 check 不请求漏洞数据库。
+
+发布包含每个归档的 SPDX JSON 和最终 checksums.txt。下载同一 Release 的资产后先验证校验和，再检查 SPDX 与来源证明：
+
+```sh
+sha256sum -c checksums.txt
+# macOS 可用 shasum -a 256 -c checksums.txt
+gh attestation verify <asset> --repo <owner/repo>
+```
+
+将占位符替换为实际资产与目标仓库。每个 `<archive>.spdx.json` 的 name 对应归档，packages 列出分析到的依赖；它描述最终构建依赖，不等于源码许可证合规结论。
+`mise run release:snapshot` 与 `mise run release:verify` 仅在本地构建和验证，不生成或上传远端证明。
+私有仓库须先确认套餐和组织策略支持 artifact attestations。证明失败会使 release workflow 失败；若资产已发布，重试时使用已发布的原始字节生成证明，不能重新构建或覆盖资产。
