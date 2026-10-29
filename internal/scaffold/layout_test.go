@@ -64,3 +64,37 @@ func TestOriginUsesCommandEntry(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "unknown", origin.SourceCommit)
 }
+
+func TestInitializeRejectsGoVersionNamesBeforeWriting(t *testing.T) {
+	for _, name := range []string{"v2", "v10", "v999999999999999999999999999999999999999"} {
+		t.Run(name, func(t *testing.T) {
+			root := projectFixture(t, TemplateModule, TemplateName)
+			before, err := os.ReadFile(filepath.Join(root, "go.mod"))
+			require.NoError(t, err)
+			_, err = Initialize(root, "example.com/tool", name)
+			require.Error(t, err)
+			after, err := os.ReadFile(filepath.Join(root, "go.mod"))
+			require.NoError(t, err)
+			require.Equal(t, before, after)
+			require.NoDirExists(t, filepath.Join(root, "cmd", name))
+		})
+	}
+}
+
+func TestInspectRejectsGoVersionNames(t *testing.T) {
+	for _, name := range []string{"v2", "v10"} {
+		t.Run(name, func(t *testing.T) {
+			root := projectFixture(t, "example.com/tool", name)
+			_, err := Inspect(root)
+			require.Error(t, err)
+		})
+	}
+	for _, name := range []string{"v0", "v1", "v02"} {
+		t.Run(name, func(t *testing.T) {
+			root := projectFixture(t, "example.com/tool", name)
+			project, err := Inspect(root)
+			require.NoError(t, err)
+			require.Equal(t, name, project.Name)
+		})
+	}
+}

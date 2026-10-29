@@ -3,7 +3,9 @@ package scaffold
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -22,6 +24,61 @@ func commandTransactionFixture(t *testing.T) (*Initializer, string, []change, *c
 	require.NoError(t, afero.WriteFile(i.FS, filepath.Join(root, from, "main_test.go"), []byte("package main\n"), 0600))
 	changes := []change{{filepath.Join(root, "go.mod"), []byte("module example.com/team/repository\n\ngo 1.27.0\n"), 0600}, {filepath.Join(root, from, "main.go"), []byte(strings.ReplaceAll(string(source), TemplateName, "my-cli")), 0640}}
 	return i, root, changes, &commandMove{From: from, To: "cmd/my-cli"}
+}
+
+func TestCommandMoveHardExitHelper(t *testing.T) {
+	if os.Getenv("LAYOUT_HARD_EXIT_HELPER") != "1" {
+		return
+	}
+	root := os.Getenv("LAYOUT_HARD_EXIT_ROOT")
+	point := os.Getenv("LAYOUT_HARD_EXIT_POINT")
+	base := afero.NewOsFs()
+	failed := false
+	fs := faultFS{Fs: base, rename: func(a, b string) error {
+		if point == "rollback" && a == filepath.Join(root, "cmd", TemplateName) && b == filepath.Join(root, "cmd/my-cli") {
+			failed = true
+			return errors.New("触发回滚")
+		}
+		if b == filepath.Join(root, "cmd", TemplateName, "main.go") && (point == "apply" || point == "same-name" || failed) {
+			os.Exit(99)
+		}
+		return base.Rename(a, b)
+	}}
+	i := Initializer{FS: fs}
+	name := "my-cli"
+	if point == "same-name" {
+		name = TemplateName
+	}
+	_, _ = i.Initialize(context.Background(), root, "example.com/tool", name)
+	t.Fatal("未触发进程退出")
+}
+
+func TestCommandMoveRecoversHardExitTemporaryFile(t *testing.T) {
+	for _, point := range []string{"apply", "rollback", "same-name"} {
+		t.Run(point, func(t *testing.T) {
+			root := projectFixture(t, TemplateModule, TemplateName)
+			source := "package main\nimport _ \"" + TemplateModule + "/internal/cli\"\nconst appName=\"" + TemplateName + "\"\nfunc main(){}\n"
+			require.NoError(t, os.WriteFile(filepath.Join(root, "cmd", TemplateName, "main.go"), []byte(source), 0600))
+			cmd := exec.Command(os.Args[0], "-test.run=^TestCommandMoveHardExitHelper$")
+			cmd.Env = append(os.Environ(), "LAYOUT_HARD_EXIT_HELPER=1", "LAYOUT_HARD_EXIT_ROOT="+root, "LAYOUT_HARD_EXIT_POINT="+point)
+			err := cmd.Run()
+			var exit *exec.ExitError
+			require.ErrorAs(t, err, &exit)
+			require.Equal(t, 99, exit.ExitCode())
+			name := "my-cli"
+			if point == "same-name" {
+				name = TemplateName
+			}
+			_, err = Initialize(root, "example.com/tool", name)
+			require.NoError(t, err)
+			project, err := Inspect(root)
+			require.NoError(t, err)
+			require.Equal(t, name, project.Name)
+			entries, err := os.ReadDir(filepath.Join(root, "cmd", name))
+			require.NoError(t, err)
+			require.Len(t, entries, 1)
+		})
+	}
 }
 
 func TestCommandMoveTransaction(t *testing.T) {

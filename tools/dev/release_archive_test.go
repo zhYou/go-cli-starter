@@ -38,6 +38,12 @@ func releaseArchiveBytes(t *testing.T, windows bool, binary, mode string) []byte
 		members = append(members, members[2])
 	case "symlink":
 		members[2].mode = os.ModeSymlink | 0644
+	case "dot-alias":
+		members = append(members, archiveMember{"./config.example.yaml", nil, 0644})
+	case "parent-alias":
+		members = append(members, archiveMember{"sub/../config.example.yaml", nil, 0644})
+	case "windows-alias":
+		members = append(members, archiveMember{`.\config.example.yaml`, nil, 0644})
 	}
 	var out bytes.Buffer
 	if windows {
@@ -75,7 +81,7 @@ func releaseArchiveBytes(t *testing.T, windows bool, binary, mode string) []byte
 
 func TestReleaseArchiveContents(t *testing.T) {
 	for _, target := range []string{"linux_amd64", "windows_amd64"} {
-		for _, mode := range []string{"valid", "binary", "readme", "config", "empty", "parent", "duplicate", "corrupt", "symlink"} {
+		for _, mode := range []string{"valid", "binary", "readme", "config", "empty", "parent", "duplicate", "corrupt", "symlink", "dot-alias", "parent-alias", "windows-alias"} {
 			t.Run(target+"/"+mode, func(t *testing.T) {
 				dir := releaseFixtureMode(t, target, mode)
 				err := checkReleaseSnapshot(dir)

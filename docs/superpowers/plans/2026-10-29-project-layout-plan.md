@@ -12,7 +12,7 @@
 
 **设计：** [已确认的目录迁移设计](../specs/2026-10-29-project-layout-design.md)。
 
-**状态：** 设计与计划已确认，用户选择本会话直接执行；五项实现及本地验收已完成，独立整分支审查待完成。
+**状态：** 设计与计划已确认，用户选择本会话直接执行；五项实现、本地验收、独立审查与重要问题修复均已完成。
 
 ## 全局约束
 
@@ -248,10 +248,29 @@
 
 ## 独立审查与交付记录
 
-- [ ] 独立审查全部实现提交并处理重要问题。
-- [ ] 更新待办状态及最终验证记录，交付隔离工作区。
+- [x] 独立审查全部实现提交并处理重要问题。
+- [x] 更新待办状态及最终验证记录，交付隔离工作区。
 
 本地验收：`fmt`、`check`（包含模板初始化、安装和契约检查）、`test:race`、
 `mcp:check`、六目标 `release:snapshot`、`release:verify` 与历史 Git 基准契约比较均通过。
 六目标归档根目录配置与源码字节一致；`codex mcp list` 已确认 gopls。
 本机验证 Linux 运行和六目标交叉构建，macOS/Windows 运行仍由对应 CI 确认。
+
+
+独立审查发现三项 Important、无 Critical/Minor；已在一次修复中完成以下回归：
+
+- `TestCommandMoveRecoversHardExitTemporaryFile`：真实子进程在应用或回滚原子替换前退出，
+  临时文件不再阻断恢复；同名初始化也覆盖。只清理由日志确认的目标临时路径。
+- `TestInitializeRejectsGoVersionNamesBeforeWriting`、`TestInspectRejectsGoVersionNames`：
+  提前拒绝会改变安装名的 Go 版本段；`TestInstallVersionLikeCommandNames` 实际安装
+  `v0`、`v1`、`v02`，确认允许的边界仍可用。
+- `TestReleaseArchiveContents`：tar.gz、zip 的点路径、父路径与 Windows 分隔符别名
+  不能覆盖已验证的必要文件。
+
+三项问题均观察到失败后再修复通过。最终完整测试为 12/12 包通过，完整 check、race、
+MCP、六目标 snapshot/verify、历史契约比较与配置字节核对也再次通过。
+
+执行判断记录：任务标题适配技能脚本；先保存实现提交再进行整分支审查，未自动合并；
+为保证安装名而拒绝 `v2` 等版本段名称，代价为允许名称范围收窄；异平台运行留给 CI，
+本地无该运行证据；延续不承诺断电原子性的边界，断电损坏可能须人工恢复；
+保持单应用范围，多入口仍明确失败。没有延后的 Minor 项。

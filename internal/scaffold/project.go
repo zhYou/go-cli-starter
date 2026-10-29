@@ -76,7 +76,10 @@ func (i *Initializer) inspect(root string) (Project, error) {
 		if err != nil {
 			return project, err
 		}
-		if !validName.MatchString(name) || name != entry.Name() {
+		if err := validateCommandName(name); err != nil {
+			return project, fmt.Errorf("命令入口 %s 的名称无效：%w", relative, err)
+		}
+		if name != entry.Name() {
 			return project, fmt.Errorf("命令目录与有效 appName 不一致：%s", relative)
 		}
 		count++

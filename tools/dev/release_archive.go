@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	archivepath "path"
 	"strings"
 )
 
@@ -15,6 +16,10 @@ import (
 func validateArchive(path, binary string) error {
 	required := map[string]bool{binary: false, "README.md": false, "config.example.yaml": false}
 	accept := func(name string, regular, nonempty bool) error {
+		canonical := archivepath.Clean(strings.ReplaceAll(name, `\`, "/"))
+		if _, needed := required[canonical]; needed && name != canonical {
+			return fmt.Errorf("归档必要文件使用非规范路径：%s", name)
+		}
 		found, needed := required[name]
 		if !needed {
 			return nil

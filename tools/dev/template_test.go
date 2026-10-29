@@ -59,3 +59,19 @@ func TestTemplateMetadataAndGuidesSurviveRename(t *testing.T) {
 	require.FileExists(t, filepath.Join(dir, "docs/template-upgrades.md"))
 	require.NoError(t, validateTemplateMetadata(dir))
 }
+
+func TestInstallVersionLikeCommandNames(t *testing.T) {
+	for _, name := range []string{"v0", "v1", "v02"} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/installfixture\n\ngo 1.27.0\n"), 0600))
+			dir := filepath.Join(root, "cmd", name)
+			require.NoError(t, os.MkdirAll(dir, 0755))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\nconst appName=\""+name+"\"\nfunc main(){}\n"), 0600))
+			require.NoError(t, prepareFixture(root))
+			project, err := scaffold.Inspect(root)
+			require.NoError(t, err)
+			require.NoError(t, verifyCommandInstall(root, project))
+		})
+	}
+}

@@ -19,13 +19,13 @@ func validateMove(move *commandMove, name string) error {
 	if move == nil {
 		return nil
 	}
-	if !validName.MatchString(name) || name == TemplateName || move.From != "cmd/"+TemplateName || move.To != "cmd/"+name {
+	if validateCommandName(name) != nil || name == TemplateName || move.From != "cmd/"+TemplateName || move.To != "cmd/"+name {
 		return fmt.Errorf("命令目录移动记录无效")
 	}
 	return nil
 }
 
-func (i *Initializer) commandMembers(root, relative string) ([]os.FileInfo, error) {
+func (i *Initializer) commandMembers(root, relative string, temporary ...string) ([]os.FileInfo, error) {
 	dir, err := i.safePath(root, relative)
 	if err != nil {
 		return nil, err
@@ -34,9 +34,13 @@ func (i *Initializer) commandMembers(root, relative string) ([]os.FileInfo, erro
 	if err != nil {
 		return nil, err
 	}
+	allowedTemporary := map[string]bool{}
+	for _, name := range temporary {
+		allowedTemporary[name] = true
+	}
 	main := false
 	for _, entry := range entries {
-		if entry.Name() != "main.go" && entry.Name() != "main_test.go" {
+		if entry.Name() != "main.go" && entry.Name() != "main_test.go" && !allowedTemporary[entry.Name()] {
 			return nil, fmt.Errorf("命令目录包含非受管内容：%s", entry.Name())
 		}
 		file, err := i.safePath(root, path.Join(relative, entry.Name()))
@@ -110,23 +114,28 @@ func (i *Initializer) commandLocation(root string, tx transaction) (string, erro
 	if (tx.Phase == "prepared" && location != tx.Move.From) || (tx.Phase == "committed" && location != tx.Move.To) {
 		return "", fmt.Errorf("命令目录与恢复阶段不一致")
 	}
-	entries, err := i.commandMembers(root, location)
-	if err != nil {
-		return "", err
-	}
 	expected := map[string]bool{}
+	temporary := []string{}
 	for _, file := range tx.Files {
 		if strings.HasPrefix(file.Path, tx.Move.From+"/") {
 			expected[strings.TrimPrefix(file.Path, tx.Move.From+"/")] = true
+			temporary = append(temporary, path.Base(transactionTemporary(file.Path)))
 		}
 	}
-	if len(expected) != len(entries) {
-		return "", fmt.Errorf("命令目录成员与恢复记录不一致")
+	entries, err := i.commandMembers(root, location, temporary...)
+	if err != nil {
+		return "", err
 	}
+	observed := map[string]bool{}
 	for _, entry := range entries {
-		if !expected[entry.Name()] {
+		if expected[entry.Name()] {
+			observed[entry.Name()] = true
+		} else if entry.Name() == "main.go" || entry.Name() == "main_test.go" {
 			return "", fmt.Errorf("命令目录出现未记录的文件：%s", entry.Name())
 		}
+	}
+	if len(observed) != len(expected) {
+		return "", fmt.Errorf("命令目录成员与恢复记录不一致")
 	}
 	return location, nil
 }

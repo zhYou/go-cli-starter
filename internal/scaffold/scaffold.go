@@ -63,8 +63,8 @@ func (original *Initializer) Initialize(ctx context.Context, root, module, name 
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if !validName.MatchString(name) {
-		return nil, errors.New("名称必须以小写字母开头，且只能包含小写字母、数字或连字符")
+	if err := validateCommandName(name); err != nil {
+		return nil, err
 	}
 	if !validModule.MatchString(module) || strings.HasSuffix(module, "/") {
 		return nil, errors.New("无效的 Go 模块路径")

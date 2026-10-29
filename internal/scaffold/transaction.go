@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/afero"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -56,6 +57,22 @@ func (i *Initializer) prepare(root, module, name string, changes []change, move 
 	changes, err = i.includeCommandFiles(root, changes, move)
 	if err != nil {
 		return tx, err
+	}
+	// 临时路径在持久日志写入前必须不存在，随后仅按日志中的目标路径推导。
+	for _, item := range changes {
+		relative, err := filepath.Rel(root, item.path)
+		if err != nil {
+			return tx, err
+		}
+		temporary, err := i.safePath(root, transactionTemporary(filepath.ToSlash(relative)))
+		if err != nil {
+			return tx, err
+		}
+		if _, err := i.FS.Stat(temporary); err == nil {
+			return tx, fmt.Errorf("事务临时文件已存在，保留现场：%s", temporary)
+		} else if !os.IsNotExist(err) {
+			return tx, err
+		}
 	}
 	if err := i.FS.Mkdir(filepath.Join(root, journalDir), 0700); err != nil {
 		return tx, err
@@ -137,6 +154,15 @@ func (i *Initializer) validateTransaction(root string, tx transaction) error {
 				return fmt.Errorf("恢复数据摘要不符：%s", relative)
 			}
 		}
+		temporary, err := i.transactionPath(root, tx, transactionTemporary(file.Path))
+		if err != nil {
+			return err
+		}
+		if info, err := i.FS.Stat(temporary); err == nil && !info.Mode().IsRegular() {
+			return fmt.Errorf("事务临时文件不是普通文件：%s", temporary)
+		} else if err != nil && !os.IsNotExist(err) {
+			return err
+		}
 		data, err := afero.ReadFile(i.FS, path)
 		exists := err == nil
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -183,7 +209,14 @@ func (i *Initializer) rollback(root string, tx transaction) error {
 			if err != nil {
 				return err
 			}
-			if err := i.atomicWrite(change{path, data, file.Mode}); err != nil {
+			temporary, err := i.transactionPath(root, tx, transactionTemporary(file.Path))
+			if err != nil {
+				return err
+			}
+			if err := i.FS.Remove(temporary); err != nil && !os.IsNotExist(err) {
+				return err
+			}
+			if err := i.atomicWriteAt(change{path, data, file.Mode}, temporary); err != nil {
 				return err
 			}
 		} else if err == nil {
@@ -268,7 +301,11 @@ func (i *Initializer) apply(ctx context.Context, root, module, name string, chan
 		if err := i.validateTransaction(root, tx); err != nil {
 			return nil, err
 		}
-		if err := i.atomicWrite(item); err != nil {
+		temporary, err := i.transactionPath(root, tx, transactionTemporary(tx.Files[index].Path))
+		if err != nil {
+			return nil, err
+		}
+		if err := i.atomicWriteAt(item, temporary); err != nil {
 			return fail(fmt.Errorf("初始化 %s 失败：%w", item.path, err))
 		}
 		changed = append(changed, tx.Files[index].Path)
@@ -332,6 +369,16 @@ func (file *transactionFile) UnmarshalJSON(data []byte) error {
 }
 
 func (i *Initializer) cleanup(root string, tx transaction) error {
+	for _, file := range tx.Files {
+		temporary, err := i.transactionPath(root, tx, transactionTemporary(file.Path))
+		if err != nil {
+			return err
+		}
+		if err := i.FS.Remove(temporary); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+
 	// 终态日志保留到最后，备份允许已被此前的清理删除。
 	for _, file := range tx.Files {
 		for _, relative := range []string{file.Backup, file.Staged} {
@@ -366,4 +413,9 @@ func (i *Initializer) cleanup(root string, tx transaction) error {
 	}
 	// 此处若中断，只留下空目录；重试可安全移除。
 	return i.FS.Remove(dir)
+}
+
+// transactionTemporary 的路径由持久记录的文件路径唯一确定。
+func transactionTemporary(relative string) string {
+	return path.Join(path.Dir(relative), ".template-init-"+path.Base(relative))
 }
