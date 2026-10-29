@@ -164,7 +164,8 @@ BL-004 至 BL-016 的范围已在讨论中确认，完整方案见
 
 ## BL-015 JSON 结果结构描述
 
-范围：从 Go Result 类型生成 JSON Schema，在现有命令描述中公开结果结构。
+范围：使用已确认的 google/jsonschema-go，从 Go Result 类型生成 JSON Schema，
+在现有命令描述中公开结果结构。
 
 验收：保留既有 schema 字段，结果描述与实际序列化一致；发现结构无需执行业务或读取配置。
 

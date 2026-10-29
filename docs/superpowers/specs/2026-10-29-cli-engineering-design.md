@@ -67,10 +67,11 @@ Protobuf、Buf 和 ozzo-validation 已从本次范围移出。
 | Go 类型与 JSON Schema | 与现有 JSON 输出衔接，结果结构可发现、可验证，需要处理序列化语义和补充描述 | 用户已选择 |
 | Protobuf 与 Buf | 适合共享 IDL、多语言生成和协议管理，需要代码生成工具链和 JSON 适配 | 本次不采用 |
 
-JSON Schema 库尚未由用户指定。本文作者提议采用 `github.com/google/jsonschema-go`，
-用于类型推导和测试中的结果验证。该库提供这些能力，且没有标准库以外的依赖；
-具体版本在实施前核验稳定标签并锁定。此项属于作者的选型提案。
-参考：[库说明](https://github.com/google/jsonschema-go)。
+用户已确认采用 `github.com/google/jsonschema-go`，用于类型推导和测试中的结果验证。
+该库由 Go 团队成员开发，以 Google 官方开源项目的独立 Go 模块发布，未纳入标准库。
+运行时无需额外第三方依赖；具体版本在实施前核验稳定标签并锁定。
+参考：[库说明](https://github.com/google/jsonschema-go)、
+[Go 团队成员的发布介绍](https://opensource.googleblog.com/2026/01/a-json-schema-package-for-go.html)。
 
 ## 命令执行与依赖
 
@@ -170,6 +171,8 @@ JSON Schema；本期只导出 Cobra 已明确提供的调用信息和结果类�
 Result 是结果契约的定义源。字段描述可通过库支持的标签补充。
 `omitempty`、指针、空切片、map、嵌套类型及自定义 JSON 编码必须与实际输出一致；
 无法正确推导的类型显式提供覆盖，无法描述时返回清晰错误，禁止静默丢字段。
+所选库不会自动推导递归 Go 类型，这类结果需显式描述；其验证器将 format 作为描述信息，
+不据此检查邮箱或日期等格式。需要保证的格式约束由显式校验和对应测试覆盖。
 结果对象允许将来增加字段，生成的对象 Schema 应允许额外属性；已定义字段的类型、
 可空性和必填约束须精确。该策略与拒绝未知配置键的策略分别处理。
 
@@ -318,8 +321,9 @@ template:check、mcp:check 和 release:snapshot；工具集成变更确认受信
 
 ### 作者提案与实施者裁量
 
-需要用户在确认本文时一并审阅的作者提案：JSON Schema 使用 google/jsonschema-go；
-在 schema_version 1 下增加可选 result_schema；精确说明输出设备写入失败的边界；
+JSON Schema 的 google/jsonschema-go 选型已由用户确认。
+需要用户在确认本文时一并审阅的作者提案：在 schema_version 1 下增加可选 result_schema；
+精确说明输出设备写入失败的边界；
 使用恢复记录处理初始化中断；SBOM 使用 Syft；托管设置通过维护者清单完成。
 
 实施者可决定包内文件划分、私有类型与接口名称、测试夹具组织、依赖的具体稳定版本、
