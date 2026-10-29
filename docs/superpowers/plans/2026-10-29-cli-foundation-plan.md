@@ -47,11 +47,11 @@
 **输入：** 任务 1 的 Runtime 分类。
 **输出：** CLI 包内 `writeJSON(io.Writer,any) error`、`writeText(io.Writer,func(io.Writer)error) error`；只在渲染成功后写出，短写使用 `io.ErrShortWrite`；每次 Run 创建 `recordingWriter`，提供 `Write([]byte)(int,error)` 和 `Err() error`。
 
-- [ ] 写 `TestJSONMarshalFailureLeavesOutputEmpty`：不可编码值返回错误且 `out.Len()==0`；`TestTextRenderFailureLeavesOutputEmpty`：渲染先写局部文本再报错，外部 stdout 仍为空；`TestShortWriteIsFailure`：`n<len(data),err=nil` 映射为 1；`TestHelpWriteFailureIsRuntimeError`：void 帮助 callback 的写错也通过 Run 返回 1。
-- [ ] 执行 `mise exec -- go test ./internal/cli -run 'TestJSONMarshalFailure|TestTextRenderFailure|TestShortWrite|TestHelpWriteFailure'`，确认失败来自缺失输出入口或现有帮助错误丢失。
-- [ ] 在 output.go 实现缓冲渲染和一次写出，JSON 追加一个换行；替换各命令分散编码。Run 以 recordingWriter 包装 stdout，执行返回 nil 时检查记录的写入错误，覆盖 SetHelpFunc 无返回值的边界；已存在的业务错误优先保留，不增加全局错误槽。
-- [ ] 更新文档：执行和序列化失败为空 stdout；底层写入失败可能已有部分字节，消费方先检查退出码。
-- [ ] 执行 `mise exec -- go test ./internal/cli`，验证文本/JSON、补全和 schema 形式兼容；`mise run template:check` 通过后提交 `refactor: 统一结果渲染与输出失败处理`。
+- [x] 写 `TestJSONMarshalFailureLeavesOutputEmpty`：不可编码值返回错误且 `out.Len()==0`；`TestTextRenderFailureLeavesOutputEmpty`：渲染先写局部文本再报错，外部 stdout 仍为空；`TestShortWriteIsFailure`：`n<len(data),err=nil` 映射为 1；`TestHelpWriteFailureIsRuntimeError`：void 帮助 callback 的写错也通过 Run 返回 1。
+- [x] 执行 `mise exec -- go test ./internal/cli -run 'TestJSONMarshalFailure|TestTextRenderFailure|TestShortWrite|TestHelpWriteFailure'`，确认失败来自缺失输出入口或现有帮助错误丢失。
+- [x] 在 output.go 实现缓冲渲染和一次写出，JSON 追加一个换行；替换各命令分散编码。Run 以 recordingWriter 包装 stdout，执行返回 nil 时检查记录的写入错误，覆盖 SetHelpFunc 无返回值的边界；已存在的业务错误优先保留，不增加全局错误槽。
+- [x] 更新文档：执行和序列化失败为空 stdout；底层写入失败可能已有部分字节，消费方先检查退出码。
+- [x] 执行 `mise exec -- go test ./internal/cli`，验证文本/JSON、补全和 schema 形式兼容；`mise run template:check` 通过后提交 `refactor: 统一结果渲染与输出失败处理`。
 
 ### Task 3: 复用业务校验
 

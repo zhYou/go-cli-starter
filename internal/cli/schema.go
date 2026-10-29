@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"sort"
 
 	"github.com/spf13/cobra"
@@ -37,7 +36,7 @@ func newSchemaCommand(root *cobra.Command) *cobra.Command {
 			return err
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return json.NewEncoder(cmd.OutOrStdout()).Encode(struct {
+			return writeJSON(cmd.OutOrStdout(), struct {
 				SchemaVersion int             `json:"schema_version"`
 				OutputFormats []string        `json:"output_formats"`
 				ExitCodes     map[string]int  `json:"exit_codes"`

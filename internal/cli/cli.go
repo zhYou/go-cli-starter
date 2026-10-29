@@ -3,7 +3,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -28,9 +27,14 @@ type Options struct {
 // Run 执行一次命令并返回约定的退出码，不直接退出进程。
 func Run(ctx context.Context, args []string, opts Options) int {
 	opts = defaults(opts)
+	sink := &recordingWriter{writer: opts.Out}
+	opts.Out = sink
 	root := newRoot(opts)
 	root.SetArgs(args)
 	_, err := root.ExecuteContextC(ctx)
+	if err == nil && sink.Err() != nil {
+		err = apperror.Wrap(apperror.Runtime, "写入结果失败", sink.Err())
+	}
 	err = classifyExecutionError(err)
 	if err == nil {
 		return 0
@@ -140,10 +144,9 @@ func newRoot(opts Options) *cobra.Command {
 			}
 			logger.DebugContext(cmd.Context(), "已生成问候语", "name", name)
 			if asJSON {
-				return json.NewEncoder(cmd.OutOrStdout()).Encode(result)
+				return writeJSON(cmd.OutOrStdout(), result)
 			}
-			_, err = fmt.Fprintln(cmd.OutOrStdout(), result.Message)
-			return err
+			return writeText(cmd.OutOrStdout(), func(w io.Writer) error { _, err := fmt.Fprintln(w, result.Message); return err })
 		},
 	}
 	greet.Flags().StringVar(&name, "name", "", "问候对象的姓名")
@@ -155,15 +158,17 @@ func newRoot(opts Options) *cobra.Command {
 		Annotations: map[string]string{"skip-config": "true"},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if asJSON {
-				return json.NewEncoder(cmd.OutOrStdout()).Encode(struct {
+				return writeJSON(cmd.OutOrStdout(), struct {
 					Name    string `json:"name"`
 					Version string `json:"version"`
 					Commit  string `json:"commit"`
 					Date    string `json:"date"`
 				}{opts.Name, opts.Version, opts.Commit, opts.Date})
 			}
-			_, err := fmt.Fprintf(cmd.OutOrStdout(), "%s 版本 %s（提交 %s，构建时间 %s）\n", opts.Name, opts.Version, opts.Commit, opts.Date)
-			return err
+			return writeText(cmd.OutOrStdout(), func(w io.Writer) error {
+				_, err := fmt.Fprintf(w, "%s 版本 %s（提交 %s，构建时间 %s）\n", opts.Name, opts.Version, opts.Commit, opts.Date)
+				return err
+			})
 		},
 	}
 	root.CompletionOptions.DisableDefaultCmd = true

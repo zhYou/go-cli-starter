@@ -67,7 +67,7 @@ go install github.com/zhYou/go-cli-starter@latest
 ```
 
 - 默认文本；`--json` 不随终端环境改变，也不由配置或环境变量隐式开启。
-- 成功结果写 stdout，日志和错误写 stderr。失败时 stdout 为空，错误输出为文本。
+- 成功结果写 stdout，日志和错误写 stderr。执行或序列化失败时 stdout 为空，错误输出为文本。底层写入失败可能留下部分字节，消费方须先检查退出码。
 - 缺少必需参数直接失败。
 - `schema [命令路径...]` 总是输出 JSON，包含命令树、用法、示例、参数类型、必填标记、默认值和退出码。它描述调用方式，不是业务结果的 JSON Schema。
 - 帮助输出文本，补全输出 shell 脚本；它们不受 `--json` 影响。
