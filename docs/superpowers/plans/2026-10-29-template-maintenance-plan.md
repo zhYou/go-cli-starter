@@ -28,7 +28,7 @@
 修改 scaffold.go 作为身份与受管文件入口、tools/init 作为 CLI 适配。
 新增根目录 `.template-version`、初始化生成的 `.template-origin.json` 和 `docs/template-upgrades.md`。
 
-### 任务 10：文件适配、互斥与恢复事务
+### Task 10: 文件适配、互斥与恢复事务
 
 **文件：** 新建 `internal/scaffold/filesystem.go`、`filesystem_test.go`、`transaction.go`、`transaction_test.go`；修改 scaffold.go、scaffold_test.go、tools/init/main.go、go.mod/go.sum、.gitignore、tools/dev/template.go。
 **输入：** 现有 Identity、参数规则和受管白名单；Afero 与 flock 的总览版本。
@@ -43,7 +43,7 @@
 - [ ] 对真实路径与 journal 路径保留根目录、白名单、Lstat/EvalSymlinks 检查；Afero 内存测试不能替代这些检查。同步 Go 注释中“仅标准库”的旧表述，并从模板复制和发布中排除恢复目录及锁。
 - [ ] 执行 `mise exec -- go test ./internal/scaffold ./tools/init ./tools/dev`、`mise run template:check`、`mise run test:race`，三平台 CI 保留真实 FS 测试；提交 `feat: 为模板初始化增加互斥与失败恢复`。
 
-### 任务 11：模板来源、版本与迁移
+### Task 11: 模板来源、版本与迁移
 
 **文件：** 新建 `.template-version`、`internal/scaffold/origin.go`、`origin_test.go`、`docs/template-upgrades.md`；修改 transaction.go、scaffold.go、tools/dev/template.go、template_test.go、README 和开发说明。
 **输入：** 任务 10 的事务和“文件原本是否存在”记录；`.template-version` 首版值 `0.1.0`，与应用版本独立。

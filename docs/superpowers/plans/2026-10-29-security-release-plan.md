@@ -29,7 +29,7 @@
 `renovate.json`、`.github/workflows/security.yml`、PR 模板、CODEOWNERS 示例、SECURITY 和维护说明。
 修改 mise、工具锁、doctor、CI、发布配置、README、开发说明与 scaffold 受管清单。
 
-### 任务 12：工具一致性与依赖更新配置
+### Task 12: 工具一致性与依赖更新配置
 
 **文件：** 新建 `tools/dev/versions.go`、`versions_test.go`、`renovate.json`；修改 tools/dev/main.go、main_test.go、mise.toml、README、AGENTS、CI、go.mod/go.sum 和 scaffold 白名单。
 **输入：** mise.toml、mise.lock、go.mod、当前 README 工具表和 CI 引导版本。
@@ -42,7 +42,7 @@
 - [ ] Doctor 用各工具专用、带边界的版本提取器；新增 `versions:check` 接入 check。Renovate 固定依赖、忽略预发布、关闭自动合并，覆盖 Go、Actions SHA、mise，并分组相关工具链变更；锁文件自动更新受平台权限约束时由维护者按文档补齐，检查照常失败。
 - [ ] 运行 `mise run versions:check`、`mise run doctor`、`mise exec -- go test ./tools/dev`、`mise run mcp:check`、`mise run template:check`，确认受信任会话中 `codex mcp list` 包含 gopls；提交 `feat: 检查工具版本一致性并配置依赖更新`。
 
-### 任务 13：独立漏洞扫描与定时 CI
+### Task 13: 独立漏洞扫描与定时 CI
 
 **文件：** 新建 `tools/dev/vulnerability.go`、`vulnerability_test.go`、`.github/workflows/security.yml`；修改 tools/dev/main.go、mise.toml、mise.lock、README、开发说明、版本期望测试和 scaffold 白名单。
 **输入：** 任务 12 的 VersionSet；govulncheck 模块 v1.9.0。
@@ -54,7 +54,7 @@
 - [ ] 提供 `mise run vuln`，从 check 中保持独立。security workflow 对 PR、main 和每日 `17 3 * * *` 执行；contents: read，不接收发布凭据。文档说明数据库访问、失败处理和定时扫描作用。
 - [ ] 执行 `mise run setup`、`mise run doctor`、`mise run versions:check`、`mise exec -- go test ./tools/dev`、`mise run vuln`；真实网络不可用时记录失败，不以 fake runner 通过替代。提交 `feat: 增加持续漏洞检查与定时扫描`。
 
-### 任务 14：SBOM、来源证明与产物校验
+### Task 14: SBOM、来源证明与产物校验
 
 **文件：** 新建 `tools/dev/release.go`、`release_test.go`；修改 .goreleaser.yaml、release.yml、mise.toml、mise.lock、tools/dev/main.go、README、开发说明和 scaffold 白名单。
 **输入：** 当前六目标压缩包、checksums.txt、Syft v1.55.0；任务 12 的版本检查。
@@ -68,7 +68,7 @@
 - [ ] 文档提供 checksum、SPDX 和 `gh attestation verify <asset> --repo <owner/repo>` 步骤，说明私有仓库平台前提与本地 snapshot 边界；所有 Actions 保持完整 SHA 锁定。
 - [ ] 执行 `mise run setup`、`mise run doctor`、`mise run versions:check`、`mise exec -- go test ./tools/dev`、`mise run release:snapshot`、`mise run release:verify`、`mise run template:check`。本地不运行 attestation 上传；记录远端集成尚需受信任 workflow 验证。提交 `feat: 为发布包生成 SBOM 与构建来源证明`。
 
-### 任务 15：维护者入口与最终验收
+### Task 15: 维护者入口与最终验收
 
 **文件：** 新建 `.github/PULL_REQUEST_TEMPLATE.md`、`.github/CODEOWNERS.example`、`SECURITY.md`、`docs/maintenance.md`；修改 README、开发说明、template-upgrades、scaffold 白名单和 docs/backlog.md。
 **输入：** 前十四项的真实任务名、验证结果、模板元数据和迁移说明。

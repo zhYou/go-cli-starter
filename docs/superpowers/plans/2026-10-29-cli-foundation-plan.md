@@ -28,20 +28,20 @@
 `internal/logging/{logging,logging_test}.go`；CLI 新增 errors.go、output.go、dependencies.go、greet.go、version.go 及相应测试。
 修改现有 cli.go、help.go、discovery.go、schema.go、config 和 greeting；每项同步 scaffold 受管清单及开发说明。
 
-### 任务 1：错误分类与 Cobra 错误边界
+### Task 1: 错误分类与 Cobra 错误边界
 
 **文件：** 新建 `internal/apperror/error.go`、`error_test.go`、`internal/cli/errors.go`、`errors_test.go`；修改 cli.go、help.go、discovery.go、schema.go、go.mod/go.sum 和 `internal/scaffold/scaffold.go`。
 **输入：** 现有 `Run(context.Context, []string, Options) int` 和各命令 callback。
 **输出：** `apperror.Kind` 的 Usage/Configuration/Runtime；`Error{Kind,Message,Cause}`；`New(Kind,string) error`、`Wrap(Kind,string,error) error`、`KindOf(error) Kind`；CLI 的 `exitCode(error) int`、`wrapRun(func(*cobra.Command,[]string)error) func(*cobra.Command,[]string)error`。
 
-- [ ] 引入总览锁定的 Testify，保留现有测试作为行为基线。
-- [ ] 写 `TestExitCodeAndUnwrap`：断言 Usage=2、Configuration/Runtime/普通业务错误=1、包装的 Canceled/DeadlineExceeded=130、nil=0；`errors.Is(wrapped,cause)==true`。写 `TestBusinessErrorWithCustomPreRun`：自定义 PreRun 后业务失败仍为 1。
-- [ ] 执行 `mise exec -- go test ./internal/apperror ./internal/cli -run 'TestExitCodeAndUnwrap|TestBusinessErrorWithCustomPreRun'`，确认因缺失分类能力失败。
-- [ ] 实现错误类型与适配：所有业务 RunE 的普通错误先由 wrapRun 标为 Runtime；配置/日志准备错误标为 Configuration；Args、flag 解析和剩余 Cobra 框架失败标为 Usage。取消优先匹配原因链。移除以 started 判定业务错误的逻辑，禁止匹配第三方英文错误字符串。
-- [ ] 运行上述测试及 `mise exec -- go test ./internal/cli ./internal/apperror`；确认必填标记、未知选项、未知命令、错误路径均保持 2。运行 `mise run template:check`。
-- [ ] 提交：`git commit -m 'refactor: 明确错误分类与退出码边界'`，仅暂存本任务文件。
+- [x] 引入总览锁定的 Testify，保留现有测试作为行为基线。
+- [x] 写 `TestExitCodeAndUnwrap`：断言 Usage=2、Configuration/Runtime/普通业务错误=1、包装的 Canceled/DeadlineExceeded=130、nil=0；`errors.Is(wrapped,cause)==true`。写 `TestBusinessErrorWithCustomPreRun`：自定义 PreRun 后业务失败仍为 1。
+- [x] 执行 `mise exec -- go test ./internal/apperror ./internal/cli -run 'TestExitCodeAndUnwrap|TestBusinessErrorWithCustomPreRun'`，确认因缺失分类能力失败。
+- [x] 实现错误类型与适配：所有业务 RunE 的普通错误先由 wrapRun 标为 Runtime；配置/日志准备错误标为 Configuration；Args、flag 解析和剩余 Cobra 框架失败标为 Usage。取消优先匹配原因链。移除以 started 判定业务错误的逻辑，禁止匹配第三方英文错误字符串。
+- [x] 运行上述测试及 `mise exec -- go test ./internal/cli ./internal/apperror`；确认必填标记、未知选项、未知命令、错误路径均保持 2。运行 `mise run template:check`。
+- [x] 提交：`git commit -m 'refactor: 明确错误分类与退出码边界'`，仅暂存本任务文件。
 
-### 任务 2：完整渲染后统一输出
+### Task 2: 完整渲染后统一输出
 
 **文件：** 新建 `internal/cli/output.go`、`output_test.go`；修改 cli.go、schema.go、discovery.go、help.go、README、AGENTS 和开发说明。
 **输入：** 任务 1 的 Runtime 分类。
@@ -53,7 +53,7 @@
 - [ ] 更新文档：执行和序列化失败为空 stdout；底层写入失败可能已有部分字节，消费方先检查退出码。
 - [ ] 执行 `mise exec -- go test ./internal/cli`，验证文本/JSON、补全和 schema 形式兼容；`mise run template:check` 通过后提交 `refactor: 统一结果渲染与输出失败处理`。
 
-### 任务 3：复用业务校验
+### Task 3: 复用业务校验
 
 **文件：** 新建 `internal/validation/validation.go`、`validation_test.go`、`internal/greeting/greeting_test.go`；修改 greeting.go、cli.go、go.mod/go.sum 和 scaffold 受管清单。
 **输入：** `apperror.Usage`；总览中的 validator 版本。
@@ -65,7 +65,7 @@
 - [ ] 执行 `mise exec -- go test ./internal/validation ./internal/greeting ./internal/cli`；确认无效参数在配置加载或业务执行前失败，直接业务调用同样受保护。
 - [ ] 更新添加业务命令的示例及受管白名单，`mise run template:check` 后提交 `feat: 统一业务选项校验与中文提示`。
 
-### 任务 4：严格配置接入 koanf
+### Task 4: 严格配置接入 koanf
 
 **文件：** 修改 `internal/config/config.go`、`config_test.go`、cli.go、go.mod/go.sum、scaffold 受管清单和开发说明。
 **输入：** 任务 3 的 `*validation.Validator`。
@@ -77,7 +77,7 @@
 - [ ] 执行 `mise exec -- go test ./internal/config ./internal/cli`、`mise run template:check`；确认损坏配置不阻断发现命令。
 - [ ] 提交 `refactor: 使用 koanf 保持严格配置覆盖规则`。
 
-### 任务 5：每次调用的 zap 日志
+### Task 5: 每次调用的 zap 日志
 
 **文件：** 新建 `internal/logging/logging.go`、`logging_test.go`；修改 cli.go、go.mod/go.sum、scaffold 受管清单。
 **输入：** 任务 4 的有效日志级别和调用者 ErrOut。
@@ -89,7 +89,7 @@
 - [ ] 执行 `mise exec -- go test ./internal/logging ./internal/cli`，确认无 `slog` 全局状态或新日志格式选项。
 - [ ] 更新日志说明及受管清单，提交 `refactor: 使用独立 zap logger 输出诊断`。
 
-### 任务 6：命令构造与依赖装配
+### Task 6: 命令构造与依赖装配
 
 **文件：** 新建 `internal/cli/dependencies.go`、`dependencies_test.go`、`greet.go`、`version.go`；修改 cli.go、cli_test.go、scaffold 受管清单及开发说明。
 **输入：** 任务 1—5 的错误、输出、校验、加载和日志接口。

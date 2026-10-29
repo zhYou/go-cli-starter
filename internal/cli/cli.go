@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/zhYou/go-cli-starter/internal/apperror"
 	"github.com/zhYou/go-cli-starter/internal/config"
 	"github.com/zhYou/go-cli-starter/internal/greeting"
 )
@@ -24,15 +25,13 @@ type Options struct {
 	LookupEnv                   func(string) (string, bool)
 }
 
-type execution struct{ started bool }
-
 // Run 执行一次命令并返回约定的退出码，不直接退出进程。
 func Run(ctx context.Context, args []string, opts Options) int {
 	opts = defaults(opts)
-	state := &execution{}
-	root := newRoot(opts, state)
+	root := newRoot(opts)
 	root.SetArgs(args)
 	_, err := root.ExecuteContextC(ctx)
+	err = classifyExecutionError(err)
 	if err == nil {
 		return 0
 	}
@@ -45,14 +44,11 @@ func Run(ctx context.Context, args []string, opts Options) int {
 		return 130
 	}
 	_, _ = fmt.Fprintf(opts.ErrOut, "错误：%v\n", err)
-	if state.started {
-		return 1
-	}
-	return 2
+	return exitCode(err)
 }
 
 // NewRoot 提供命令构造入口，供扩展和嵌入式测试使用。
-func NewRoot(opts Options) *cobra.Command { return newRoot(defaults(opts), &execution{}) }
+func NewRoot(opts Options) *cobra.Command { return newRoot(defaults(opts)) }
 
 func defaults(opts Options) Options {
 	if opts.Name == "" {
@@ -79,7 +75,7 @@ func defaults(opts Options) Options {
 	return opts
 }
 
-func newRoot(opts Options, state *execution) *cobra.Command {
+func newRoot(opts Options) *cobra.Command {
 	var asJSON bool
 	var configPath, logLevel string
 	logger := slog.New(slog.NewTextHandler(opts.ErrOut, &slog.HandlerOptions{Level: slog.LevelWarn}))
@@ -99,7 +95,6 @@ func newRoot(opts Options, state *execution) *cobra.Command {
 	root.PersistentFlags().StringVar(&configPath, "config", "", "从指定的 YAML 文件读取配置")
 	root.PersistentFlags().StringVar(&logLevel, "log-level", "warn", "日志级别：debug、info、warn、error")
 	root.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
-		state.started = true
 		if err := cmd.Context().Err(); err != nil {
 			return err
 		}
@@ -115,11 +110,11 @@ func newRoot(opts Options, state *execution) *cobra.Command {
 			LookupEnv: opts.LookupEnv, LogLevel: override,
 		})
 		if err != nil {
-			return err
+			return apperror.Wrap(apperror.Configuration, "读取配置失败", err)
 		}
 		var level slog.Level
 		if err := level.UnmarshalText([]byte(cfg.LogLevel)); err != nil {
-			return err
+			return apperror.Wrap(apperror.Configuration, "日志配置无效", err)
 		}
 		logger = slog.New(slog.NewTextHandler(opts.ErrOut, &slog.HandlerOptions{Level: level}))
 		return nil
@@ -177,6 +172,8 @@ func newRoot(opts Options, state *execution) *cobra.Command {
 	root.AddCommand(greet, version, newSchemaCommand(root), newCompletionCommand(root))
 	configureChineseHelp(root)
 	configureChineseHelp(help)
+	protectCommand(root)
+	protectCommand(help)
 	return root
 }
 

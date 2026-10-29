@@ -28,7 +28,7 @@ Draft 2020-12；消费方忽略新增字段，结果对象允许额外属性，�
 `tools/dev/contracts.go` 及测试、`testdata/contracts/v1.json` 和 `docs/compatibility.md`。
 进程测试放在 `internal/cli/process_test.go` 和 `main_test.go`；脚本放在 `internal/cli/testdata/process/`。
 
-### 任务 7：结果类型注册与 Schema 生成
+### Task 7: 结果类型注册与 Schema 生成
 
 **文件：** 新建 `internal/contract/schema.go`、`schema_test.go`、`internal/cli/results.go`、`schema_test.go`；修改 schema.go、greet.go、version.go、cli.go、go.mod/go.sum、scaffold 白名单、README 和开发说明。
 **输入：** 第一批命令工厂、writeJSON 和有类型 greeting.Result；version 的匿名结果改为 `versionResult`，字段及 JSON 标签完全保留。
@@ -41,7 +41,7 @@ Draft 2020-12；消费方忽略新增字段，结果对象允许额外属性，�
 - [ ] 用 go-cmp 检查规范化结构；额外字段验证可通过，删除 message 或改成数字必须失败；发现入口损坏配置测试继续通过。运行 `mise exec -- go test ./internal/contract ./internal/cli` 和 `mise run template:check`。
 - [ ] 提交 `feat: 从结果类型公开 JSON Schema`。
 
-### 任务 8：机器接口基线与变更记录
+### Task 8: 机器接口基线与变更记录
 
 **文件：** 新建 `internal/contract/snapshot.go`、`snapshot_test.go`、`tools/dev/contracts.go`、`contracts_test.go`、`testdata/contracts/v1.json`、`docs/compatibility.md`、`docs/compatibility/changes/2026-10-29-result-schema.json`；修改 tools/dev/main.go、mise.toml、CI、go.mod/go.sum、scaffold 白名单和开发说明。
 **输入：** 任务 7 的实际命令描述、Result Schema 和第一批 Run；基线应用名称固定 `contract-cli`，版本字段固定测试值。
@@ -54,7 +54,7 @@ Draft 2020-12；消费方忽略新增字段，结果对象允许额外属性，�
 - [ ] 增加 `contract:check` 和显式 `contract:update`；check 不改文件，接入 mise check。tools/dev main 通过 runArgs 允许 contract-check 的 `--against`，其他多余参数立即中文报错。CI 另用 `mise run contract:check -- --against <base SHA>` 对 PR base / push before 比较，fetch 足够历史；首个基线不存在时要求明确的初始化记录。Git 参数逐项传递，模板临时仓库默认检查不要求已有 HEAD 或 remote。
 - [ ] 运行 `mise run contract:check`、上述测试及 `mise run check`；用测试 fixture 重现刷新快照仍失败；提交 `feat: 检查机器接口基线与兼容变更记录`。
 
-### 任务 9：真实二进制与信号测试
+### Task 9: 真实二进制与信号测试
 
 **文件：** 新建 `internal/cli/process_test.go`、`internal/cli/testdata/process/{success,usage,configuration,discovery}.txtar`、`main_test.go`；修改 main.go、go.mod/go.sum、CI、scaffold 白名单、README 和开发说明。
 **输入：** `cli.Options.Dependencies` 和任务 1 的错误映射。
