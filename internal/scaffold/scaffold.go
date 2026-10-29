@@ -29,6 +29,7 @@ var managedFiles = []string{
 	"internal/cli/process_test.go",
 	"tools/dev/contracts_test.go",
 	"tools/dev/contracts.go",
+	"tools/dev/template_test.go",
 	"internal/cli/result_schema_test.go",
 	"internal/cli/results.go",
 	"internal/cli/dependencies.go",
@@ -145,6 +146,13 @@ func (original *Initializer) Initialize(ctx context.Context, root, module, name 
 			}
 			changes = append(changes, change{path, updatedData, info.Mode().Perm()})
 		}
+	}
+	origin, err := i.originChange(ctx, root, module, name)
+	if err != nil {
+		return nil, err
+	}
+	if origin != nil {
+		changes = append(changes, *origin)
 	}
 	if len(changes) == 0 {
 		return []string{}, nil

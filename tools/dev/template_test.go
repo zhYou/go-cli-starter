@@ -1,6 +1,9 @@
 package main
 
 import (
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/require"
+	"github.com/zhYou/go-cli-starter/internal/scaffold"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -30,4 +33,21 @@ func TestCopiedRepositorySupportsGoVCSStamping(t *testing.T) {
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("独立构建失败：%v\n%s", err, output)
 	}
+}
+
+func TestTemplateMetadataAndGuidesSurviveRename(t *testing.T) {
+	dir := t.TempDir()
+	for name, data := range map[string]string{"go.mod": "module " + scaffold.TemplateModule + "\n\ngo 1.27.0\n", "main.go": "package main\nconst appName = \"" + scaffold.TemplateName + "\"\nfunc main(){}\n", ".template-version": "0.1.0\n"} {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(data), 0600))
+	}
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "docs"), 0755))
+	require.NoError(t, copyFile("../../docs/template-upgrades.md", filepath.Join(dir, "docs/template-upgrades.md")))
+	_, err := scaffold.Initialize(dir, "example.com/copied/tool", "copied")
+	require.NoError(t, err)
+	origin, err := scaffold.ReadOrigin(afero.NewOsFs(), dir)
+	require.NoError(t, err)
+	require.Equal(t, scaffold.TemplateModule, origin.Template)
+	require.Equal(t, "example.com/copied/tool", origin.Module)
+	require.FileExists(t, filepath.Join(dir, "docs/template-upgrades.md"))
+	require.NoError(t, validateTemplateMetadata(dir))
 }

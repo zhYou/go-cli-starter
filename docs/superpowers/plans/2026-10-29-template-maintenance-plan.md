@@ -49,9 +49,9 @@
 **输入：** 任务 10 的事务和“文件原本是否存在”记录；`.template-version` 首版值 `0.1.0`，与应用版本独立。
 **输出：** `Origin{FormatVersion int, Template string, TemplateVersion string, SourceCommit string, Module string, Name string}`；JSON 字段依次为 format_version、template、template_version、source_commit、module、name；`ReadOrigin(afero.Fs,string)(Origin,error)`、`makeOrigin(root,module,name string)(Origin,error)`。
 
-- [ ] 写 `TestOriginWithoutGitAndLegacyProject`：SourceCommit 缺失为 `unknown`，旧项目缺少来源记录仍可 build/check；`TestOriginIsIdempotent`：再次同参初始化记录逐字不变；`TestOriginFailureRollsBackRename`：来源写入失败不留下部分改名。在 tools/dev/template_test.go 新增 `TestTemplateMetadataAndGuidesSurviveRename`，验证来源元数据及升级指南在新项目中有效。
-- [ ] 执行 `mise exec -- go test ./internal/scaffold ./tools/dev -run 'TestOrigin'`，确认缺失来源机制时失败。
-- [ ] 将 `.template-origin.json` 作为事务最后应用的文件，Template 使用原始 TemplateModule 来源标识，不能被目标名称替换。SourceCommit 仅在可确定原模板来源时记录；旧定制项目不根据自己的 HEAD 伪造来源。未知来源可继续工作，不回填猜测数据。
-- [ ] 明确身份已匹配时的行为：已有记录保持字节幂等；旧项目无记录仍报告未知来源；来源身份明确的新模板第一次初始化才创建记录。原始模板身份与来源标识的固定内容不进入目标名称替换。
-- [ ] 为本次 0.1.0 迁移写具体说明：CLI 执行基础、Schema 增量、开发任务、发布与托管配置；标清业务示例如何人工合并，不提供自动覆盖命令。更新受管清单及模板副本检查，使新副本的元数据、契约 fixture、模块导入和工具配置均独立有效。
-- [ ] 执行 `mise run fmt`、`mise run check`、`mise run test:race`、`mise run template:check`；提交 `feat: 记录模板来源并提供升级迁移路径`，按验收更新 BL-010/016。
+- [x] 写 `TestOriginWithoutGitAndLegacyProject`：SourceCommit 缺失为 `unknown`，旧项目缺少来源记录仍可 build/check；`TestOriginIsIdempotent`：再次同参初始化记录逐字不变；`TestOriginFailureRollsBackRename`：来源写入失败不留下部分改名。在 tools/dev/template_test.go 新增 `TestTemplateMetadataAndGuidesSurviveRename`，验证来源元数据及升级指南在新项目中有效。
+- [x] 执行 `mise exec -- go test ./internal/scaffold ./tools/dev -run 'TestOrigin'`，确认缺失来源机制时失败。
+- [x] 将 `.template-origin.json` 作为事务最后应用的文件，Template 使用原始 TemplateModule 来源标识，不能被目标名称替换。SourceCommit 仅在可确定原模板来源时记录；旧定制项目不根据自己的 HEAD 伪造来源。未知来源可继续工作，不回填猜测数据。
+- [x] 明确身份已匹配时的行为：已有记录保持字节幂等；旧项目无记录仍报告未知来源；来源身份明确的新模板第一次初始化才创建记录。原始模板身份与来源标识的固定内容不进入目标名称替换。
+- [x] 为本次 0.1.0 迁移写具体说明：CLI 执行基础、Schema 增量、开发任务、发布与托管配置；标清业务示例如何人工合并，不提供自动覆盖命令。更新受管清单及模板副本检查，使新副本的元数据、契约 fixture、模块导入和工具配置均独立有效。
+- [x] 执行 `mise run fmt`、`mise run check`、`mise run test:race`、`mise run template:check`；提交 `feat: 记录模板来源并提供升级迁移路径`，按验收更新 BL-010/016。

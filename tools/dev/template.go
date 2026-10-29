@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/afero"
 	"github.com/zhYou/go-cli-starter/internal/scaffold"
 )
 
@@ -48,6 +49,9 @@ func verifyTemplate() error {
 	}
 	if changed, err := scaffold.Initialize(dir, module, name); err != nil || len(changed) != 0 {
 		return fmt.Errorf("初始化不满足幂等性：%v", err)
+	}
+	if err := validateTemplateMetadata(dir); err != nil {
+		return err
 	}
 	if err := prepareFixture(dir); err != nil {
 		return err
@@ -115,4 +119,23 @@ func copyFile(source, target string) error {
 		return copyErr
 	}
 	return closeErr
+}
+
+func validateTemplateMetadata(dir string) error {
+	origin, err := scaffold.ReadOrigin(afero.NewOsFs(), dir)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	module, name, err := scaffold.Identity(dir)
+	if err != nil {
+		return err
+	}
+	if origin.Module != module || origin.Name != name {
+		return fmt.Errorf("来源记录与项目标识不一致")
+	}
+	_, err = os.Stat(filepath.Join(dir, "docs/template-upgrades.md"))
+	return err
 }

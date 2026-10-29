@@ -151,3 +151,5 @@ git push origin v0.1.0
 GoReleaser 使用 workflow 的 `GITHUB_TOKEN` 创建 Release，生成 Linux、macOS、Windows 的 amd64/arm64 产物和校验文件。Linux/macOS 使用 tar.gz，Windows 使用 zip；纯 Go 二进制包含版本、提交和构建时间。
 
 模板没有预选许可证；发布自己的项目时按需要添加许可证文件。
+
+模板版本与后续合并方式见[模板升级](docs/template-upgrades.md)。
