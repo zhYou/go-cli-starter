@@ -35,9 +35,9 @@ func TestGreetOutput(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"text", []string{"greet", "--name", "Codex"}, "Hello, Codex!\n"},
-		{"json", []string{"greet", "--name", "Codex", "--json"}, "{\"message\":\"Hello, Codex!\"}\n"},
-		{"unicode", []string{"--json", "greet", "--name", "周游"}, "{\"message\":\"Hello, 周游!\"}\n"},
+		{"text", []string{"greet", "--name", "Codex"}, "你好，Codex！\n"},
+		{"json", []string{"greet", "--name", "Codex", "--json"}, "{\"message\":\"你好，Codex！\"}\n"},
+		{"unicode", []string{"--json", "greet", "--name", "周游"}, "{\"message\":\"你好，周游！\"}\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			code, out, errOut := invoke(t, tc.args...)
@@ -56,9 +56,73 @@ func TestInvalidArgumentsFailWithoutOutputOrPrompt(t *testing.T) {
 		{"help", "unknown"}, {"help", "greet", "unknown"},
 	} {
 		code, out, errOut := invoke(t, args...)
-		if code != 2 || out != "" || strings.Count(errOut, "Error:") != 1 {
+		if code != 2 || out != "" || strings.Count(errOut, "错误：") != 1 {
 			t.Errorf("args=%v code=%d stdout=%q stderr=%q", args, code, out, errOut)
 		}
+	}
+}
+
+func TestChineseHelpRegardlessOfLocale(t *testing.T) {
+	t.Setenv("LANG", "en_US.UTF-8")
+	t.Setenv("LC_ALL", "en_US.UTF-8")
+	for _, args := range [][]string{{}, {"--help"}, {"greet", "--help"}, {"help", "greet"}, {"version", "--help"}, {"schema", "--help"}, {"completion", "--help"}, {"help", "--help"}} {
+		code, out, errOut := invoke(t, args...)
+		if code != 0 || errOut != "" || !strings.Contains(out, "用法：") || !strings.Contains(out, "显示帮助") || !strings.Contains(out, "日志级别") || !strings.Contains(out, "默认值") {
+			t.Errorf("参数=%v 退出码=%d 标准输出=%q 标准错误=%q", args, code, out, errOut)
+		}
+		for _, english := range []string{"Usage:", "Available Commands:", "Flags:", "Global Flags:", "help for", "(default", "[command]", "NAME"} {
+			if strings.Contains(out, english) {
+				t.Errorf("参数=%v 帮助仍包含 %q：%s", args, english, out)
+			}
+		}
+	}
+}
+
+func TestChineseErrorsPreserveUserValues(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"unknown"}, "unknown"},
+		{[]string{"greet"}, "--name"},
+		{[]string{"greet", "--name", "x", "extra"}, "extra"},
+		{[]string{"greet", "--unknown"}, "unknown"},
+		{[]string{"greet", "-x"}, "x"},
+		{[]string{"greet", "--name"}, "name"},
+		{[]string{"--json=invalid"}, "invalid"},
+		{[]string{"completion", "bogus"}, "bogus"},
+		{[]string{"help", "bogus"}, "bogus"},
+		{[]string{"schema", "bogus"}, "bogus"},
+	} {
+		code, out, errOut := invoke(t, tc.args...)
+		if code != 2 || out != "" || !strings.HasPrefix(errOut, "错误：") || !strings.Contains(errOut, tc.want) {
+			t.Errorf("参数=%v 退出码=%d 标准输出=%q 标准错误=%q", tc.args, code, out, errOut)
+		}
+		for _, english := range []string{"unknown", "required", "unsupported", "invalid", "accepts", "Error:"} {
+			// 用户输入保留原文，错误模板必须使用中文。
+			if strings.Contains(strings.ReplaceAll(errOut, tc.want, ""), english) {
+				t.Errorf("参数=%v 错误仍包含英文模板：%s", tc.args, errOut)
+			}
+		}
+	}
+}
+
+func TestChineseVersionAndSchema(t *testing.T) {
+	for _, args := range [][]string{{"version"}, {"--version"}} {
+		code, out, errOut := invoke(t, args...)
+		if code != 0 || !strings.Contains(out, "版本") || !strings.Contains(out, "v1.2.3") || errOut != "" {
+			t.Fatalf("参数=%v 退出码=%d 标准输出=%q 标准错误=%q", args, code, out, errOut)
+		}
+	}
+	code, out, errOut := invoke(t, "schema", "greet")
+	var got struct {
+		Commands []commandSchema `json:"commands"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatal(err)
+	}
+	if code != 0 || errOut != "" || len(got.Commands) != 1 || !strings.Contains(got.Commands[0].Description, "问候") {
+		t.Fatalf("退出码=%d 标准输出=%q 标准错误=%q", code, out, errOut)
 	}
 }
 
@@ -95,7 +159,7 @@ func TestCancellationExitCode(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	code, out, errOut := invokeContext(t, ctx, "greet", "--name", "Codex")
-	if code != 130 || out != "" || errOut == "" {
+	if code != 130 || out != "" || !strings.Contains(errOut, "操作已取消") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, out, errOut)
 	}
 }
@@ -114,8 +178,8 @@ func TestVersionJSON(t *testing.T) {
 func TestSchemaReflectsRegisteredCommands(t *testing.T) {
 	var out bytes.Buffer
 	root := NewRoot(Options{Name: "testcli", Out: &out})
-	extra := &cobra.Command{Use: "extra", Short: "An added command"}
-	extra.Flags().String("token", "", "An example flag")
+	extra := &cobra.Command{Use: "extra", Short: "新增的命令"}
+	extra.Flags().String("token", "", "示例选项")
 	if err := extra.MarkFlagRequired("token"); err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +211,7 @@ func TestSchemaReflectsRegisteredCommands(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatalf("required flag missing: %s", out.String())
+		t.Fatalf("缺少必填选项标记：%s", out.String())
 	}
 }
 

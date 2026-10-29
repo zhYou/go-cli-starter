@@ -10,69 +10,69 @@ golangci-lint = "2.15.0"
 goreleaser = "2.19.0"
 
 [tasks.setup]
-description = "Install pinned tools and download Go dependencies"
+description = "安装锁定版本的工具并下载 Go 依赖"
 run = ["mise install --locked go go:golang.org/x/tools/gopls golangci-lint goreleaser", "go mod download"]
 
 [tasks.doctor]
-description = "Check project tools and pinned versions"
+description = "检查项目工具和锁定版本"
 run = "go run ./tools/dev doctor"
 
 [tasks."doctor:agent"]
-description = "Check project tools and report user-level Codex helpers"
+description = "检查项目工具并报告用户级 Codex 辅助工具状态"
 run = "go run ./tools/dev doctor-agent"
 
 [tasks.fmt]
-description = "Format Go files"
+description = "格式化 Go 文件"
 run = "go run ./tools/dev fmt"
 
 [tasks."fmt:check"]
-description = "Check Go formatting without changing files"
+description = "检查 Go 格式，不修改文件"
 run = "go run ./tools/dev fmt-check"
 
 [tasks.test]
-description = "Run unit and command tests"
+description = "运行单元测试和命令测试"
 run = "go test ./..."
 
 [tasks."test:race"]
-description = "Run the race detector (requires a C compiler)"
+description = "运行竞态检测（需要 C 编译器）"
 run = "go test -race ./..."
 
 [tasks.lint]
-description = "Run the pinned linters"
+description = "运行锁定版本的静态检查工具"
 run = "golangci-lint run"
 
 [tasks.vet]
-description = "Run Go vet"
+description = "运行 Go vet 检查"
 run = "go vet ./..."
 
 [tasks."mod:check"]
-description = "Check module metadata without modifying it"
+description = "检查模块元数据，不修改文件"
 run = "go mod tidy -diff"
 
 [tasks.build]
-description = "Build a local binary with version metadata"
+description = "构建包含版本信息的本地程序"
 run = "go run ./tools/dev build"
 
 [tasks."release:check"]
-description = "Validate release configuration"
+description = "验证发布配置"
 run = "goreleaser check"
 
 [tasks."template:check"]
-description = "Initialize and verify an independent temporary project"
+description = "初始化并验证独立的临时项目"
 run = "go run ./tools/dev template-check"
 
 [tasks.check]
-description = "Run the same source checks as CI"
+description = "运行与 CI 相同的源码检查"
 depends = ["fmt:check", "mod:check", "test", "vet", "lint", "build", "template:check"]
 
 [tasks.init]
-description = "Rename a fresh template: mise run init --module github.com/acme/mycli --name mycli"
+description = "重命名原始模板：mise run init --module github.com/acme/mycli --name mycli"
 run = "go run ./tools/init"
 
 [tasks."mcp:check"]
-description = "Initialize gopls MCP, list tools, and diagnose this workspace"
+description = "初始化 gopls MCP，发现工具并诊断当前工作区"
 run = "go run ./tools/dev mcp-check"
 
 [tasks."release:snapshot"]
-description = "Build all release archives locally without publishing"
+description = "在本地构建全部发布压缩包，不执行发布"
 run = "goreleaser release --snapshot --clean --parallelism 2"

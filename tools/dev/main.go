@@ -1,4 +1,4 @@
-// Command dev provides portable development tasks using only Go's standard library.
+// Command dev 仅使用 Go 标准库，提供跨平台的开发任务。
 package main
 
 import (
@@ -17,11 +17,11 @@ const appName = "go-cli-starter"
 
 func main() {
 	if len(os.Args) != 2 {
-		fmt.Fprintln(os.Stderr, "Usage: dev <build|fmt|fmt-check|doctor|doctor-agent|template-check|mcp-check>")
+		fmt.Fprintln(os.Stderr, "用法：dev <build|fmt|fmt-check|doctor|doctor-agent|template-check|mcp-check>")
 		os.Exit(2)
 	}
 	if err := run(os.Args[1]); err != nil {
-		fmt.Fprintln(os.Stderr, "Error:", err)
+		fmt.Fprintln(os.Stderr, "错误：", err)
 		os.Exit(1)
 	}
 }
@@ -43,7 +43,7 @@ func run(task string) error {
 	case "mcp-check":
 		return checkMCP()
 	default:
-		return fmt.Errorf("unknown task %q", task)
+		return fmt.Errorf("未知任务 %q", task)
 	}
 }
 
@@ -52,7 +52,7 @@ func command(dir, name string, args ...string) error {
 	cmd.Dir = dir
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%s %s: %w", name, strings.Join(args, " "), err)
+		return fmt.Errorf("执行 %s %s 失败：%w", name, strings.Join(args, " "), err)
 	}
 	return nil
 }
@@ -105,10 +105,10 @@ func format(write bool) error {
 	cmd := exec.Command("gofmt", append([]string{flag}, files...)...)
 	data, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("gofmt: %w\n%s", err, data)
+		return fmt.Errorf("gofmt 执行失败：%w\n%s", err, data)
 	}
 	if !write && len(data) != 0 {
-		return fmt.Errorf("run mise run fmt to format:\n%s", data)
+		return fmt.Errorf("请运行 mise run fmt 格式化以下文件：\n%s", data)
 	}
 	return nil
 }
@@ -125,40 +125,40 @@ func doctor(agent bool) error {
 	}
 	var problems []error
 	if _, err := exec.LookPath("git"); err != nil {
-		problems = append(problems, errors.New("git is missing"))
+		problems = append(problems, errors.New("未找到 git"))
 	} else {
-		fmt.Println("OK git")
+		fmt.Println("通过：git")
 	}
 	for _, tool := range tools {
 		data, err := exec.Command(tool.name, tool.args...).CombinedOutput()
 		if err != nil {
-			problems = append(problems, fmt.Errorf("%s unavailable: %w", tool.name, err))
+			problems = append(problems, fmt.Errorf("%s 不可用：%w", tool.name, err))
 			continue
 		}
 		if !strings.Contains(string(data), tool.version) {
-			problems = append(problems, fmt.Errorf("%s does not match pinned version %s; run mise run setup", tool.name, tool.version))
+			problems = append(problems, fmt.Errorf("%s 与锁定版本 %s 不符，请运行 mise run setup", tool.name, tool.version))
 			continue
 		}
-		fmt.Printf("OK %s %s\n", tool.name, tool.version)
+		fmt.Printf("通过：%s %s\n", tool.name, tool.version)
 	}
 	if agent {
 		for _, name := range []string{"codex", "rtk"} {
 			if _, err := exec.LookPath(name); err != nil {
-				fmt.Printf("OPTIONAL %s is not on PATH\n", name)
+				fmt.Printf("可选工具：PATH 中未找到 %s\n", name)
 			} else {
 				data, err := exec.Command(name, "--version").CombinedOutput()
 				if err != nil {
-					fmt.Printf("OPTIONAL %s version unavailable: %v\n", name, err)
+					fmt.Printf("可选工具：无法读取 %s 的版本：%v\n", name, err)
 				} else {
-					fmt.Printf("USER %s", data)
+					fmt.Printf("用户工具：%s", data)
 					if len(data) == 0 || data[len(data)-1] != '\n' {
 						fmt.Println()
 					}
 				}
 			}
 		}
-		fmt.Println("USER superpowers: confirm the user-level skills are available in Codex; no installation path is assumed.")
-		fmt.Println("Run mise run mcp:check for a live gopls connection check.")
+		fmt.Println("用户工具：superpowers，请确认用户级技能在 Codex 中可用，项目不限定安装路径。")
+		fmt.Println("运行 mise run mcp:check 检查 gopls 的实际连接。")
 	}
 	return errors.Join(problems...)
 }

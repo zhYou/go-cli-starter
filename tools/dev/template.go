@@ -21,12 +21,12 @@ func verifyTemplate() error {
 		return err
 	}
 	defer func() { _ = os.RemoveAll(dir) }()
-	// Git's file selection excludes local credentials, caches and build artifacts.
+	// 利用 Git 文件列表排除本地凭据、缓存和构建产物。
 	cmd := exec.Command("git", "ls-files", "--cached", "--others", "--exclude-standard", "-z")
 	cmd.Dir = root
 	files, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("list template files (run inside a Git repository): %w", err)
+		return fmt.Errorf("列出模板文件失败（请在 Git 仓库中运行）：%w", err)
 	}
 	for _, name := range strings.Split(string(files), "\x00") {
 		if name == "" {
@@ -47,7 +47,7 @@ func verifyTemplate() error {
 		return err
 	}
 	if changed, err := scaffold.Initialize(dir, module, name); err != nil || len(changed) != 0 {
-		return fmt.Errorf("initializer is not idempotent: %v", err)
+		return fmt.Errorf("初始化不满足幂等性：%v", err)
 	}
 	if err := prepareFixture(dir); err != nil {
 		return err
@@ -68,7 +68,7 @@ func verifyTemplate() error {
 		return err
 	}
 	if module != scaffold.TemplateModule && strings.Contains(string(imports), scaffold.TemplateModule) {
-		return fmt.Errorf("generated project still imports the original template")
+		return fmt.Errorf("生成的项目仍在导入原模板模块")
 	}
 	if err := command(dir, "go", "run", ".", "schema", "greet"); err != nil {
 		return err
@@ -76,7 +76,7 @@ func verifyTemplate() error {
 	if err := command(dir, "goreleaser", "check"); err != nil {
 		return err
 	}
-	fmt.Println("Template copy: initialization, idempotence, tests, build, schema and release configuration passed.")
+	fmt.Println("模板副本检查通过：初始化、幂等性、测试、构建、命令描述和发布配置。")
 	return nil
 }
 
@@ -84,8 +84,8 @@ func prepareFixture(dir string) error {
 	if err := command(dir, "git", "-c", "init.templateDir=", "init", "--quiet"); err != nil {
 		return err
 	}
-	// This is a disposable repository, never the caller's remote. GoReleaser's
-	// SCM validation needs a GitHub-shaped origin, but does not contact it.
+	// 此仓库只用于临时检查，不修改调用方的远端。
+	// GoReleaser 的 SCM 校验需要 GitHub 格式的 origin，但不会连接该地址。
 	return command(dir, "git", "remote", "add", "origin", "https://github.com/example/template-check.git")
 }
 
@@ -95,7 +95,7 @@ func copyFile(source, target string) error {
 		return err
 	}
 	if !info.Mode().IsRegular() {
-		return fmt.Errorf("cannot copy non-regular template file %s", source)
+		return fmt.Errorf("无法复制非常规模板文件 %s", source)
 	}
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return err

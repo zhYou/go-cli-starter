@@ -23,11 +23,11 @@ func TestCopiedRepositorySupportsGoVCSStamping(t *testing.T) {
 	remote := exec.Command("git", "remote", "get-url", "origin")
 	remote.Dir = dir
 	if output, err := remote.Output(); err != nil || len(output) == 0 {
-		t.Fatalf("fixture needs an SCM identity for release validation: %v", err)
+		t.Fatalf("测试仓库缺少发布校验所需的 SCM 标识：%v", err)
 	}
 	cmd := exec.Command("go", "build", "-o", filepath.Join(dir, "fixture"), ".")
 	cmd.Dir = dir
 	if output, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("independent build: %v\n%s", err, output)
+		t.Fatalf("独立构建失败：%v\n%s", err, output)
 	}
 }

@@ -4,6 +4,8 @@
 
 默认输出文本，通过 `--json` 输出结构化结果。包含命令发现、配置、日志、测试、本地环境、项目改名和跨平台发布。
 
+项目交流、文档和 CLI 提示默认使用中文，不随系统区域设置改变。命令名、选项名和机器字段保持稳定；多语言支持记录在 [项目待办](docs/backlog.md)。
+
 ## 创建新项目
 
 在 GitHub 使用 **Use this template** 创建仓库并克隆，或直接复制项目文件后执行 `git init`。准备好 Git 和 mise 2026.10.21 或更新的稳定版，然后在新项目根目录执行：
@@ -61,7 +63,7 @@ go install github.com/zhYou/go-cli-starter@latest
 示例结果：
 
 ```json
-{"message":"Hello, Codex!"}
+{"message":"你好，Codex！"}
 ```
 
 - 默认文本；`--json` 不随终端环境改变，也不由配置或环境变量隐式开启。
@@ -111,7 +113,7 @@ codex mcp list
 
 RTK 和 superpowers 使用用户目录中的安装。模板不复制全局技能，不写个人路径、模型、认证或权限偏好。`doctor:agent` 报告辅助工具状态；superpowers 是否加载，以 Codex 中的技能列表为准。缺少辅助工具不影响基础检查。
 
-首版仅支持 Codex。Claude Code、OpenCode、TUI 和 CLI 自身的 MCP 服务留待后续。
+当前仅支持 Codex。Claude Code 和 OpenCode 支持见 [项目待办](docs/backlog.md)；TUI 和 CLI 自身的 MCP 服务暂不在范围内。
 
 ## 开发命令
 
@@ -133,7 +135,7 @@ RTK 和 superpowers 使用用户目录中的安装。模板不复制全局技能
 
 `check` 在临时仓库中验证发布配置，无需为内部工具配置 remote。真正发布或运行 `release:check` 前，为目标项目设置自己的 GitHub origin。
 
-新增命令、工具升级和发布步骤见 [开发说明](docs/development.md)。
+新增命令、工具升级和发布步骤见 [开发说明](docs/development.md)，后续工作见 [项目待办](docs/backlog.md)。
 
 ## 发布
 

@@ -1,3 +1,3 @@
-# Copy to your system user config directory: go-cli-starter/config.yaml
-# Override with GO_CLI_STARTER_LOG_LEVEL or --log-level.
+# 复制到系统用户配置目录下的 go-cli-starter/config.yaml。
+# 通过 GO_CLI_STARTER_LOG_LEVEL 或 --log-level 覆盖配置。
 log_level: warn

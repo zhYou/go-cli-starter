@@ -15,10 +15,10 @@ func TestConfigurationPrecedence(t *testing.T) {
 	for _, tc := range []struct {
 		name, path, env, flag, want string
 	}{
-		{"default", "", "", "", "warn"},
-		{"file", path, "", "", "info"},
-		{"environment", path, "error", "", "error"},
-		{"explicit flag", path, "error", "debug", "debug"},
+		{"默认值", "", "", "", "warn"},
+		{"文件", path, "", "", "info"},
+		{"环境变量", path, "error", "", "error"},
+		{"显式选项", path, "error", "debug", "debug"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var override *string
@@ -42,11 +42,11 @@ func TestInvalidConfigurationFails(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err := Load(Options{AppName: "testcli", Path: path}); err == nil {
-			t.Errorf("accepted %q", content)
+			t.Errorf("错误地接受了无效配置 %q", content)
 		}
 	}
 	if _, err := Load(Options{AppName: "testcli", Path: filepath.Join(t.TempDir(), "missing")}); err == nil {
-		t.Fatal("missing explicit config accepted")
+		t.Fatal("错误地接受了不存在的显式配置文件")
 	}
 }
 

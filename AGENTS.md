@@ -1,60 +1,59 @@
-# Project instructions
+# 项目协作约定
 
-## Start here
+## 从这里开始
 
-- Read README.md for setup, CLI contracts and repository layout.
-- Run commands from the repository root through mise. First run `mise run setup`,
-  then `mise run doctor`. Requires Git and mise 2026.10.21 or newer.
-- Reuse user-level RTK and superpowers when available. Follow their installed
-  instructions; do not install copies here or add personal paths.
-- Only Codex is supported. Keep personal models, credentials, permissions and
-  plugin preferences in user configuration.
+- 阅读 README.md，了解环境准备、CLI 约定和仓库结构。
+- 默认使用中文交流，并以中文编写文档、注释、帮助、日志和错误提示。
+  命令名、选项名、环境变量、JSON 字段、枚举值和协议标识保持原样。
+- 在仓库根目录通过 mise 执行命令。先运行 `mise run setup`，再运行
+  `mise run doctor`。需要 Git 和 mise 2026.10.21 或更新版本。
+- 复用用户级 RTK 和 superpowers，遵循其已安装的说明，不在项目中复制安装，
+  不写入个人路径。
+- 当前只支持 Codex。个人模型、凭据、权限和插件偏好保留在用户配置中。
+- 后续工作统一记录在 [项目待办](docs/backlog.md)。待办条目不代表已授权实施；
+  开始前确认任务范围，交付时更新状态、更新日期和关联 PR。
 
-## Implementation
+## 实现约定
 
-- The root entry point owns signals and process exit. `internal/cli` owns Cobra
-  commands, argument validation, IO and exit-code mapping. Business logic accepts
-  context and typed options in its own internal package.
-- Construct fresh commands per invocation. Pass dependencies explicitly; avoid
-  package-level mutable commands, configuration and logger state.
-- Extend the typed configuration loader. Resolve explicit flags > environment >
-  YAML > defaults. Check `Changed` before applying a flag override.
-- Commands must run entirely from arguments. Missing input fails immediately.
-  Do not add prompts, automatic pagers, spinners or a default TUI.
-- Default output is text. `--json` writes one JSON document to stdout. Logs and
-  errors go to stderr; failed commands leave stdout empty. Help and completion
-  retain native formats; schema always emits JSON.
-- Exit codes: 0 success, 1 runtime/configuration failure, 2 invalid invocation,
-  130 cancellation. Validate arguments before beginning command execution.
-- New commands need validation, help/examples, tests and typed results. Schema
-  derives from the command tree; annotate required flags with `MarkFlagRequired`.
-- `greet` and `internal/greeting` are removable examples. Update registration and
-  tests when replacing them with application behavior.
+- 根入口负责信号和进程退出。`internal/cli` 负责 Cobra 命令、参数校验、
+  输入输出和退出码映射。业务逻辑放在独立的 internal 包中，接收 context 和有类型的选项。
+- 每次调用创建独立命令树，显式传入依赖，避免包级可变命令、配置和日志状态。
+- 扩展有类型的配置加载器，按显式选项 > 环境变量 > YAML > 默认值解析。
+  应用选项覆盖前检查 `Changed`。
+- 命令必须仅凭参数完成运行，缺少输入立即失败。不添加交互提示、自动分页、
+  进度动画或默认 TUI。
+- 默认输出文本，`--json` 向 stdout 写入一个 JSON 文档。日志和错误写 stderr，
+  命令失败时 stdout 为空。帮助输出文本，补全保留原生脚本格式，schema 始终输出 JSON。
+- 当前 CLI 统一使用中文，不根据系统区域切换语言；多语言支持见 BL-001。
+  第三方工具和系统诊断可保留原文，项目提供的上下文使用中文。
+- 退出码：0 成功，1 运行或配置失败，2 调用无效，130 取消。
+  开始执行命令前先校验参数。
+- 新命令须包含校验、帮助、示例、测试和有类型的结果。schema 从命令树生成，
+  必填选项使用 `MarkFlagRequired` 标记。
+- `greet` 和 `internal/greeting` 是可移除示例，替换时同步更新注册和测试。
 
-## Go tools and verification
+## Go 工具与验证
 
-- Use gopls MCP for Go symbols, references and diagnostics. Read its instructions
-  with `mise exec -- gopls mcp -instructions`. Discover the workspace, inspect
-  affected symbols, and check diagnostics after editing. Shell checks remain
-  the verification authority.
-- Run focused tests while editing. Before handoff run `mise run fmt` and
-  `mise run check`; also run `mise run test:race` on a supported host.
-- For template/identity changes run `mise run template:check`. Update the managed
-  file list when new files embed the application identity.
-- For tool integration changes run `mise run mcp:check` and confirm
-  `codex mcp list` includes gopls in a trusted project session.
-- For release changes run `mise run release:snapshot`; it does not publish.
-  Explain checks that could not run rather than claiming they passed.
+- 使用 gopls MCP 查询 Go 符号、引用和诊断。通过
+  `mise exec -- gopls mcp -instructions` 阅读说明，发现工作区、检查受影响符号，
+  修改后检查诊断。最终验证以命令行检查结果为准。
+- 编辑期间运行针对性测试。交付前运行 `mise run fmt` 和 `mise run check`，
+  并在支持的主机上运行 `mise run test:race`。
+- 修改模板或项目标识时运行 `mise run template:check`。
+  新文件包含应用标识时同步更新受管文件清单。
+- 修改工具集成时运行 `mise run mcp:check`，并在受信任的项目会话中确认
+  `codex mcp list` 包含 gopls。
+- 修改发布流程时运行 `mise run release:snapshot`，该命令不会发布。
+  无法运行的检查须说明原因，不能声称通过。
 
-## Dependencies and maintenance
+## 依赖与维护
 
-- Use the latest official LTS, or latest stable release where no LTS exists.
-  Exclude alpha, beta, RC and nightly versions. Pin resolved versions.
-- Keep mise.toml, mise.lock, Go module/toolchain directives, doctor expectations,
-  CI bootstrap version and documented versions consistent during upgrades.
-- Lock Linux, macOS and Windows on amd64 and arm64. Basic checks must work
-  without Codex, RTK or superpowers installed.
-- Update tests, help and docs with behavior changes. Keep machine-readable
-  fields and exit codes compatible unless a change is deliberate.
-- Never copy local secrets, caches or user-level agent configuration into
-  generated projects. Initialization must not change remotes, commit or publish.
+- 使用官方最新 LTS；没有 LTS 的工具使用最新稳定版。
+  排除 alpha、beta、RC 和 nightly，核验后锁定具体版本。
+- 升级时保持 mise.toml、mise.lock、Go 模块与工具链声明、doctor 预期版本、
+  CI 引导版本和文档版本一致。
+- 锁定 Linux、macOS、Windows 的 amd64 和 arm64 工具版本。
+  基础检查必须能在未安装 Codex、RTK 或 superpowers 时运行。
+- 行为变更同步更新测试、帮助和文档。除非明确决定变更，否则保持机器字段和退出码兼容。
+- 不把本地密钥、缓存或用户级智能体配置复制到生成的项目。
+  初始化不得修改远端、创建提交或发布。

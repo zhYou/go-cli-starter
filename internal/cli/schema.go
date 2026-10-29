@@ -29,7 +29,7 @@ type flagSchema struct {
 func newSchemaCommand(root *cobra.Command) *cobra.Command {
 	var target *cobra.Command
 	return &cobra.Command{
-		Use: "schema [command path...]", Short: "Describe commands and flags as JSON",
+		Use: "schema [命令路径...]", Short: "以 JSON 格式描述命令和选项",
 		Annotations: map[string]string{"skip-config": "true"},
 		Args: func(_ *cobra.Command, args []string) error {
 			var err error
