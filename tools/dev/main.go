@@ -1,7 +1,8 @@
-// Command dev 仅使用 Go 标准库，提供跨平台的开发任务。
+// Command dev 提供跨平台的开发任务。
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -16,18 +17,34 @@ import (
 const appName = "go-cli-starter"
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Fprintln(os.Stderr, "用法：dev <build|fmt|fmt-check|doctor|doctor-agent|template-check|mcp-check>")
-		os.Exit(2)
-	}
-	if err := run(os.Args[1]); err != nil {
+
+	if err := runArgs(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "错误：", err)
 		os.Exit(1)
 	}
 }
 
-func run(task string) error {
+func run(task string) error { return runArgs([]string{task}) }
+func runArgs(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("必须指定开发任务")
+	}
+	task := args[0]
+	if task == "contract-check" {
+		against := ""
+		if len(args) == 3 && args[1] == "--against" {
+			against = args[2]
+		} else if len(args) != 1 {
+			return fmt.Errorf("用法：dev contract-check [--against Git引用]")
+		}
+		return checkContract(context.Background(), against)
+	}
+	if len(args) != 1 {
+		return fmt.Errorf("任务 %s 不接受额外参数", task)
+	}
 	switch task {
+	case "contract-update":
+		return updateContract(context.Background())
 	case "build":
 		return build()
 	case "fmt":

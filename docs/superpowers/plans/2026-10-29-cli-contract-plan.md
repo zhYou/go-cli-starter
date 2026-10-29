@@ -47,12 +47,12 @@ Draft 2020-12；消费方忽略新增字段，结果对象允许额外属性，�
 **输入：** 任务 7 的实际命令描述、Result Schema 和第一批 Run；基线应用名称固定 `contract-cli`，版本字段固定测试值。
 **输出：** `contract.Change{Path string,Kind string,Before json.RawMessage,After json.RawMessage}`、`Diff([]byte,[]byte)([]Change,error)`；工具侧 `captureContract(context.Context)([]byte,error)`、`checkContract(context.Context,string) error`、`updateContract(context.Context) error`。check 的字符串为可选 Git 基准引用，默认比较仓库当前快照。新增 `runArgs([]string) error` 解析工具参数，保留 `run(task string) error` 为单任务兼容包装。
 
-- [ ] 从设计确认时的代码版本 54d9dcd 在临时副本构建，捕获初始命令与结果基线；不回退工作树。模板副本使用提交的规范化 fixture，不依赖该历史提交。变更记录含 id、compatibility、summary、paths、previous_version、target_version、migration；首次基线 previous_version 为 null，明确记录允许新增 result_schema。
-- [ ] 写 `TestBaselineRefreshStillRequiresChangeRecord`：旧字段由字符串变数字，即使当前快照同步更新，相对旧基线仍失败；缺少记录失败；已记录的 result_schema 增量可通过。写 `TestContractNormalization`：人类描述文案不作为字段类型，机器标识和必填标记必须保留。
-- [ ] 执行 `mise exec -- go test ./internal/contract ./tools/dev -run 'TestBaselineRefresh|TestContractNormalization'`，确认新增差异检查先失败。
-- [ ] 引入总览锁定的 x/mod，实现确定性 JSON 差异及 change record 校验，已知删除/类型变化标记为可能破坏兼容；禁止把它们直接声明为兼容。复杂 Schema 变化输出差异并要求审查，不实现通用兼容性推理器。用 semver 比较记录中的发布版本：0.x 破坏变更提升次版本，1.x 以后提升主版本；首次基线不虚构旧发布版本。
-- [ ] 增加 `contract:check` 和显式 `contract:update`；check 不改文件，接入 mise check。tools/dev main 通过 runArgs 允许 contract-check 的 `--against`，其他多余参数立即中文报错。CI 另用 `mise run contract:check -- --against <base SHA>` 对 PR base / push before 比较，fetch 足够历史；首个基线不存在时要求明确的初始化记录。Git 参数逐项传递，模板临时仓库默认检查不要求已有 HEAD 或 remote。
-- [ ] 运行 `mise run contract:check`、上述测试及 `mise run check`；用测试 fixture 重现刷新快照仍失败；提交 `feat: 检查机器接口基线与兼容变更记录`。
+- [x] 从设计确认时的代码版本 54d9dcd 在临时副本构建，捕获初始命令与结果基线；不回退工作树。模板副本使用提交的规范化 fixture，不依赖该历史提交。变更记录含 id、compatibility、summary、paths、previous_version、target_version、migration；首次基线 previous_version 为 null，明确记录允许新增 result_schema。
+- [x] 写 `TestBaselineRefreshStillRequiresChangeRecord`：旧字段由字符串变数字，即使当前快照同步更新，相对旧基线仍失败；缺少记录失败；已记录的 result_schema 增量可通过。写 `TestContractNormalization`：人类描述文案不作为字段类型，机器标识和必填标记必须保留。
+- [x] 执行 `mise exec -- go test ./internal/contract ./tools/dev -run 'TestBaselineRefresh|TestContractNormalization'`，确认新增差异检查先失败。
+- [x] 引入总览锁定的 x/mod，实现确定性 JSON 差异及 change record 校验，已知删除/类型变化标记为可能破坏兼容；禁止把它们直接声明为兼容。复杂 Schema 变化输出差异并要求审查，不实现通用兼容性推理器。用 semver 比较记录中的发布版本：0.x 破坏变更提升次版本，1.x 以后提升主版本；首次基线不虚构旧发布版本。
+- [x] 增加 `contract:check` 和显式 `contract:update`；check 不改文件，接入 mise check。tools/dev main 通过 runArgs 允许 contract-check 的 `--against`，其他多余参数立即中文报错。CI 另用 `mise run contract:check -- --against <base SHA>` 对 PR base / push before 比较，fetch 足够历史；首个基线不存在时要求明确的初始化记录。Git 参数逐项传递，模板临时仓库默认检查不要求已有 HEAD 或 remote。
+- [x] 运行 `mise run contract:check`、上述测试及 `mise run check`；用测试 fixture 重现刷新快照仍失败；提交 `feat: 检查机器接口基线与兼容变更记录`。
 
 ### Task 9: 真实二进制与信号测试
 
