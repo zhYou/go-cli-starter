@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/afero"
 	"github.com/zhYou/go-cli-starter/internal/scaffold"
 )
 
@@ -29,7 +30,7 @@ func verifyTemplate() error {
 		return fmt.Errorf("列出模板文件失败（请在 Git 仓库中运行）：%w", err)
 	}
 	for _, name := range strings.Split(string(files), "\x00") {
-		if name == "" {
+		if name == "" || name == ".template-init.lock" || strings.HasPrefix(name, ".template-init/") {
 			continue
 		}
 		if err := copyFile(filepath.Join(root, name), filepath.Join(dir, name)); err != nil {
@@ -48,6 +49,9 @@ func verifyTemplate() error {
 	}
 	if changed, err := scaffold.Initialize(dir, module, name); err != nil || len(changed) != 0 {
 		return fmt.Errorf("初始化不满足幂等性：%v", err)
+	}
+	if err := validateTemplateMetadata(dir); err != nil {
+		return err
 	}
 	if err := prepareFixture(dir); err != nil {
 		return err
@@ -115,4 +119,27 @@ func copyFile(source, target string) error {
 		return copyErr
 	}
 	return closeErr
+}
+
+func validateTemplateMetadata(dir string) error {
+	origin, err := scaffold.ReadOrigin(afero.NewOsFs(), dir)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	module, name, err := scaffold.Identity(dir)
+	if err != nil {
+		return err
+	}
+	if origin.Module != module || origin.Name != name {
+		return fmt.Errorf("来源记录与项目标识不一致")
+	}
+	for _, name := range []string{"docs/template-upgrades.md", "docs/maintenance.md", "SECURITY.md", ".github/PULL_REQUEST_TEMPLATE.md", ".github/CODEOWNERS.example"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			return err
+		}
+	}
+	return nil
 }

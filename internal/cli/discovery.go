@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"slices"
 	"strings"
 
@@ -59,16 +60,18 @@ func newCompletionCommand(root *cobra.Command) *cobra.Command {
 			if len(args) == 0 {
 				return cmd.Help()
 			}
-			switch args[0] {
-			case "bash":
-				return root.GenBashCompletionV2(cmd.OutOrStdout(), true)
-			case "zsh":
-				return root.GenZshCompletion(cmd.OutOrStdout())
-			case "fish":
-				return root.GenFishCompletion(cmd.OutOrStdout(), true)
-			default:
-				return root.GenPowerShellCompletionWithDesc(cmd.OutOrStdout())
-			}
+			return writeText(cmd.OutOrStdout(), func(w io.Writer) error {
+				switch args[0] {
+				case "bash":
+					return root.GenBashCompletionV2(w, true)
+				case "zsh":
+					return root.GenZshCompletion(w)
+				case "fish":
+					return root.GenFishCompletion(w, true)
+				default:
+					return root.GenPowerShellCompletionWithDesc(w)
+				}
+			})
 		},
 	}
 }

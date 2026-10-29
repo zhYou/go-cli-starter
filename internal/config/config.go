@@ -2,33 +2,47 @@
 package config
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"fmt"
+	"github.com/go-viper/mapstructure/v2"
+	"github.com/knadh/koanf/providers/confmap"
+	"github.com/knadh/koanf/v2"
+	"github.com/zhYou/go-cli-starter/internal/validation"
+	"go.yaml.in/yaml/v3"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"go.yaml.in/yaml/v3"
 )
 
-// Config 保存应用配置；扩展 CLI 时在此添加有类型的字段。
 type Config struct {
-	LogLevel string `yaml:"log_level"`
+	LogLevel string `yaml:"log_level" validate:"oneof=debug info warn error" label:"日志级别"`
 }
-
-// Options 指定配置来源；覆盖值为 nil 表示未设置对应选项。
 type Options struct {
-	AppName       string
-	Path          string
-	UserConfigDir string
-	LookupEnv     func(string) (string, bool)
-	LogLevel      *string
+	AppName, Path, UserConfigDir string
+	LookupEnv                    func(string) (string, bool)
+	LogLevel                     *string
+	Context                      context.Context
+	Validator                    *validation.Validator
 }
 
-// Load 按显式选项 > 环境变量 > YAML > 默认值的优先级解析配置。
+// Load 按显式选项 > 非空环境变量 > YAML > 默认值解析。
 func Load(opts Options) (Config, error) {
+	ctx := opts.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	cfg := Config{LogLevel: "warn"}
+	if err := ctx.Err(); err != nil {
+		return cfg, err
+	}
+	k := koanf.New(".")
+	layer := func(values map[string]any) error { return k.Load(confmap.Provider(values, "."), nil) }
+	if err := layer(map[string]any{"log_level": "warn"}); err != nil {
+		return cfg, err
+	}
 	path := opts.Path
 	if path == "" {
 		dir := opts.UserConfigDir
@@ -48,14 +62,12 @@ func Load(opts Options) (Config, error) {
 		}
 	} else {
 		defer func() { _ = file.Close() }()
-		decoder := yaml.NewDecoder(file)
-		decoder.KnownFields(true)
-		if err := decoder.Decode(&cfg); err != nil && !errors.Is(err, io.EOF) {
+		values, err := readYAML(file)
+		if err != nil {
 			return cfg, fmt.Errorf("解析配置文件 %q 失败：%w", path, err)
 		}
-		var extra any
-		if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
-			return cfg, fmt.Errorf("配置文件 %q 必须只包含一个 YAML 文档", path)
+		if err := layer(values); err != nil {
+			return cfg, err
 		}
 	}
 	lookup := opts.LookupEnv
@@ -64,16 +76,57 @@ func Load(opts Options) (Config, error) {
 	}
 	prefix := strings.ToUpper(strings.ReplaceAll(opts.AppName, "-", "_"))
 	if value, ok := lookup(prefix + "_LOG_LEVEL"); ok && value != "" {
-		cfg.LogLevel = value
+		if err := layer(map[string]any{"log_level": value}); err != nil {
+			return cfg, err
+		}
 	}
 	if opts.LogLevel != nil {
-		cfg.LogLevel = *opts.LogLevel
+		if err := layer(map[string]any{"log_level": *opts.LogLevel}); err != nil {
+			return cfg, err
+		}
+	}
+	if err := k.UnmarshalWithConf("", &cfg, koanf.UnmarshalConf{Tag: "yaml", DecoderConfig: &mapstructure.DecoderConfig{WeaklyTypedInput: false, ErrorUnused: true}}); err != nil {
+		return cfg, fmt.Errorf("解码配置失败：%w", err)
 	}
 	cfg.LogLevel = strings.ToLower(cfg.LogLevel)
-	switch cfg.LogLevel {
-	case "debug", "info", "warn", "error":
-		return cfg, nil
-	default:
-		return cfg, fmt.Errorf("日志级别 %q 无效：请选择 debug、info、warn 或 error", cfg.LogLevel)
+	v := opts.Validator
+	if v == nil {
+		v = validation.New()
 	}
+	if err := v.Struct(ctx, cfg); err != nil {
+		return cfg, err
+	}
+	return cfg, nil
+}
+
+// readYAML 先严格验证结构，再返回实际存在的非 null 值。
+func readYAML(input io.Reader) (map[string]any, error) {
+	data, err := io.ReadAll(input)
+	if err != nil {
+		return nil, err
+	}
+	decoder := yaml.NewDecoder(bytes.NewReader(data))
+	decoder.KnownFields(true)
+	var typed Config
+	if err := decoder.Decode(&typed); err != nil && !errors.Is(err, io.EOF) {
+		return nil, err
+	}
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		return nil, errors.New("必须只包含一个 YAML 文档")
+	}
+	var values map[string]any
+	if err := yaml.Unmarshal(data, &values); err != nil {
+		return nil, err
+	}
+	for key, value := range values {
+		if value == nil {
+			delete(values, key)
+			continue
+		}
+		if _, ok := value.(string); !ok {
+			return nil, fmt.Errorf("配置项 %s 必须为字符串", key)
+		}
+	}
+	return values, nil
 }

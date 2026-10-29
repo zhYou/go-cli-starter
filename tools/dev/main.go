@@ -1,7 +1,8 @@
-// Command dev 仅使用 Go 标准库，提供跨平台的开发任务。
+// Command dev 提供跨平台的开发任务。
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -16,18 +17,40 @@ import (
 const appName = "go-cli-starter"
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Fprintln(os.Stderr, "用法：dev <build|fmt|fmt-check|doctor|doctor-agent|template-check|mcp-check>")
-		os.Exit(2)
-	}
-	if err := run(os.Args[1]); err != nil {
+
+	if err := runArgs(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "错误：", err)
 		os.Exit(1)
 	}
 }
 
-func run(task string) error {
+func run(task string) error { return runArgs([]string{task}) }
+func runArgs(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("必须指定开发任务")
+	}
+	task := args[0]
+	if task == "contract-check" {
+		against := ""
+		if len(args) == 3 && args[1] == "--against" {
+			against = args[2]
+		} else if len(args) != 1 {
+			return fmt.Errorf("用法：dev contract-check [--against Git引用]")
+		}
+		return checkContract(context.Background(), against)
+	}
+	if len(args) != 1 {
+		return fmt.Errorf("任务 %s 不接受额外参数", task)
+	}
 	switch task {
+	case "release-verify":
+		return checkReleaseSnapshot("dist")
+	case "vuln":
+		return checkVulnerabilities(context.Background(), nil)
+	case "versions-check":
+		return checkVersions(".")
+	case "contract-update":
+		return updateContract(context.Background())
 	case "build":
 		return build()
 	case "fmt":
@@ -114,14 +137,9 @@ func format(write bool) error {
 }
 
 func doctor(agent bool) error {
-	tools := []struct {
-		name, version string
-		args          []string
-	}{
-		{"go", "go1.27.3", []string{"version"}},
-		{"gopls", "v0.24.0", []string{"version"}},
-		{"golangci-lint", "2.15.0", []string{"version"}},
-		{"goreleaser", "2.19.0", []string{"--version"}},
+	versions, err := loadVersions(".")
+	if err != nil {
+		return err
 	}
 	var problems []error
 	if _, err := exec.LookPath("git"); err != nil {
@@ -129,18 +147,24 @@ func doctor(agent bool) error {
 	} else {
 		fmt.Println("通过：git")
 	}
-	for _, tool := range tools {
-		data, err := exec.Command(tool.name, tool.args...).CombinedOutput()
+	for _, key := range sortedTools(versions) {
+		spec, err := versionTool(key)
 		if err != nil {
-			problems = append(problems, fmt.Errorf("%s 不可用：%w", tool.name, err))
+			problems = append(problems, err)
 			continue
 		}
-		if !strings.Contains(string(data), tool.version) {
-			problems = append(problems, fmt.Errorf("%s 与锁定版本 %s 不符，请运行 mise run setup", tool.name, tool.version))
+		data, err := exec.Command(spec.Name, spec.Args...).CombinedOutput()
+		if err != nil {
+			problems = append(problems, fmt.Errorf("%s 不可用：%w", spec.Name, err))
 			continue
 		}
-		fmt.Printf("通过：%s %s\n", tool.name, tool.version)
+		if err := matchToolVersion(key, string(data), versions.Tools[key]); err != nil {
+			problems = append(problems, err)
+			continue
+		}
+		fmt.Printf("通过：%s %s\n", spec.Name, versions.Tools[key])
 	}
+
 	if agent {
 		for _, name := range []string{"codex", "rtk"} {
 			if _, err := exec.LookPath(name); err != nil {

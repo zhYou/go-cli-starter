@@ -37,3 +37,6 @@ go.work.sum
 /.superpowers/
 mise.local.toml
 mise.local.lock
+
+/.template-init/
+/.template-init.lock

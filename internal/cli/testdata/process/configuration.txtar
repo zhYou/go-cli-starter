@@ -1,0 +1,5 @@
+cli 1 greet --name Codex --config bad.yaml
+! stdout .
+stderr '解析配置'
+-- bad.yaml --
+[broken

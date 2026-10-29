@@ -5,13 +5,15 @@ task.run_auto_install = false
 
 [tools]
 go = "1.27.3"
+"go:golang.org/x/vuln/cmd/govulncheck" = "1.9.0"
 "go:golang.org/x/tools/gopls" = "0.24.0"
 golangci-lint = "2.15.0"
 goreleaser = "2.19.0"
+syft = "1.55.0"
 
 [tasks.setup]
 description = "安装锁定版本的工具并下载 Go 依赖"
-run = ["mise install --locked go go:golang.org/x/tools/gopls golangci-lint goreleaser", "go mod download"]
+run = ["mise install --locked go go:golang.org/x/tools/gopls golangci-lint goreleaser go:golang.org/x/vuln/cmd/govulncheck syft", "go mod download"]
 
 [tasks.doctor]
 description = "检查项目工具和锁定版本"
@@ -63,7 +65,7 @@ run = "go run ./tools/dev template-check"
 
 [tasks.check]
 description = "运行与 CI 相同的源码检查"
-depends = ["fmt:check", "mod:check", "test", "vet", "lint", "build", "template:check"]
+depends = ["fmt:check", "mod:check", "test", "vet", "lint", "build", "template:check", "contract:check", "versions:check"]
 
 [tasks.init]
 description = "重命名原始模板：mise run init --module github.com/acme/mycli --name mycli"
@@ -76,3 +78,23 @@ run = "go run ./tools/dev mcp-check"
 [tasks."release:snapshot"]
 description = "在本地构建全部发布压缩包，不执行发布"
 run = "goreleaser release --snapshot --clean --parallelism 2"
+
+[tasks."contract:check"]
+description = "检查机器契约，不修改快照"
+run = "go run ./tools/dev contract-check"
+
+[tasks."contract:update"]
+description = "显式更新机器契约快照，须另写兼容变更记录"
+run = "go run ./tools/dev contract-update"
+
+[tasks."versions:check"]
+description = "检查工具锁、模块、CI 和当前文档版本一致性"
+run = "go run ./tools/dev versions-check"
+
+[tasks.vuln]
+description = "联网检查受影响的 Go 漏洞，失败保留原因"
+run = "go run ./tools/dev vuln"
+
+[tasks."release:verify"]
+description = "验证六目标归档、SPDX 和最终 SHA-256 清单"
+run = "go run ./tools/dev release-verify"

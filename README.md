@@ -25,13 +25,20 @@ mise run check
 
 [安装 mise](https://mise.jdx.dev/getting-started.html)。已有 mise 按其安装方式升级；独立安装的版本可运行 `mise self-update`。
 
+<!-- tool-versions:start -->
+
 | 工具 | 固定版本 |
 | --- | --- |
 | mise（本地最低版本、CI 固定版本） | 2026.10.21 |
 | Go | 1.27.3 |
+| Go 模块最低版本 | 1.27.0 |
 | gopls | 0.24.0 |
 | golangci-lint | 2.15.0 |
 | GoReleaser | 2.19.0 |
+| govulncheck | 1.9.0 |
+| Syft | 1.55.0 |
+
+<!-- tool-versions:end -->
 
 有官方 LTS 时使用最新 LTS 补丁版，否则使用最新稳定版；核验后锁定具体版本。本地和 CI 读取相同配置。Go 没有单独的 LTS 渠道，模板采用 1.27 系列，模块最低版本为 1.27.0。
 
@@ -67,9 +74,9 @@ go install github.com/zhYou/go-cli-starter@latest
 ```
 
 - 默认文本；`--json` 不随终端环境改变，也不由配置或环境变量隐式开启。
-- 成功结果写 stdout，日志和错误写 stderr。失败时 stdout 为空，错误输出为文本。
+- 成功结果写 stdout，日志和错误写 stderr。执行或序列化失败时 stdout 为空，错误输出为文本。底层写入失败可能留下部分字节，消费方须先检查退出码。
 - 缺少必需参数直接失败。
-- `schema [命令路径...]` 总是输出 JSON，包含命令树、用法、示例、参数类型、必填标记、默认值和退出码。它描述调用方式，不是业务结果的 JSON Schema。
+- `schema [命令路径...]` 总是输出 JSON，包含命令树、用法、示例、参数类型、必填标记、默认值和退出码。greet/version 的 result_schema 公开 Draft 2020-12 结果结构。消费方应忽略新增字段；配置文件仍拒绝未知键。
 - 帮助输出文本，补全输出 shell 脚本；它们不受 `--json` 影响。
 - 检查退出状态后再解析 JSON。测试真实退出码时使用构建后的程序；`go run` 会包装非零退出码。
 
@@ -151,3 +158,21 @@ git push origin v0.1.0
 GoReleaser 使用 workflow 的 `GITHUB_TOKEN` 创建 Release，生成 Linux、macOS、Windows 的 amd64/arm64 产物和校验文件。Linux/macOS 使用 tar.gz，Windows 使用 zip；纯 Go 二进制包含版本、提交和构建时间。
 
 模板没有预选许可证；发布自己的项目时按需要添加许可证文件。
+
+模板版本与后续合并方式见[模板升级](docs/template-upgrades.md)。
+
+`mise run vuln` 独立访问 Go 漏洞数据库，PR、main 和每日定时执行；发现漏洞、数据库不可达或工具缺失均失败。源码 check 不请求漏洞数据库。
+
+发布包含每个归档的 SPDX JSON 和最终 checksums.txt。下载同一 Release 的资产后先验证校验和，再检查 SPDX 与来源证明：
+
+```sh
+sha256sum -c checksums.txt
+# macOS 可用 shasum -a 256 -c checksums.txt
+gh attestation verify <asset> --repo <owner/repo>
+```
+
+将占位符替换为实际资产与目标仓库。每个 `<archive>.spdx.json` 的 name 对应归档，packages 列出分析到的依赖；它描述最终构建依赖，不等于源码许可证合规结论。
+`mise run release:snapshot` 与 `mise run release:verify` 仅在本地构建和验证，不生成或上传远端证明。
+私有仓库须先确认套餐和组织策略支持 artifact attestations。证明失败会使 release workflow 失败；若资产已发布，重试时使用已发布的原始字节生成证明，不能重新构建或覆盖资产。
+
+维护者从[维护清单](docs/maintenance.md)配置审查、安全报告、依赖更新和托管发布；开发扩展见[开发说明](docs/development.md)，机器接口变更见[兼容性规则](docs/compatibility.md)。

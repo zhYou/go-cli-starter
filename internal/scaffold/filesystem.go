@@ -1,0 +1,116 @@
+package scaffold
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"github.com/gofrs/flock"
+	"github.com/spf13/afero"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+)
+
+type Initializer struct {
+	FS         afero.Fs
+	RunCommand func(context.Context, string, ...string) ([]byte, error)
+	Lock       func(string) (func() error, error)
+}
+
+func realCommand(ctx context.Context, name string, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Env = append(os.Environ(), "GOWORK=off")
+	return cmd.CombinedOutput()
+}
+func osLock(path string) (func() error, error) {
+	lock := flock.New(path)
+	ok, err := lock.TryLock()
+	if err != nil {
+		_ = lock.Close()
+		return nil, err
+	}
+	if !ok {
+		_ = lock.Close()
+		return nil, errors.New("已有初始化进程正在运行")
+	}
+	return lock.Close, nil
+}
+func (i *Initializer) defaults() Initializer {
+	copy := *i
+	if copy.FS == nil {
+		copy.FS = afero.NewOsFs()
+	}
+	if copy.RunCommand == nil {
+		copy.RunCommand = realCommand
+	}
+	if copy.Lock == nil {
+		copy.Lock = osLock
+	}
+	return copy
+}
+func (i *Initializer) validateModule(ctx context.Context, module string) error {
+	dir, err := os.MkdirTemp("", "cli-module-check-*")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.RemoveAll(dir) }()
+	output, err := i.RunCommand(ctx, "go", "-C", dir, "mod", "init", module)
+	if err != nil {
+		return fmt.Errorf("无效的 Go 模块路径：%w：%s", err, strings.TrimSpace(string(output)))
+	}
+	return nil
+}
+
+// safePath 检查每一级路径，不允许符号链接、上层跳转或非普通目标。
+func (i *Initializer) safePath(root, relative string) (string, error) {
+	if relative == "" || filepath.IsAbs(relative) || strings.Contains(relative, "\\") || filepath.ToSlash(filepath.Clean(filepath.FromSlash(relative))) != relative || relative == ".." || strings.HasPrefix(relative, "../") {
+		return "", fmt.Errorf("不安全的相对路径 %q", relative)
+	}
+	path := root
+	for index, part := range strings.Split(relative, "/") {
+		path = filepath.Join(path, part)
+		var info os.FileInfo
+		var err error
+		if fs, ok := i.FS.(afero.Lstater); ok {
+			info, _, err = fs.LstatIfPossible(path)
+		} else {
+			info, err = i.FS.Stat(path)
+		}
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return "", err
+		}
+		if info.Mode()&os.ModeSymlink != 0 || index < len(strings.Split(relative, "/"))-1 && !info.IsDir() || index == len(strings.Split(relative, "/"))-1 && !info.Mode().IsRegular() && !info.IsDir() {
+			return "", fmt.Errorf("拒绝非常规或符号链接路径 %q", relative)
+		}
+	}
+	return filepath.Join(root, filepath.FromSlash(relative)), nil
+}
+func (i *Initializer) atomicWrite(item change) error {
+	file, err := afero.TempFile(i.FS, filepath.Dir(item.path), ".template-init-*")
+	if err != nil {
+		return err
+	}
+	tempName := file.Name()
+	defer func() { _ = i.FS.Remove(tempName) }()
+	if err := i.FS.Chmod(tempName, item.mode); err != nil {
+		_ = file.Close()
+		return err
+	}
+	n, writeErr := file.Write(item.data)
+	closeErr := file.Close()
+	if writeErr != nil {
+		return writeErr
+	}
+	if n != len(item.data) {
+		return io.ErrShortWrite
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	return i.FS.Rename(tempName, item.path)
+}

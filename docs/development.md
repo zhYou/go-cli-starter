@@ -48,3 +48,27 @@ check 不改写源码，但会写 Go 缓存、临时测试文件和 bin 下的�
 后续需求集中记录在 [项目待办](backlog.md)，不分散创建多个状态清单。新增条目分配唯一 ID，填写优先级、状态、工作量和日期，并说明背景、范围及验收条件。
 
 待办不代表已授权实施。确认范围后再开始，开始时更新为进行中；交付时更新状态、更新日期并关联 PR。暂缓或完成的条目保留记录，避免丢失决策依据。
+
+结果经 writeJSON/writeText 完整渲染后写出。执行和序列化失败保持 stdout 为空；底层写入失败可能已有部分字节，调用者应先检查退出码。
+
+业务选项通过 `validate` 与 `label` 标签声明规则，CLI Args 和业务入口调用同一个 Validate 方法。`validation.New` 的可选注册 callback 在实例使用前配置自定义和条件规则；不要在并发调用后修改注册。
+
+配置由严格 YAML 解码和 koanf 分层合并；环境变量为空时忽略，YAML null 沿用默认值，显式选项仅在 Changed 时覆盖。禁止弱类型转换。
+
+每次调用创建独立 zap logger，默认 warn，诊断写 stderr；logger 不关闭调用者 writer，也不替换全局实例。
+
+命令使用独立构造函数，依赖由 Options.Dependencies 显式注入；装配复制依赖并补默认值，每次调用不共享选项、配置或日志。测试可替换加载器、业务函数与 logger 工厂。
+
+有类型的结果通过 registerResult 注册到本次命令树，使用 google/jsonschema-go 生成 Draft 2020-12。json.Marshaler、encoding.TextMarshaler、字节切片、json string 标签和递归类型须显式覆盖并验证实际 JSON；format 不提供语义校验，业务约束交给 validator。
+
+进程测试构建真实二进制，用 testscript 验证 0/1/2、输出流与损坏配置下的发现命令。根入口测试等待就绪后发 Unix 中断，检查真实退出 130；Windows 使用注入 notify 的受控取消，辅助分支只在测试代码中。
+
+初始化持有 `.template-init.lock` 的系统锁；失败时根据 `.template-init/` 日志回滚。相同参数重试会先恢复，不同参数或人工修改会保留现场并报错。不要删除活跃进程的锁文件；锁文件常驻。单文件以同目录临时文件替换，不承诺跨文件或断电原子性。
+
+工具升级后更新 mise.toml、mise.lock、Go 声明、README 当前工具表及 CI 引导版本，再运行 versions:check。二进制工具校验六平台归档；Go 后端锁定同一模块来源版本，跨平台本地编译，不生成虚假的平台归档记录。Renovate 配置需由仓库管理员启用；受信任执行权限不足时维护者自行补齐六平台锁，检查不会放宽。
+
+发布使用固定 Syft 对六个本地归档生成 SPDX JSON，配置关闭 enrichment、远程许可证查询和更新检查；GoReleaser 在 SBOM 后生成最终 checksums.txt。release:verify 校验实际文件，不上传证明。发布证明只在受信任 release job 生成。
+
+提交 PR 时使用仓库模板记录实际行为、兼容记录和验证。安全报告及维护责任按[维护清单](maintenance.md)配置；托管权限和平台功能须由管理员实际启用。
+
+提交完成或回滚完成后先持久记录终态，再逐个清理备份，最后删除 journal。清理中断可继续；仅剩空恢复目录时安全移除，未知内容仍保留并报错。
