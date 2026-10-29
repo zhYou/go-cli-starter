@@ -1,5 +1,5 @@
-// Package scaffold renames this template without walking or modifying user files.
-// It intentionally depends only on the standard library.
+// Package scaffold 重命名模板，不遍历或修改用户文件。
+// 此包仅依赖标准库。
 package scaffold
 
 import (
@@ -20,8 +20,8 @@ import (
 const TemplateModule = "github.com/zhYou/go-cli-starter"
 const TemplateName = "go-cli-starter"
 
-// These are the only files whose application identity is managed by the template.
-// Keep this implementation and its fixtures unchanged when initializing a project.
+// 模板只管理这些文件中的应用标识。
+// 初始化项目时保留本实现及其测试夹具，避免改动初始化基准。
 var managedFiles = []string{
 	"go.mod", "main.go", "internal/cli/cli.go", "tools/init/main.go",
 	"tools/dev/main.go", "tools/dev/template.go", "mise.toml", ".goreleaser.yaml", "README.md", "AGENTS.md",
@@ -37,17 +37,17 @@ type change struct {
 	mode os.FileMode
 }
 
-// Initialize changes a pristine template's identity, or does nothing if it matches.
+// Initialize 修改原始模板的标识；标识已匹配时不做修改。
 func Initialize(root, module, name string) ([]string, error) {
 	if !validName.MatchString(name) {
-		return nil, errors.New("name must start with a lowercase letter and contain only lowercase letters, digits, or hyphens")
+		return nil, errors.New("名称必须以小写字母开头，且只能包含小写字母、数字或连字符")
 	}
 	if !validModule.MatchString(module) || strings.HasSuffix(module, "/") {
-		return nil, errors.New("invalid Go module path")
+		return nil, errors.New("无效的 Go 模块路径")
 	}
 	for _, part := range strings.Split(module, "/") {
 		if part == "" || part == "." || part == ".." {
-			return nil, errors.New("invalid Go module path segment")
+			return nil, errors.New("无效的 Go 模块路径片段")
 		}
 	}
 	if err := validateModulePath(module); err != nil {
@@ -69,11 +69,11 @@ func Initialize(root, module, name string) ([]string, error) {
 		return []string{}, nil
 	}
 	if currentModule != TemplateModule || currentName != TemplateName {
-		return nil, errors.New("project is already initialized; refusing to replace its identity")
+		return nil, errors.New("项目已初始化，拒绝替换现有标识")
 	}
 	replacer := strings.NewReplacer(TemplateModule, module, TemplateName, name, "GO_CLI_STARTER", strings.ToUpper(strings.ReplaceAll(name, "-", "_")))
 	var changes []change
-	// Preflight every destination before writing any file.
+	// 写入文件前先检查所有目标路径。
 	for _, relative := range managedFiles {
 		path := filepath.Join(root, filepath.FromSlash(relative))
 		info, err := os.Lstat(path)
@@ -88,7 +88,7 @@ func Initialize(root, module, name string) ([]string, error) {
 			return nil, err
 		}
 		if !info.Mode().IsRegular() || resolved != path {
-			return nil, fmt.Errorf("refusing non-regular or symlinked template file %q", relative)
+			return nil, fmt.Errorf("拒绝修改非常规文件或包含符号链接的模板路径 %q", relative)
 		}
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -100,7 +100,7 @@ func Initialize(root, module, name string) ([]string, error) {
 			if filepath.Ext(path) == ".go" {
 				updatedData, err = format.Source(updatedData)
 				if err != nil {
-					return nil, fmt.Errorf("format renamed file %q: %w", relative, err)
+					return nil, fmt.Errorf("格式化重命名后的文件 %q 失败：%w", relative, err)
 				}
 			}
 			changes = append(changes, change{path, updatedData, info.Mode().Perm()})
@@ -109,7 +109,7 @@ func Initialize(root, module, name string) ([]string, error) {
 	changed := make([]string, 0, len(changes))
 	for _, item := range changes {
 		if err := atomicWrite(item); err != nil {
-			return changed, fmt.Errorf("initialize %s: %w", item.path, err)
+			return changed, fmt.Errorf("初始化 %s 失败：%w", item.path, err)
 		}
 		relative, err := filepath.Rel(root, item.path)
 		if err != nil {
@@ -120,7 +120,7 @@ func Initialize(root, module, name string) ([]string, error) {
 	return changed, nil
 }
 
-// Identity reads the module path and executable name without running project code.
+// Identity 读取模块路径和可执行文件名，不执行项目代码。
 func Identity(root string) (string, string, error) {
 	data, err := os.ReadFile(filepath.Join(root, "go.mod"))
 	if err != nil {
@@ -155,7 +155,7 @@ func Identity(root string) (string, string, error) {
 		return true
 	})
 	if module == "" || name == "" {
-		return "", "", errors.New("cannot find module path or appName in this template")
+		return "", "", errors.New("无法从模板中找到模块路径或 appName")
 	}
 	return module, name, nil
 }
@@ -180,8 +180,8 @@ func atomicWrite(item change) error {
 	return os.Rename(file.Name(), item.path)
 }
 
-// Let the installed Go tool validate version suffixes and platform-specific path
-// rules. The scratch module is removed before any project file is changed.
+// 通过已安装的 Go 工具检查版本后缀和各平台的路径规则。
+// 修改项目文件前即删除用于检查的临时模块。
 func validateModulePath(module string) error {
 	dir, err := os.MkdirTemp("", "cli-module-check-*")
 	if err != nil {
@@ -192,7 +192,7 @@ func validateModulePath(module string) error {
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GOWORK=off")
 	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("invalid Go module path: %w: %s", err, strings.TrimSpace(string(output)))
+		return fmt.Errorf("无效的 Go 模块路径：%w：%s", err, strings.TrimSpace(string(output)))
 	}
 	return nil
 }

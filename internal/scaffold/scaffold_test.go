@@ -47,20 +47,20 @@ func TestInitializeRewritesOnlyTemplateFiles(t *testing.T) {
 		t.Fatalf("changed=%v", changed)
 	}
 	if !strings.HasPrefix(read(t, root, "go.mod"), "module github.com/acme/tool\n") {
-		t.Fatal("module not renamed")
+		t.Fatal("模块未重命名")
 	}
 	if !strings.Contains(read(t, root, "main.go"), `appName = "my-cli"`) {
-		t.Fatal("binary identity not renamed")
+		t.Fatal("程序标识未重命名")
 	}
 	if got := read(t, root, "README.md"); got != "my-cli github.com/acme/tool MY_CLI_LOG_LEVEL\n" {
 		t.Fatalf("README=%q", got)
 	}
 	if read(t, root, "user.txt") != "go-cli-starter\n" {
-		t.Fatal("unrelated file modified")
+		t.Fatal("修改了无关文件")
 	}
 	info, err := os.Stat(filepath.Join(root, "main.go"))
 	if err != nil || info.Mode().Perm() != before.Mode().Perm() {
-		t.Fatalf("file mode changed: %v %v", info, err)
+		t.Fatalf("文件权限发生变化：%v %v", info, err)
 	}
 }
 
@@ -75,10 +75,10 @@ func TestInitializeIsIdempotentAndRejectsConflictingIdentity(t *testing.T) {
 	}
 	before := read(t, root, "main.go")
 	if _, err := Initialize(root, "example.com/team/other", "other"); err == nil {
-		t.Fatal("conflicting reinitialization accepted")
+		t.Fatal("错误地接受了冲突的重复初始化")
 	}
 	if read(t, root, "main.go") != before {
-		t.Fatal("conflicting initialization changed project")
+		t.Fatal("冲突的初始化修改了项目")
 	}
 }
 
@@ -91,10 +91,10 @@ func TestInitializeRejectsInvalidInputsBeforeWriting(t *testing.T) {
 	} {
 		root := fixture(t)
 		if _, err := Initialize(root, tc.module, tc.name); err == nil {
-			t.Errorf("accepted %+v", tc)
+			t.Errorf("错误地接受了无效输入 %+v", tc)
 		}
 		if !strings.Contains(read(t, root, "go.mod"), "github.com/zhYou/go-cli-starter") {
-			t.Fatal("invalid input changed module")
+			t.Fatal("无效输入修改了模块")
 		}
 	}
 }
@@ -105,7 +105,7 @@ func TestInitializeDoesNotRewriteNewModuleSubstring(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(read(t, root, "go.mod"), "module example.com/go-cli-starter-tools\n") {
-		t.Fatal("module replacement cascaded")
+		t.Fatal("模块替换发生了级联改写")
 	}
 }
 
@@ -120,7 +120,7 @@ func TestInitializeKeepsRenamedImportsFormatted(t *testing.T) {
 	}
 	wantImports := "import (\n\t\"example.com/team/tool/internal/config\"\n\t\"github.com/spf13/cobra\"\n)"
 	if got := read(t, root, "main.go"); !strings.Contains(got, wantImports) {
-		t.Fatalf("renamed imports are not formatted:\n%s", got)
+		t.Fatalf("重命名后的导入未格式化：\n%s", got)
 	}
 }
 
@@ -134,12 +134,12 @@ func TestInitializeRejectsSymlinkBeforeAnyWrites(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(outside, filepath.Join(root, "README.md")); err != nil {
-		t.Skipf("symlinks unavailable: %v", err)
+		t.Skipf("符号链接不可用：%v", err)
 	}
 	if _, err := Initialize(root, "example.com/tool", "tool"); err == nil {
-		t.Fatal("symlink accepted")
+		t.Fatal("错误地接受了符号链接")
 	}
 	if !strings.Contains(read(t, root, "go.mod"), "github.com/zhYou/go-cli-starter") {
-		t.Fatal("preflight failure partially modified project")
+		t.Fatal("预检失败时仍修改了部分项目文件")
 	}
 }

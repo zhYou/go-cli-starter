@@ -1,5 +1,5 @@
-# Project settings are loaded after this repository is trusted in Codex.
-# Prepare dependencies with `mise run setup`, then start Codex from the repository.
+# 在 Codex 中信任此仓库后加载项目配置。
+# 先运行 `mise run setup` 准备依赖，再从仓库启动 Codex。
 [mcp_servers.gopls]
 command = "mise"
 args = ["exec", "--", "gopls", "mcp"]

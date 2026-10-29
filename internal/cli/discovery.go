@@ -19,7 +19,7 @@ func resolveCommand(root *cobra.Command, args []string) (*cobra.Command, error) 
 			}
 		}
 		if next == nil {
-			return nil, fmt.Errorf("unknown command path %q", strings.Join(args, " "))
+			return nil, fmt.Errorf("未知的命令路径 %q", strings.Join(args, " "))
 		}
 		target = next
 	}
@@ -29,7 +29,7 @@ func resolveCommand(root *cobra.Command, args []string) (*cobra.Command, error) 
 func newHelpCommand(root *cobra.Command) *cobra.Command {
 	var target *cobra.Command
 	return &cobra.Command{
-		Use: "help [command path...]", Short: "Show help for a command",
+		Use: "help [命令路径...]", Short: "显示命令帮助",
 		Annotations: map[string]string{"skip-config": "true"},
 		Args: func(_ *cobra.Command, args []string) error {
 			var err error
@@ -43,15 +43,15 @@ func newHelpCommand(root *cobra.Command) *cobra.Command {
 func newCompletionCommand(root *cobra.Command) *cobra.Command {
 	shells := []string{"bash", "zsh", "fish", "powershell"}
 	return &cobra.Command{
-		Use: "completion [bash|zsh|fish|powershell]", Short: "Generate a shell completion script",
+		Use: "completion [bash|zsh|fish|powershell]", Short: "生成 Shell 补全脚本",
 		ValidArgs:   shells,
 		Annotations: map[string]string{"skip-config": "true"},
-		Args: func(cmd *cobra.Command, args []string) error {
-			if err := cobra.MaximumNArgs(1)(cmd, args); err != nil {
-				return err
+		Args: func(_ *cobra.Command, args []string) error {
+			if len(args) > 1 {
+				return fmt.Errorf("最多接受一个 Shell 名称，实际收到 %d 个参数", len(args))
 			}
 			if len(args) == 1 && !slices.Contains(shells, args[0]) {
-				return fmt.Errorf("unsupported shell %q: use bash, zsh, fish, or powershell", args[0])
+				return fmt.Errorf("不支持的 Shell %q：请选择 bash、zsh、fish 或 powershell", args[0])
 			}
 			return nil
 		},

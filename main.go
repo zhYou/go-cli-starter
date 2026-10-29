@@ -11,7 +11,7 @@ import (
 
 const appName = "go-cli-starter"
 
-// Set by release builds with -ldflags.
+// 发布构建通过 -ldflags 注入这些值。
 var (
 	version = "dev"
 	commit  = "none"

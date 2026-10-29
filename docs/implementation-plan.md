@@ -1,33 +1,33 @@
-# Go CLI template implementation plan
+# Go CLI 模板实施计划
 
-Build a reusable Go CLI for agents and occasional human use. Default to text;
-require `--json` for machine output. Use Cobra, typed YAML, slog, injectable IO,
-context cancellation, stable exit codes, and a generated command description.
+本文记录模板首版的实施范围。后续工作统一记录在 [项目待办](backlog.md)。
 
-## Constraints
+构建可复用的 Go CLI，主要面向智能体，兼顾手动使用。默认输出文本，通过 `--json`
+输出机器可读结果。使用 Cobra、有类型的 YAML、slog、可注入的输入输出、context 取消、
+稳定退出码和自动生成的命令描述。
 
-- Select the latest official LTS, or the latest stable release when no LTS exists;
-  resolve and pin versions rather than floating on `latest`.
-- Go 1.27.3, gopls 0.24.0, golangci-lint 2.15.0, GoReleaser 2.19.0,
-  mise 2026.10.21; Cobra 1.10.2 and YAML v3.0.5.
-- Only Codex project integration. Reuse user-level RTK and superpowers.
-- No TUI, application MCP server, business SDKs, or global agent configuration changes.
-- Retain existing user files. Do not publish or push during implementation.
+## 约束
 
-## Tasks
+- 使用官方最新 LTS；没有 LTS 时使用最新稳定版。核验并锁定具体版本，不使用浮动的 `latest`。
+- Go 1.27.3、gopls 0.24.0、golangci-lint 2.15.0、GoReleaser 2.19.0、
+  mise 2026.10.21；Cobra 1.10.2、YAML v3.0.5。
+- 仅集成 Codex 项目配置，复用用户级 RTK 和 superpowers。
+- 不加入 TUI、应用 MCP 服务、业务 SDK，不修改全局智能体配置。
+- 保留现有用户文件；首版实施阶段不推送或发布。
 
-1. Implement and test CLI/configuration contracts: greet, version, completion,
-   schema; stdout results, stderr diagnostics; exit codes 0/1/2/130.
-2. Implement and test the standard-library project initializer and portable
-   development helpers. Initialization rewrites only template files, is idempotent
-   for the same identity, and refuses a conflicting second identity.
-3. Configure mise, Codex/gopls, CI, cross-platform releases, and Chinese onboarding.
-   Verify the generated project independently, including snapshot packaging and MCP.
-4. Review the whole change with a fresh reviewer; fix material findings and verify.
+## 任务
 
-## Acceptance
+1. 实现并测试 CLI 和配置约定：greet、version、completion、schema；
+   结果写 stdout，诊断写 stderr，退出码为 0/1/2/130。
+2. 实现并测试仅依赖标准库的项目初始化和跨平台开发工具。
+   初始化仅改写模板文件，同一标识重复执行具有幂等性，拒绝冲突的第二个标识。
+3. 配置 mise、Codex/gopls、CI、跨平台发布和中文入门说明。
+   独立验证生成的项目，包括本地发布快照打包和 MCP。
+4. 由新的审查者检查整体变更，修复实质问题并验证。
 
-Text/JSON, IO separation, invalid arguments, configuration precedence and failures,
-configuration-independent help/version/completion/schema, cancellation, generated
-schema, fresh-project rename/build/test/release, locked tools, and a real MCP handshake
-and navigation/diagnostic call. Basic checks work without user-level agent tools.
+## 验收
+
+覆盖文本/JSON、输入输出分离、无效参数、配置优先级及失败场景、不依赖配置的帮助、
+版本、补全和 schema、取消、自动生成的命令描述，以及新项目的改名、构建、测试和发布。
+验证工具版本锁定、真实 MCP 握手和导航/诊断调用。
+未安装用户级智能体工具时，基础检查仍能通过。

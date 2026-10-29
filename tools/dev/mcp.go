@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// checkMCP exercises the same stdio command configured for Codex.
+// checkMCP 验证 Codex 配置中使用的 stdio 命令。
 func checkMCP() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
@@ -41,13 +41,13 @@ func checkMCP() error {
 				Error  json.RawMessage `json:"error"`
 			}
 			if err := decoder.Decode(&response); err != nil {
-				return nil, fmt.Errorf("%s: %w", method, err)
+				return nil, fmt.Errorf("读取 %s 响应失败：%w", method, err)
 			}
 			if response.ID != id {
 				continue
 			}
 			if len(response.Error) != 0 {
-				return nil, fmt.Errorf("%s: %s", method, response.Error)
+				return nil, fmt.Errorf("%s 调用失败：%s", method, response.Error)
 			}
 			return response.Result, nil
 		}
@@ -80,7 +80,7 @@ func checkMCP() error {
 		}
 	}
 	if !found {
-		return errors.New("gopls did not expose go_diagnostics")
+		return errors.New("gopls 未提供 go_diagnostics 工具")
 	}
 	path, err := filepath.Abs("main.go")
 	if err != nil {
@@ -97,8 +97,8 @@ func checkMCP() error {
 		return err
 	}
 	if diagnostic.IsError {
-		return fmt.Errorf("gopls diagnostics failed: %s", result)
+		return fmt.Errorf("gopls 诊断失败：%s", result)
 	}
-	fmt.Printf("MCP initialized; discovered %d tools; diagnosed %s.\n", len(catalog.Tools), path)
+	fmt.Printf("MCP 已初始化，发现 %d 个工具，已诊断 %s。\n", len(catalog.Tools), path)
 	return nil
 }

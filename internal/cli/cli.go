@@ -1,4 +1,4 @@
-// Package cli constructs independent command trees and owns the process IO contract.
+// Package cli 构造独立的命令树，管理进程的输入输出约定。
 package cli
 
 import (
@@ -15,7 +15,7 @@ import (
 	"github.com/zhYou/go-cli-starter/internal/greeting"
 )
 
-// Options supplies process dependencies; every invocation gets a fresh command tree.
+// Options 提供进程依赖；每次调用均创建新的命令树。
 type Options struct {
 	Name, Version, Commit, Date string
 	In                          io.Reader
@@ -26,7 +26,7 @@ type Options struct {
 
 type execution struct{ started bool }
 
-// Run executes once and returns a documented process exit code. It never exits.
+// Run 执行一次命令并返回约定的退出码，不直接退出进程。
 func Run(ctx context.Context, args []string, opts Options) int {
 	opts = defaults(opts)
 	state := &execution{}
@@ -36,17 +36,22 @@ func Run(ctx context.Context, args []string, opts Options) int {
 	if err == nil {
 		return 0
 	}
-	_, _ = fmt.Fprintf(opts.ErrOut, "Error: %v\n", err)
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		message := "操作已取消"
+		if errors.Is(err, context.DeadlineExceeded) {
+			message = "操作已超时"
+		}
+		_, _ = fmt.Fprintf(opts.ErrOut, "错误：%s\n", message)
 		return 130
 	}
+	_, _ = fmt.Fprintf(opts.ErrOut, "错误：%v\n", err)
 	if state.started {
 		return 1
 	}
 	return 2
 }
 
-// NewRoot exposes command construction for extension and embedded command tests.
+// NewRoot 提供命令构造入口，供扩展和嵌入式测试使用。
 func NewRoot(opts Options) *cobra.Command { return newRoot(defaults(opts), &execution{}) }
 
 func defaults(opts Options) Options {
@@ -80,9 +85,9 @@ func newRoot(opts Options, state *execution) *cobra.Command {
 	logger := slog.New(slog.NewTextHandler(opts.ErrOut, &slog.HandlerOptions{Level: slog.LevelWarn}))
 	root := &cobra.Command{
 		Use:           opts.Name,
-		Short:         "A reusable CLI for people and automation",
+		Short:         "供用户和自动化工具使用的 CLI 模板",
 		Version:       opts.Version,
-		Args:          cobra.NoArgs,
+		Args:          noArgs,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE:          func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
@@ -90,9 +95,9 @@ func newRoot(opts Options, state *execution) *cobra.Command {
 	root.SetIn(opts.In)
 	root.SetOut(opts.Out)
 	root.SetErr(opts.ErrOut)
-	root.PersistentFlags().BoolVar(&asJSON, "json", false, "Write the result as JSON")
-	root.PersistentFlags().StringVar(&configPath, "config", "", "Read configuration from this YAML file")
-	root.PersistentFlags().StringVar(&logLevel, "log-level", "warn", "Log level: debug, info, warn, error")
+	root.PersistentFlags().BoolVar(&asJSON, "json", false, "以 JSON 格式输出结果")
+	root.PersistentFlags().StringVar(&configPath, "config", "", "从指定的 YAML 文件读取配置")
+	root.PersistentFlags().StringVar(&logLevel, "log-level", "warn", "日志级别：debug、info、warn、error")
 	root.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
 		state.started = true
 		if err := cmd.Context().Err(); err != nil {
@@ -121,15 +126,15 @@ func newRoot(opts Options, state *execution) *cobra.Command {
 	}
 	var name string
 	greet := &cobra.Command{
-		Use:     "greet --name NAME",
-		Short:   "Print a greeting (removable example)",
+		Use:     "greet --name 姓名",
+		Short:   "输出问候语（可移除的示例）",
 		Example: fmt.Sprintf("  %s greet --name Codex\n  %s greet --name Codex --json", opts.Name, opts.Name),
 		Args: func(cmd *cobra.Command, args []string) error {
-			if err := cobra.NoArgs(cmd, args); err != nil {
+			if err := noArgs(cmd, args); err != nil {
 				return err
 			}
 			if strings.TrimSpace(name) == "" {
-				return errors.New("--name is required and must not be blank")
+				return errors.New("必须提供 --name，且姓名不能为空白")
 			}
 			return nil
 		},
@@ -138,7 +143,7 @@ func newRoot(opts Options, state *execution) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			logger.DebugContext(cmd.Context(), "greeting created", "name", name)
+			logger.DebugContext(cmd.Context(), "已生成问候语", "name", name)
 			if asJSON {
 				return json.NewEncoder(cmd.OutOrStdout()).Encode(result)
 			}
@@ -146,12 +151,12 @@ func newRoot(opts Options, state *execution) *cobra.Command {
 			return err
 		},
 	}
-	greet.Flags().StringVar(&name, "name", "", "Name to greet")
+	greet.Flags().StringVar(&name, "name", "", "问候对象的姓名")
 	if err := greet.MarkFlagRequired("name"); err != nil {
 		panic(err)
 	}
 	version := &cobra.Command{
-		Use: "version", Short: "Print version and build information", Args: cobra.NoArgs,
+		Use: "version", Short: "显示版本和构建信息", Args: noArgs,
 		Annotations: map[string]string{"skip-config": "true"},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if asJSON {
@@ -162,13 +167,16 @@ func newRoot(opts Options, state *execution) *cobra.Command {
 					Date    string `json:"date"`
 				}{opts.Name, opts.Version, opts.Commit, opts.Date})
 			}
-			_, err := fmt.Fprintf(cmd.OutOrStdout(), "%s %s (commit %s, built %s)\n", opts.Name, opts.Version, opts.Commit, opts.Date)
+			_, err := fmt.Fprintf(cmd.OutOrStdout(), "%s 版本 %s（提交 %s，构建时间 %s）\n", opts.Name, opts.Version, opts.Commit, opts.Date)
 			return err
 		},
 	}
 	root.CompletionOptions.DisableDefaultCmd = true
-	root.SetHelpCommand(newHelpCommand(root))
+	help := newHelpCommand(root)
+	root.SetHelpCommand(help)
 	root.AddCommand(greet, version, newSchemaCommand(root), newCompletionCommand(root))
+	configureChineseHelp(root)
+	configureChineseHelp(help)
 	return root
 }
 
