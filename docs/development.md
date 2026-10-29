@@ -60,3 +60,5 @@ check 不改写源码，但会写 Go 缓存、临时测试文件和 bin 下的�
 命令使用独立构造函数，依赖由 Options.Dependencies 显式注入；装配复制依赖并补默认值，每次调用不共享选项、配置或日志。测试可替换加载器、业务函数与 logger 工厂。
 
 有类型的结果通过 registerResult 注册到本次命令树，使用 google/jsonschema-go 生成 Draft 2020-12。特殊编码与递归类型须显式覆盖并验证实际 JSON；format 不提供语义校验，业务约束交给 validator。
+
+进程测试构建真实二进制，用 testscript 验证 0/1/2、输出流与损坏配置下的发现命令。根入口测试等待就绪后发 Unix 中断，检查真实退出 130；Windows 使用注入 notify 的受控取消，辅助分支只在测试代码中。

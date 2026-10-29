@@ -1,0 +1,5 @@
+cli 0 greet --name Codex --json
+stdout '^\{"message":"你好，Codex！"\}$'
+! stderr .
+cli 0 version
+stdout '版本'

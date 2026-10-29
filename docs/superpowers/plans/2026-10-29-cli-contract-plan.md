@@ -60,9 +60,9 @@ Draft 2020-12；消费方忽略新增字段，结果对象允许额外属性，�
 **输入：** `cli.Options.Dependencies` 和任务 1 的错误映射。
 **输出：** 根入口 `run(args []string,deps *cli.Dependencies,notify func()(context.Context,context.CancelFunc)) int` 与 `signalContext()(context.Context,context.CancelFunc)`；main 只调用 run 后 os.Exit。testscript 使用构建后的真实程序。
 
-- [ ] 引入总览锁定的 go-internal/testscript。写 `TestProcessExitCodes`：真实成功=0、显式损坏配置=1、无效调用=2，失败 stdout 为空；测试临时 HOME/USERPROFILE 和配置目录隔离，PATH 只加入 fixture 程序。
-- [ ] 写 `TestMainSignalCancellation`：根包测试子进程注入等待 context 的 Greet，发出“就绪”后再发实际 Unix 信号；期待退出 130、无业务 stdout。Windows 不能发送等价信号时说明具体原因，并通过注入 notify 的受控取消子进程覆盖同一 run 入口。测试辅助分支只存在于 _test.go。
-- [ ] 执行 `mise exec -- go test . ./internal/cli -run 'TestProcessExitCodes|TestMainSignalCancellation'`，确认缺少入口依赖注入或取消场景时失败；不使用抢发信号碰运气。
-- [ ] 把既有信号生命周期提取为上述根入口函数，生产路径仍使用 os/signal；testscript 场景调用真正构建的程序，脚本独立于 bash，异常状态精确检查 ProcessState.ExitCode，不用 go run 代替。
-- [ ] 在 Linux 执行 `mise exec -- go test . ./internal/cli`、`mise run fmt`、`mise run check`、`mise run test:race`；macOS/Windows CI 执行同一测试，明确保留平台跳过原因。
-- [ ] 提交 `test: 验证真实进程退出输出与取消行为`，按验收更新 BL-005/007/015。
+- [x] 引入总览锁定的 go-internal/testscript。写 `TestProcessExitCodes`：真实成功=0、显式损坏配置=1、无效调用=2，失败 stdout 为空；测试临时 HOME/USERPROFILE 和配置目录隔离，PATH 只加入 fixture 程序。
+- [x] 写 `TestMainSignalCancellation`：根包测试子进程注入等待 context 的 Greet，发出“就绪”后再发实际 Unix 信号；期待退出 130、无业务 stdout。Windows 不能发送等价信号时说明具体原因，并通过注入 notify 的受控取消子进程覆盖同一 run 入口。测试辅助分支只存在于 _test.go。
+- [x] 执行 `mise exec -- go test . ./internal/cli -run 'TestProcessExitCodes|TestMainSignalCancellation'`，确认缺少入口依赖注入或取消场景时失败；不使用抢发信号碰运气。
+- [x] 把既有信号生命周期提取为上述根入口函数，生产路径仍使用 os/signal；testscript 场景调用真正构建的程序，脚本独立于 bash，异常状态精确检查 ProcessState.ExitCode，不用 go run 代替。
+- [x] 在 Linux 执行 `mise exec -- go test . ./internal/cli`、`mise run fmt`、`mise run check`、`mise run test:race`；macOS/Windows CI 执行同一测试，明确保留平台跳过原因。
+- [x] 提交 `test: 验证真实进程退出输出与取消行为`，按验收更新 BL-005/007/015。

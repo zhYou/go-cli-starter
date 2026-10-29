@@ -18,12 +18,14 @@ var (
 	date    = "unknown"
 )
 
-func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	code := cli.Run(ctx, os.Args[1:], cli.Options{
-		Name: appName, Version: version, Commit: commit, Date: date,
-		In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr,
-	})
-	stop()
-	os.Exit(code)
+func main() { os.Exit(run(os.Args[1:], nil, signalContext)) }
+
+func signalContext() (context.Context, context.CancelFunc) {
+	return signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+}
+
+func run(args []string, deps *cli.Dependencies, notify func() (context.Context, context.CancelFunc)) int {
+	ctx, stop := notify()
+	defer stop()
+	return cli.Run(ctx, args, cli.Options{Name: appName, Version: version, Commit: commit, Date: date, In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr, Dependencies: deps})
 }
