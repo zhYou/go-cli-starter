@@ -1,6 +1,6 @@
 # go-cli-starter
 
-可直接复制复用的 Go CLI 项目模板。主要面向智能体调用，兼顾手动使用；使用 Codex 开发和维护。
+可直接复制复用的 Go CLI 项目模板。主要面向智能体调用，兼顾手动使用。开发和维护由智能体执行，维护者负责需求、合并和发布决策。
 
 默认输出文本，通过 `--json` 输出结构化结果。包含命令发现、配置、日志、测试、本地环境、项目改名和跨平台发布。
 
@@ -122,6 +122,8 @@ RTK 和 superpowers 使用用户目录中的安装。模板不复制全局技能
 
 当前仅支持 Codex。Claude Code 和 OpenCode 支持见 [项目待办](docs/backlog.md)；TUI 和 CLI 自身的 MCP 服务暂不在范围内。
 
+隔离 worktree、分支命名、提交署名和 PR 交付规则见 [协作约定](AGENTS.md#隔离开发与交付)。
+
 ## 开发命令
 
 | 命令 | 用途 |
@@ -147,7 +149,7 @@ configs/config.example.yaml 配置示例
 test/integration/           真实进程测试与脚本
 test/testdata/contracts/    机器契约基线
 tools/                     初始化与开发任务
-docs/                      使用、设计和维护说明
+docs/                      使用和维护说明、项目待办
 ```
 
 `cmd/<name>` 入口负责信号和退出；`internal/cli` 组织命令，`internal/config` 加载配置，`internal/greeting` 演示业务逻辑；`internal/scaffold` 和 `tools` 提供初始化与开发任务。
