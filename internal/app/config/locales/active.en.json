@@ -1,0 +1,26 @@
+{
+  "config.path": {
+    "other": "A configuration path is required"
+  },
+  "config.read": {
+    "other": "Failed to read configuration file {{.Path}}"
+  },
+  "config.parse": {
+    "other": "Failed to parse TOML configuration file {{.Path}}"
+  },
+  "config.decode": {
+    "other": "Invalid configuration key or type"
+  },
+  "config.environment": {
+    "other": "Invalid environment variable {{.Field}}"
+  },
+  "config.invalid": {
+    "other": "Invalid configuration value"
+  },
+  "config.duration": {
+    "other": "Duration must be a string with a unit"
+  },
+  "config.integer": {
+    "other": "Configuration value must be an integer within range"
+  }
+}

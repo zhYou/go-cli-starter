@@ -1,9 +1,10 @@
 package cli
 
 import (
-	"fmt"
+	"github.com/zhYou/go-cli-starter/internal/base/fault"
 	"io"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -20,7 +21,7 @@ func resolveCommand(root *cobra.Command, args []string) (*cobra.Command, error) 
 			}
 		}
 		if next == nil {
-			return nil, fmt.Errorf("未知的命令路径 %q", strings.Join(args, " "))
+			return nil, usageProblem("unknown_path", fault.Params{"Value": strconv.Quote(strings.Join(args, " "))})
 		}
 		target = next
 	}
@@ -49,10 +50,10 @@ func newCompletionCommand(root *cobra.Command) *cobra.Command {
 		Annotations: map[string]string{"skip-config": "true"},
 		Args: func(_ *cobra.Command, args []string) error {
 			if len(args) > 1 {
-				return fmt.Errorf("最多接受一个 Shell 名称，实际收到 %d 个参数", len(args))
+				return usageProblem("shell_count", fault.Params{"Count": len(args)})
 			}
 			if len(args) == 1 && !slices.Contains(shells, args[0]) {
-				return fmt.Errorf("不支持的 Shell %q：请选择 bash、zsh、fish 或 powershell", args[0])
+				return usageProblem("shell", fault.Params{"Value": strconv.Quote(args[0])})
 			}
 			return nil
 		},

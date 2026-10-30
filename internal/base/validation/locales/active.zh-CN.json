@@ -1,0 +1,17 @@
+{
+  "validation.required": {
+    "other": "{{.Field}} 必须提供"
+  },
+  "validation.notblank": {
+    "other": "{{.Field}} 不能为空白"
+  },
+  "validation.oneof": {
+    "other": "{{.Field}} 必须为 {{.Param}}"
+  },
+  "validation.rule": {
+    "other": "{{.Field}} 不满足校验规则 {{.Rule}} {{.Param}}"
+  },
+  "validation.definition": {
+    "other": "校验定义无效"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "config.path": {
+    "other": "必须提供配置文件路径"
+  },
+  "config.read": {
+    "other": "读取配置文件 {{.Path}} 失败"
+  },
+  "config.parse": {
+    "other": "解析 TOML 配置文件 {{.Path}} 失败"
+  },
+  "config.decode": {
+    "other": "配置项或类型无效"
+  },
+  "config.environment": {
+    "other": "环境变量 {{.Field}} 无效"
+  },
+  "config.invalid": {
+    "other": "配置值无效"
+  },
+  "config.duration": {
+    "other": "时长必须为带单位的字符串"
+  },
+  "config.integer": {
+    "other": "配置项必须为范围内的整数"
+  }
+}

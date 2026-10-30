@@ -28,7 +28,7 @@ func TestSignalHelper(t *testing.T) {
 			return ctx, cancel
 		}
 	}
-	deps := cli.Dependencies{LoadConfig: func(config.Options) (config.Config, error) { return config.Config{LogLevel: "warn"}, nil }, Greet: func(ctx context.Context, _ greeting.Options) (greeting.Result, error) {
+	deps := cli.Dependencies{LoadConfig: func(config.Options) (config.Config, error) { return config.Defaults(), nil }, Greet: func(ctx context.Context, _ greeting.Options) (greeting.Result, error) {
 		_, _ = io.WriteString(os.Stderr, "就绪\n")
 		<-ctx.Done()
 		return greeting.Result{}, ctx.Err()

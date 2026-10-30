@@ -14,7 +14,7 @@ import (
 
 // validateArchive 读取真实归档，核对用户解压后需要的根目录文件。
 func validateArchive(path, binary string) error {
-	required := map[string]bool{binary: false, "README.md": false, "config.example.yaml": false}
+	required := map[string]bool{binary: false, "README.md": false, "config.example.toml": false}
 	accept := func(name string, regular, nonempty bool) error {
 		canonical := archivepath.Clean(strings.ReplaceAll(name, `\`, "/"))
 		if _, needed := required[canonical]; needed && name != canonical {

@@ -19,9 +19,14 @@ const TemplateName = "go-cli-starter"
 // 模板只管理这些文件中的应用标识。
 // 初始化项目时保留本实现及其测试夹具，避免改动初始化基准。
 var managedFiles = []string{
+	"internal/app/cli/language.go", "internal/app/cli/language_test.go", "internal/app/cli/help.go", "internal/app/cli/discovery.go",
+	"internal/base/messages/messages.go", "internal/base/messages/messages_test.go",
+	"internal/base/paths/paths.go", "internal/base/paths/paths_test.go",
+
 	"go.mod", "cmd/" + TemplateName + "/main.go", "cmd/" + TemplateName + "/main_test.go", "internal/app/cli/cli.go",
 	"internal/app/cli/errors.go",
 	"test/integration/process_test.go",
+	"test/integration/testdata/process/language.txtar",
 	"tools/dev/contracts_test.go",
 	"tools/dev/contracts.go",
 	"tools/dev/template_test.go",
@@ -31,7 +36,7 @@ var managedFiles = []string{
 	"internal/app/cli/dependencies.go",
 	"internal/app/cli/greet.go",
 	"internal/app/cli/dependencies_test.go",
-	"internal/app/config/config.go",
+	"internal/app/config/load.go",
 	"internal/app/config/config_test.go",
 	"internal/app/greeting/greeting.go",
 	"internal/app/greeting/greeting_test.go",
@@ -40,7 +45,7 @@ var managedFiles = []string{
 	"internal/app/cli/errors_test.go",
 	"internal/base/fault/error_test.go", "tools/init/main.go",
 	"tools/dev/main.go", "tools/dev/template.go", "mise.toml", ".goreleaser.yaml", "README.md", "AGENTS.md",
-	"configs/config.example.yaml", "docs/development.md", "docs/template-upgrades.md",
+	"configs/config.example.toml", "docs/development.md", "docs/template-upgrades.md",
 }
 
 var validName = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)

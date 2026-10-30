@@ -15,7 +15,7 @@ func newVersionCommand(opts Options, call *invocation) *cobra.Command {
 				return writeJSON(cmd.OutOrStdout(), versionResult{opts.Name, opts.Version, opts.Commit, opts.Date})
 			}
 			return writeText(cmd.OutOrStdout(), func(w io.Writer) error {
-				_, err := fmt.Fprintf(w, "%s 版本 %s（提交 %s，构建时间 %s）\n", opts.Name, opts.Version, opts.Commit, opts.Date)
+				_, err := fmt.Fprintln(w, call.localizer.Text("cli.version_text", map[string]any{"Name": opts.Name, "Version": opts.Version, "Commit": opts.Commit, "Date": opts.Date}))
 				return err
 			})
 		},

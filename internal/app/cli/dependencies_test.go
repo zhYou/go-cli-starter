@@ -22,7 +22,7 @@ func TestTwoInvocationsDoNotShareDependencies(t *testing.T) {
 			if o.LogLevel != nil {
 				level = *o.LogLevel
 			}
-			return config.Config{LogLevel: level}, nil
+			return config.Config{Logging: logging.Config{Level: level, Output: "stderr"}}, nil
 		}, Greet: func(_ context.Context, o greeting.Options) (greeting.Result, error) {
 			return greeting.Result{Message: label + o.Name}, nil
 		}, NewLogger: func(w io.Writer, l string) (*zap.Logger, error) { levels = append(levels, l); return logging.New(w, l) }}

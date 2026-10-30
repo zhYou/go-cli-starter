@@ -3,12 +3,14 @@ package greeting
 
 import (
 	"context"
-	"fmt"
+	"github.com/zhYou/go-cli-starter/internal/base/messages"
 	"github.com/zhYou/go-cli-starter/internal/base/validation"
+	"sync"
 )
 
 type Options struct {
-	Name string `validate:"required,notblank" label:"--name"`
+	Localizer *messages.Localizer `validate:"-"`
+	Name      string              `validate:"required,notblank" label:"--name"`
 }
 
 func (o Options) Validate(ctx context.Context, v *validation.Validator) error {
@@ -36,5 +38,15 @@ func (s *Service) Run(ctx context.Context, opts Options) (Result, error) {
 	if err := opts.Validate(ctx, s.validator); err != nil {
 		return Result{}, err
 	}
-	return Result{Message: fmt.Sprintf("你好，%s！", opts.Name)}, nil
+	l := opts.Localizer
+	if l == nil {
+		b, err := defaultBundle()
+		if err != nil {
+			return Result{}, err
+		}
+		l = b.Localizer("zh-CN")
+	}
+	return Result{Message: l.Text("greeting.message", map[string]any{"Name": opts.Name})}, nil
 }
+
+var defaultBundle = sync.OnceValues(func() (*messages.Bundle, error) { return messages.NewBundle(Catalog()) })

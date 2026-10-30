@@ -6,10 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/zhYou/go-cli-starter/internal/app/config"
 	"github.com/zhYou/go-cli-starter/internal/base/fault"
 	"github.com/zhYou/go-cli-starter/internal/base/iostreams"
 	"io"
+	"strconv"
+	"strings"
 )
 
 // Options 提供进程依赖；每次调用均创建新的命令树。
@@ -18,6 +21,7 @@ type Options struct {
 	In                          io.Reader
 	Out, ErrOut                 io.Writer
 	ConfigDir                   string
+	Language                    string
 	LookupEnv                   func(string) (string, bool)
 	Dependencies                *Dependencies
 }
@@ -27,30 +31,39 @@ func Run(ctx context.Context, args []string, opts Options) int {
 	opts = defaults(opts)
 	sink := &recordingWriter{writer: opts.Out}
 	opts.Out = sink
-	root := newRoot(opts)
-	root.SetArgs(args)
-	_, err := root.ExecuteContextC(ctx)
+	root, call := buildRoot(opts)
+	envLang := languageEnvironment(opts)
+	if opts.Language != "" {
+		envLang = opts.Language
+	}
+	lang, err := selectLanguage(root, args, envLang)
+	call.localizer = newLocalizer(lang)
+	localizeTree(root, call.localizer)
+	if err == nil {
+		root.SetArgs(args)
+		_, err = root.ExecuteContextC(ctx)
+	}
 	if err == nil && sink.Err() != nil {
-		err = fault.Wrap(fault.Runtime, "写入结果失败", sink.Err())
+		err = (fault.Definition{Code: "cli.write", Kind: fault.Runtime}).Wrap(sink.Err())
 	}
 	err = classifyExecutionError(err)
 	if err == nil {
 		return 0
 	}
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		message := "操作已取消"
+		message := call.localizer.Text("cli.cancelled", nil)
 		if errors.Is(err, context.DeadlineExceeded) {
-			message = "操作已超时"
+			message = call.localizer.Text("cli.deadline", nil)
 		}
-		_, _ = fmt.Fprintf(opts.ErrOut, "错误：%s\n", message)
+		_, _ = fmt.Fprintln(opts.ErrOut, call.localizer.Text("cli.error", map[string]any{"Message": message}))
 		return 130
 	}
-	_, _ = fmt.Fprintf(opts.ErrOut, "错误：%v\n", err)
+	_, _ = fmt.Fprintln(opts.ErrOut, call.localizer.Text("cli.error", map[string]any{"Message": call.localizer.Render(err)}))
 	return exitCode(err)
 }
 
 // NewRoot 提供命令构造入口，供扩展和嵌入式测试使用。
-func NewRoot(opts Options) *cobra.Command { return newRoot(defaults(opts)) }
+func NewRoot(opts Options) *cobra.Command { root, _ := buildRoot(defaults(opts)); return root }
 
 func defaults(opts Options) Options {
 	if opts.Name == "" {
@@ -70,16 +83,31 @@ func defaults(opts Options) Options {
 	return opts
 }
 
-func newRoot(opts Options) *cobra.Command {
+func buildRoot(opts Options) (*cobra.Command, *invocation) {
 	call := newInvocation(opts.Dependencies)
+	lang := opts.Language
+	if lang == "" {
+		lang = languageEnvironment(opts)
+	}
+	if normalized, ok := canonicalLanguage(lang); ok {
+		lang = normalized
+	} else {
+		lang = "zh-CN"
+	}
+	call.localizer = newLocalizer(lang)
 	root := &cobra.Command{Use: opts.Name, Short: "供用户和自动化工具使用的 CLI 模板", Version: opts.Version, Args: noArgs, SilenceErrors: true, SilenceUsage: true, RunE: func(cmd *cobra.Command, _ []string) error { return cmd.Help() }}
 	root.SetIn(opts.In)
 	root.SetOut(opts.Out)
 	root.SetErr(opts.ErrOut)
 	root.PersistentFlags().BoolVar(&call.asJSON, "json", false, "以 JSON 格式输出结果")
-	root.PersistentFlags().StringVar(&call.configPath, "config", "", "从指定的 YAML 文件读取配置")
-	root.PersistentFlags().StringVar(&call.logLevel, "log-level", "warn", "日志级别：debug、info、warn、error")
+	root.PersistentFlags().StringVar(&call.configPath, "config", "", "从指定的 TOML 文件读取配置")
+	root.PersistentFlags().StringVar(&call.logLevel, "log-level", "info", "日志级别：debug、info、warn、error")
+	root.PersistentFlags().Var(&languageValue{call: call, root: root}, "lang", "显示语言")
+	root.PersistentFlags().Lookup("lang").DefValue = "zh-CN"
 	root.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
+		if err := validateFlags(cmd, call); err != nil {
+			return err
+		}
 		if err := cmd.Context().Err(); err != nil {
 			return err
 		}
@@ -90,13 +118,16 @@ func newRoot(opts Options) *cobra.Command {
 		if cmd.Flags().Changed("log-level") {
 			override = &call.logLevel
 		}
-		cfg, err := call.deps.LoadConfig(config.Options{AppName: opts.Name, Path: call.configPath, UserConfigDir: opts.ConfigDir, Context: cmd.Context(), Validator: call.deps.Validator, LookupEnv: opts.LookupEnv, LogLevel: override})
+		cfg, err := call.deps.LoadConfig(config.Options{AppName: opts.Name, Path: call.configPath, Explicit: cmd.Flags().Changed("config"), UserConfigDir: opts.ConfigDir, Context: cmd.Context(), Validator: call.deps.Validator, LookupEnv: opts.LookupEnv, LogLevel: override})
 		if err != nil {
-			return fault.Wrap(fault.Configuration, "读取配置失败", err)
+			return (fault.Definition{Code: "cli.config_failed", Kind: fault.Configuration}).Wrap(err)
 		}
-		call.logger, err = call.deps.NewLogger(opts.ErrOut, cfg.LogLevel)
+		if cfg.Logging.Output != "stderr" {
+			return nil
+		}
+		call.logger, err = call.deps.NewLogger(opts.ErrOut, cfg.Logging.Level)
 		if err != nil {
-			return fault.Wrap(fault.Configuration, "日志配置无效", err)
+			return (fault.Definition{Code: "cli.log_config", Kind: fault.Configuration}).Wrap(err)
 		}
 		return nil
 	}
@@ -104,11 +135,13 @@ func newRoot(opts Options) *cobra.Command {
 	help := newHelpCommand(root)
 	root.SetHelpCommand(help)
 	root.AddCommand(newGreetCommand(opts, call), newVersionCommand(opts, call), newSchemaCommand(root, &call.results), newCompletionCommand(root))
-	configureChineseHelp(root)
-	configureChineseHelp(help)
+	configureHelp(root, call)
+	configureHelp(help, call)
 	protectCommand(root)
 	protectCommand(help)
-	return root
+	localizeTree(root, call.localizer)
+	localizeTreeHelp(help, call)
+	return root, call
 }
 func skipsConfig(cmd, root *cobra.Command) bool {
 	if cmd == root || cmd.Annotations["skip-config"] == "true" {
@@ -120,4 +153,70 @@ func skipsConfig(cmd, root *cobra.Command) bool {
 		}
 	}
 	return false
+}
+
+// validateFlags 在配置/资源入口前根据 Cobra 元数据检查必填和组合。
+func validateFlags(cmd *cobra.Command, call *invocation) error {
+	if f := cmd.Flags().Lookup("log-level"); f != nil && f.Changed {
+		switch f.Value.String() {
+		case "debug", "info", "warn", "error":
+		default:
+			return usageProblem("invalid_flag", fault.Params{"Flag": "log-level", "Value": strconv.Quote(f.Value.String()), "Type": "debug|info|warn|error"})
+		}
+	}
+
+	var missing []string
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		if len(f.Annotations[cobra.BashCompOneRequiredFlag]) > 0 && !f.Changed {
+			missing = append(missing, "--"+f.Name)
+		}
+	})
+	if len(missing) > 0 {
+		return usageProblem("required", fault.Params{"Flags": strings.Join(missing, ", ")})
+	}
+	rules := []struct{ annotation, id string }{
+		{"cobra_annotation_required_if_others_set", "together"},
+		{"cobra_annotation_one_required", "one"},
+		{"cobra_annotation_mutually_exclusive", "exclusive"},
+	}
+	for _, rule := range rules {
+		var failure error
+		seen := map[string]bool{}
+		cmd.Flags().VisitAll(func(f *pflag.Flag) {
+			for _, group := range f.Annotations[rule.annotation] {
+				if seen[group] {
+					continue
+				}
+				seen[group] = true
+				names := strings.Fields(group)
+				count := 0
+				present := true
+				for _, name := range names {
+					other := cmd.Flags().Lookup(name)
+					if other == nil {
+						present = false
+						break
+					}
+					if other.Changed {
+						count++
+					}
+				}
+				if !present {
+					continue
+				}
+				invalid := rule.id == "together" && count > 0 && count < len(names) || rule.id == "one" && count == 0 || rule.id == "exclusive" && count > 1
+				if invalid && failure == nil {
+					failure = usageProblem("group", fault.Params{"Flags": group, "Rule": call.localizer.Text("cli.group_"+rule.id, nil)})
+				}
+			}
+		})
+		if failure != nil {
+			return failure
+		}
+	}
+	return nil
+}
+func localizeTreeHelp(help *cobra.Command, call *invocation) {
+	help.Short = call.localizer.Text("cli.help", nil)
+	help.Use = call.localizer.Text("cli.help_use", nil)
 }

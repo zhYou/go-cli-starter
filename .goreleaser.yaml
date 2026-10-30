@@ -19,7 +19,7 @@ archives:
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - README.md
-      - src: configs/config.example.yaml
+      - src: configs/config.example.toml
         dst: .
         strip_parent: true
 sboms:

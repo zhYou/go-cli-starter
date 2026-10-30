@@ -3,7 +3,7 @@ package validation
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"github.com/go-playground/validator/v10"
 	"github.com/zhYou/go-cli-starter/internal/base/fault"
 	"reflect"
@@ -11,19 +11,15 @@ import (
 )
 
 type Validator struct{ engine *validator.Validate }
-type fieldError struct {
-	message string
-	cause   error
-}
-
-func (e fieldError) Error() string { return e.message }
-func (e fieldError) Unwrap() error { return e.cause }
 
 // New 在并发使用前完成规则注册；可通过 callback 组合条件和业务规则。
 func New(register ...func(*validator.Validate)) *Validator {
 	engine := validator.New(validator.WithRequiredStructEnabled())
 	engine.RegisterTagNameFunc(func(f reflect.StructField) string {
 		if name := f.Tag.Get("label"); name != "" {
+			return name
+		}
+		if name := f.Tag.Get("mapstructure"); name != "" {
 			return name
 		}
 		return f.Name
@@ -41,23 +37,21 @@ func (v *Validator) Struct(ctx context.Context, value any) error {
 		return err
 	}
 	if err := v.engine.StructCtx(ctx, value); err != nil {
-		if fields, ok := err.(validator.ValidationErrors); ok {
-			messages := make([]string, 0, len(fields))
+		var fields validator.ValidationErrors
+		if errors.As(err, &fields) {
+			var problems []error
 			for _, field := range fields {
-				reason := "不满足校验规则"
+				code := "validation." + field.Tag()
 				switch field.Tag() {
-				case "required":
-					reason = "必须提供"
-				case "notblank":
-					reason = "不能为空白"
-				case "oneof":
-					reason = "必须为 " + field.Param()
+				case "required", "notblank", "oneof":
+				default:
+					code = "validation.rule"
 				}
-				messages = append(messages, fmt.Sprintf("%s %s", field.Field(), reason))
+				problems = append(problems, (fault.Definition{Code: fault.Code(code), Kind: fault.Usage}).Wrap(err, fault.WithParams(fault.Params{"Field": field.Field(), "Rule": field.Tag(), "Param": field.Param()})))
 			}
-			return fault.Wrap(fault.Usage, "", fieldError{strings.Join(messages, "；"), err})
+			return errors.Join(problems...)
 		}
-		return fault.Wrap(fault.Runtime, "校验定义无效", err)
+		return (fault.Definition{Code: "validation.definition", Kind: fault.Runtime}).Wrap(err)
 	}
 	return ctx.Err()
 }

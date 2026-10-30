@@ -127,14 +127,18 @@ func TestChineseVersionAndSchema(t *testing.T) {
 }
 
 func TestDebugLogsDoNotPolluteJSON(t *testing.T) {
-	code, out, errOut := invoke(t, "greet", "--name", "Codex", "--json", "--log-level", "debug")
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("[logging]\noutput = \"stderr\"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	code, out, errOut := invoke(t, "greet", "--name", "Codex", "--json", "--log-level", "debug", "--config", path)
 	if code != 0 || !json.Valid([]byte(out)) || !strings.Contains(errOut, "DEBUG") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, out, errOut)
 	}
 }
 
 func TestDiscoveryBypassesBrokenConfiguration(t *testing.T) {
-	bad := filepath.Join(t.TempDir(), "bad.yaml")
+	bad := filepath.Join(t.TempDir(), "bad.toml")
 	if err := os.WriteFile(bad, []byte("[broken"), 0o600); err != nil {
 		t.Fatal(err)
 	}

@@ -32,10 +32,13 @@ func TestProcessExitCodes(t *testing.T) {
 		if err := os.MkdirAll(home, 0700); err != nil {
 			return err
 		}
-		for _, key := range []string{"HOME", "USERPROFILE", "XDG_CONFIG_HOME", "APPDATA"} {
+		for _, key := range []string{"HOME", "USERPROFILE", "XDG_CONFIG_HOME", "APPDATA", "LOCALAPPDATA", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"} {
 			env.Setenv(key, home)
 		}
-		env.Setenv("GO_CLI_STARTER_LOG_LEVEL", "")
+		env.Setenv("GO_CLI_STARTER_HOME", home)
+		for _, key := range []string{"GO_CLI_STARTER_LOG_LEVEL", "GO_CLI_STARTER_LOGGING_LEVEL", "GO_CLI_STARTER_LOGGING_OUTPUT", "GO_CLI_STARTER_LANG", "GO_CLI_STARTER_TELEMETRY_EXPORTER"} {
+			env.Setenv(key, "")
+		}
 		return nil
 	}, Cmds: map[string]func(*testscript.TestScript, bool, []string){"cli": func(ts *testscript.TestScript, neg bool, args []string) {
 		if neg || len(args) == 0 {

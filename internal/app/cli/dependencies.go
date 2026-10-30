@@ -5,6 +5,7 @@ import (
 	"github.com/zhYou/go-cli-starter/internal/app/config"
 	"github.com/zhYou/go-cli-starter/internal/app/greeting"
 	"github.com/zhYou/go-cli-starter/internal/base/logging"
+	"github.com/zhYou/go-cli-starter/internal/base/messages"
 	"github.com/zhYou/go-cli-starter/internal/base/validation"
 	"go.uber.org/zap"
 	"io"
@@ -18,6 +19,7 @@ type Dependencies struct {
 	NewLogger  func(io.Writer, string) (*zap.Logger, error)
 }
 type invocation struct {
+	localizer            *messages.Localizer
 	results              resultRegistry
 	asJSON               bool
 	configPath, logLevel string
@@ -42,5 +44,5 @@ func newInvocation(provided *Dependencies) *invocation {
 	if deps.NewLogger == nil {
 		deps.NewLogger = logging.New
 	}
-	return &invocation{deps: deps, logLevel: "warn", logger: zap.NewNop()}
+	return &invocation{deps: deps, logLevel: "info", logger: zap.NewNop()}
 }

@@ -1,10 +1,10 @@
-cli 0 version --config bad.yaml --json
+cli 0 version --config bad.toml --json
 stdout '"version":'
-cli 0 help greet --config bad.yaml
+cli 0 help greet --config bad.toml
 stdout '用法'
-cli 0 schema greet --config bad.yaml
+cli 0 schema greet --config bad.toml
 stdout '"result_schema":'
-cli 0 completion bash --config bad.yaml
+cli 0 completion bash --config bad.toml
 stdout 'bash completion'
--- bad.yaml --
+-- bad.toml --
 [broken

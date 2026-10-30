@@ -22,7 +22,7 @@ func releaseArchiveBytes(t *testing.T, windows bool, binary, mode string) []byte
 	if mode == "corrupt" {
 		return []byte("损坏归档")
 	}
-	members := []archiveMember{{binary, []byte("测试二进制"), 0755}, {"README.md", []byte("说明"), 0644}, {"config.example.yaml", []byte("log_level: warn\n"), 0644}}
+	members := []archiveMember{{binary, []byte("测试二进制"), 0755}, {"README.md", []byte("说明"), 0644}, {"config.example.toml", []byte("[logging]\nlevel = \"info\"\n"), 0644}}
 	switch mode {
 	case "binary":
 		members = members[1:]
@@ -33,17 +33,17 @@ func releaseArchiveBytes(t *testing.T, windows bool, binary, mode string) []byte
 	case "empty":
 		members[2].data = nil
 	case "parent":
-		members[2].name = "configs/config.example.yaml"
+		members[2].name = "configs/config.example.toml"
 	case "duplicate":
 		members = append(members, members[2])
 	case "symlink":
 		members[2].mode = os.ModeSymlink | 0644
 	case "dot-alias":
-		members = append(members, archiveMember{"./config.example.yaml", nil, 0644})
+		members = append(members, archiveMember{"./config.example.toml", nil, 0644})
 	case "parent-alias":
-		members = append(members, archiveMember{"sub/../config.example.yaml", nil, 0644})
+		members = append(members, archiveMember{"sub/../config.example.toml", nil, 0644})
 	case "windows-alias":
-		members = append(members, archiveMember{`.\config.example.yaml`, nil, 0644})
+		members = append(members, archiveMember{`.\config.example.toml`, nil, 0644})
 	}
 	var out bytes.Buffer
 	if windows {

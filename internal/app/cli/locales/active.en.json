@@ -1,0 +1,155 @@
+{
+  "cli.root": {
+    "other": "CLI template for people and automation"
+  },
+  "cli.json": {
+    "other": "Output results as JSON"
+  },
+  "cli.config": {
+    "other": "Read configuration from a TOML file"
+  },
+  "cli.log_level": {
+    "other": "Log level: debug, info, warn, error"
+  },
+  "cli.lang": {
+    "other": "Language: zh-CN, en (zh is an alias)"
+  },
+  "cli.greet": {
+    "other": "Greeting example (removable)"
+  },
+  "cli.greet_use": {
+    "other": "greet --name NAME"
+  },
+  "cli.name": {
+    "other": "Name of the person to greet"
+  },
+  "cli.help": {
+    "other": "Show command help"
+  },
+  "cli.help_flag": {
+    "other": "Show help"
+  },
+  "cli.help_use": {
+    "other": "help [command path...]"
+  },
+  "cli.schema": {
+    "other": "Describe commands and flags as JSON"
+  },
+  "cli.schema_use": {
+    "other": "schema [command path...]"
+  },
+  "cli.completion": {
+    "other": "Generate shell completion scripts"
+  },
+  "cli.version": {
+    "other": "Show version and build information"
+  },
+  "cli.version_flag": {
+    "other": "Show version information"
+  },
+  "cli.version_template": {
+    "other": "{{.Name}} version {{.Version}}"
+  },
+  "cli.version_text": {
+    "other": "{{.Name}} version {{.Version}} (commit {{.Commit}}, built {{.Date}})"
+  },
+  "cli.error": {
+    "other": "Error: {{.Message}}"
+  },
+  "cli.cancelled": {
+    "other": "Operation cancelled"
+  },
+  "cli.deadline": {
+    "other": "Operation timed out"
+  },
+  "cli.unknown_path": {
+    "other": "Unknown command path {{.Value}}"
+  },
+  "cli.no_args": {
+    "other": "Unexpected argument or unknown command: {{.Value}}"
+  },
+  "cli.shell_count": {
+    "other": "Expected at most one shell name, received {{.Count}} arguments"
+  },
+  "cli.shell": {
+    "other": "Unsupported shell {{.Value}}: choose bash, zsh, fish, or powershell"
+  },
+  "cli.unknown_flag": {
+    "other": "Unknown option {{.Flag}}"
+  },
+  "cli.required_flag": {
+    "other": "Option --{{.Flag}} requires a value"
+  },
+  "cli.invalid_flag": {
+    "other": "Invalid value {{.Value}} for --{{.Flag}}; expected {{.Type}}"
+  },
+  "cli.syntax": {
+    "other": "Invalid option syntax: {{.Value}}"
+  },
+  "cli.parse": {
+    "other": "Failed to parse options"
+  },
+  "cli.language": {
+    "other": "Unsupported language {{.Value}}: choose zh-CN or en"
+  },
+  "cli.required": {
+    "other": "Required options: {{.Flags}}"
+  },
+  "cli.group": {
+    "other": "Invalid option group: {{.Flags}} ({{.Rule}})"
+  },
+  "cli.group_together": {
+    "other": "provide together"
+  },
+  "cli.group_one": {
+    "other": "provide at least one"
+  },
+  "cli.group_exclusive": {
+    "other": "provide at most one"
+  },
+  "cli.log_config": {
+    "other": "Invalid logging configuration"
+  },
+  "cli.config_failed": {
+    "other": "Failed to load configuration"
+  },
+  "cli.write": {
+    "other": "Failed to write result"
+  },
+  "cli.greet_log": {
+    "other": "Greeting generated"
+  },
+  "help.usage": {
+    "other": "Usage:"
+  },
+  "help.flags_suffix": {
+    "other": " [flags]"
+  },
+  "help.command_suffix": {
+    "other": " [command]"
+  },
+  "help.aliases": {
+    "other": "Aliases:"
+  },
+  "help.examples": {
+    "other": "Examples:"
+  },
+  "help.commands": {
+    "other": "Available commands:"
+  },
+  "help.flags": {
+    "other": "Flags"
+  },
+  "help.global_flags": {
+    "other": "Global flags"
+  },
+  "help.required": {
+    "other": " (required)"
+  },
+  "help.default": {
+    "other": " (default: {{.Value}})"
+  },
+  "help.detail": {
+    "other": "Use {{.Command}} for detailed command help."
+  }
+}
