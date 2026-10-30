@@ -10,6 +10,7 @@ import (
 	appconfig "github.com/zhYou/go-cli-starter/internal/app/config"
 	"github.com/zhYou/go-cli-starter/internal/base/diagnostics"
 	"github.com/zhYou/go-cli-starter/internal/base/fault"
+	"github.com/zhYou/go-cli-starter/internal/base/iostreams"
 	"github.com/zhYou/go-cli-starter/internal/base/logging"
 	"github.com/zhYou/go-cli-starter/internal/base/messages"
 	"github.com/zhYou/go-cli-starter/internal/base/paths"
@@ -51,13 +52,20 @@ type Session struct {
 	localizer   *messages.Localizer
 }
 
-type borrowedWriter struct{ io.Writer }
-
 // Begin 仅在参数及配置全部校验后调用；诊断失败只告警，不改变业务结果。
 func Begin(ctx context.Context, config appconfig.Config, info logging.RunInfo, opts Options, warn func(error)) (context.Context, *Session) {
-	loggingWarn := reporter(loggingFailed, warn)
-	traceWarn := reporter(telemetryFailed, warn)
-	filesWarn := reporter(diagnosticsFailed, warn)
+	// 直接嵌入 Session 的回调也可能写原始 stderr；与日志出口使用同一写锁。
+	var stderrLock sync.Mutex
+	serializedWarn := func(err error) {
+		stderrLock.Lock()
+		defer stderrLock.Unlock()
+		if warn != nil {
+			warn(err)
+		}
+	}
+	loggingWarn := reporter(loggingFailed, serializedWarn)
+	traceWarn := reporter(telemetryFailed, serializedWarn)
+	filesWarn := reporter(diagnosticsFailed, serializedWarn)
 	s := &Session{ownsLogger: opts.ExternalLogger == nil, warnLogging: loggingWarn, localizer: opts.Localizer}
 	if s.localizer == nil {
 		bundle, _ := messages.NewBundle(Catalog(), logging.Catalog(), telemetry.Catalog(), diagnostics.Catalog())
@@ -89,7 +97,7 @@ func Begin(ctx context.Context, config appconfig.Config, info logging.RunInfo, o
 			logWriter = s.writer(diagnostics.EventsFile, loggingWarn)
 		case "stderr":
 			if opts.Stderr != nil {
-				logWriter = borrowedWriter{opts.Stderr}
+				logWriter = iostreams.Synchronize(opts.Stderr, &stderrLock)
 			}
 		case "none":
 			opts.ExternalLogger = logging.NewNop()

@@ -38,6 +38,8 @@ func Run(ctx context.Context, args []string, opts Options) (code int) {
 	started := time.Now()
 	var executionErr error
 	opts = defaults(opts)
+	// Cobra、日志、诊断回调与最终错误输出共用调用级 stderr 写锁。
+	opts.ErrOut = iostreams.Synchronize(opts.ErrOut, nil)
 	sink := &recordingWriter{writer: opts.Out}
 	opts.Out = sink
 	root, call := buildRoot(opts)

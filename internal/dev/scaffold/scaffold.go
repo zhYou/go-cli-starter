@@ -19,6 +19,8 @@ const TemplateName = "go-cli-starter"
 // 模板只管理这些文件中的应用标识。
 // 初始化项目时保留本实现及其测试夹具，避免改动初始化基准。
 var managedFiles = []string{
+	"internal/app/cli/stderr_test.go",
+	"internal/app/session/stderr_test.go",
 	"internal/base/logging/external_event_test.go",
 	"internal/base/telemetry/environment_linux_test.go",
 	"internal/base/diagnostics/process_test.go",

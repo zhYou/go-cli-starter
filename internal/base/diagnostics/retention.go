@@ -20,6 +20,7 @@ type candidate struct {
 	size     int64
 	last     time.Time
 	identity os.FileInfo
+	files    map[string]os.FileInfo
 }
 
 // Cleanup 非阻塞取得维护锁，只清理有有效标记且未被写入者锁定的运行目录。
@@ -80,7 +81,7 @@ func Cleanup(base string, config Config) error {
 	return nil
 }
 func inspect(root *os.Root, name string) (candidate, error) {
-	c := candidate{name: name}
+	c := candidate{name: name, files: map[string]os.FileInfo{}}
 	info, err := root.Lstat(name)
 	if err != nil {
 		return c, err
@@ -106,6 +107,7 @@ func inspect(root *os.Root, name string) (candidate, error) {
 		if err != nil {
 			return c, err
 		}
+		c.files[e.Name()] = info
 		c.size += info.Size()
 		if info.ModTime().After(c.last) {
 			c.last = info.ModTime()
@@ -163,14 +165,34 @@ func removeCandidate(root *os.Root, base string, c candidate) (bool, error) {
 		_ = child.Close()
 		return false, err
 	}
+	// 删除前重新核对完整清单；后来新增的文件（即使名称已登记）不属于已校验快照。
+	if !matchesSnapshot(child, entries, fresh.files) {
+		_ = child.Close()
+		return false, nil
+	}
 	for _, e := range entries {
 		if e.Name() == leaseName || e.Name() == metadataName {
 			continue
+		}
+		info, statErr := child.Lstat(e.Name())
+		if statErr != nil || !info.Mode().IsRegular() || !os.SameFile(fresh.files[e.Name()], info) {
+			_ = child.Close()
+			return false, nil
 		}
 		if err = child.Remove(e.Name()); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			_ = child.Close()
 			return false, err
 		}
+		delete(fresh.files, e.Name())
+	}
+	entries, err = readEntries(child)
+	if err != nil {
+		_ = child.Close()
+		return false, err
+	}
+	if !matchesSnapshot(child, entries, fresh.files) {
+		_ = child.Close()
+		return false, nil
 	}
 	// 数据清理全部成功后再移除标记，进程中断或单个删除失败时仍可被下次清理识别。
 	if err = child.Remove(metadataName); err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -186,4 +208,22 @@ func removeCandidate(root *os.Root, base string, c candidate) (bool, error) {
 		return false, err
 	}
 	return true, root.Remove(c.name)
+}
+
+// matchesSnapshot 拒绝任何新增、替换或非普通文件，防止扫描之间的用户内容进入删除清单。
+func matchesSnapshot(root *os.Root, entries []fs.DirEntry, verified map[string]os.FileInfo) bool {
+	if len(entries) != len(verified) {
+		return false
+	}
+	for _, entry := range entries {
+		before, known := verified[entry.Name()]
+		if !known {
+			return false
+		}
+		current, err := root.Lstat(entry.Name())
+		if err != nil || !current.Mode().IsRegular() || !os.SameFile(before, current) {
+			return false
+		}
+	}
+	return true
 }
