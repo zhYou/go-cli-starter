@@ -18,13 +18,14 @@ import (
 
 // verifyRelease 在六目标归档检查后，以宿主真实安装完成发布验收。
 func verifyRelease(dist string) error {
-	if err := checkReleaseSnapshot(dist); err != nil {
+	snapshot, err := validateReleaseSnapshot(dist)
+	if err != nil {
 		return err
 	}
-	return verifyArchiveInstall(dist)
+	return verifyArchiveInstall(dist, snapshot)
 }
 
-func verifyArchiveInstall(dist string) error {
+func verifyArchiveInstall(dist string, snapshot *releaseSnapshot) error {
 	metadataPath, err := releaseFile(dist, "metadata.json")
 	if err != nil {
 		return err
@@ -44,6 +45,9 @@ func verifyArchiveInstall(dist string) error {
 	if metadata.Name != appName || metadata.Version == "" || metadata.Commit == "" {
 		return fmt.Errorf("发布元数据缺少身份、版本或提交")
 	}
+	if metadata.Version != snapshot.version {
+		return fmt.Errorf("发布元数据版本与校验清单不一致：%s != %s", metadata.Version, snapshot.version)
+	}
 	head, err := exec.Command(gitProgram, gitRevParse, "HEAD").Output()
 	if err != nil {
 		return err
@@ -58,6 +62,10 @@ func verifyArchiveInstall(dist string) error {
 		binary += executableSuffix
 	}
 	archiveName := fmt.Sprintf("%s_%s_%s_%s%s", appName, metadata.Version, runtime.GOOS, runtime.GOARCH, extension)
+	checksum, listed := snapshot.checksums[archiveName]
+	if !listed {
+		return fmt.Errorf("宿主归档未列入已验证的最终校验清单：%s", archiveName)
+	}
 	archive, err := releaseFile(dist, archiveName)
 	if err != nil {
 		return err
@@ -66,13 +74,15 @@ func verifyArchiveInstall(dist string) error {
 	if err != nil {
 		return err
 	}
-	//nolint:gosec // G304：仅读取已通过最终 SHA-256 清单验证的本地宿主归档。
+	//nolint:gosec // G304：只重新核对清单内已验证归档，安装仍使用清单摘要而非本次读取的摘要。
 	data, err = os.ReadFile(archive)
 	if err != nil {
 		return err
 	}
 	digest := sha256.Sum256(data)
-	checksum := hex.EncodeToString(digest[:])
+	if hex.EncodeToString(digest[:]) != checksum {
+		return fmt.Errorf("宿主归档与已验证的最终清单摘要不一致：%s", archiveName)
+	}
 	mise, err := exec.LookPath("mise")
 	if err != nil {
 		return err
@@ -98,7 +108,6 @@ func verifyArchiveInstall(dist string) error {
 			return err
 		}
 		config := fmt.Sprintf("[settings]\nauto_install = false\nexec_auto_install = false\n[tools.\"http:%s\"]\nversion = %q\nurl = %q\nchecksum = %q\n", appName, metadata.Version, archiveURL, "sha256:"+expected)
-		//nolint:gosec // G703：dir 仅由系统临时目录与固定阶段名组成。
 		if err := os.WriteFile(filepath.Join(dir, "mise.toml"), []byte(config), 0600); err != nil {
 			return err
 		}

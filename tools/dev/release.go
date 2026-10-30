@@ -28,15 +28,27 @@ func releaseFile(dist, name string) (string, error) {
 	}
 	return path, nil
 }
+
+// releaseSnapshot 仅在全部清单资产、六目标归档和 SPDX 校验成功后返回。
+type releaseSnapshot struct {
+	version   string
+	checksums map[string]string
+}
+
 func checkReleaseSnapshot(dist string) error {
+	_, err := validateReleaseSnapshot(dist)
+	return err
+}
+
+func validateReleaseSnapshot(dist string) (*releaseSnapshot, error) {
 	path, err := releaseFile(dist, "checksums.txt")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
 	file, err := os.Open(path)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer func() { _ = file.Close() }()
 	checksums := map[string]string{}
@@ -46,37 +58,37 @@ func checkReleaseSnapshot(dist string) error {
 		line := scanner.Text()
 		match := linePattern.FindStringSubmatch(line)
 		if len(match) != 3 {
-			return fmt.Errorf("无效的 SHA-256 校验行：%q", line)
+			return nil, fmt.Errorf("无效的 SHA-256 校验行：%q", line)
 		}
 		name := match[2]
 		if _, ok := checksums[name]; ok {
-			return fmt.Errorf("校验清单包含重复路径：%s", name)
+			return nil, fmt.Errorf("校验清单包含重复路径：%s", name)
 		}
 		path, err := releaseFile(dist, name)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
 		input, err := os.Open(path)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		hash := sha256.New()
 		_, copyErr := io.Copy(hash, input)
 		closeErr := input.Close()
 		if copyErr != nil {
-			return copyErr
+			return nil, copyErr
 		}
 		if closeErr != nil {
-			return closeErr
+			return nil, closeErr
 		}
 		if hex.EncodeToString(hash.Sum(nil)) != match[1] {
-			return fmt.Errorf("发布产物摘要不符：%s", name)
+			return nil, fmt.Errorf("发布产物摘要不符：%s", name)
 		}
 		checksums[name] = match[1]
 	}
 	if err := scanner.Err(); err != nil {
-		return err
+		return nil, err
 	}
 	pattern := regexp.MustCompile("^" + regexp.QuoteMeta(appName) + `_(.+)_(linux|darwin|windows)_(amd64|arm64)\.(tar\.gz|zip)$`)
 	targets := map[string]bool{}
@@ -88,36 +100,36 @@ func checkReleaseSnapshot(dist string) error {
 		}
 		target := match[2] + "_" + match[3]
 		if targets[target] {
-			return fmt.Errorf("目标归档重复：%s", target)
+			return nil, fmt.Errorf("目标归档重复：%s", target)
 		}
 		targets[target] = true
 		if version == "" {
 			version = match[1]
 		} else if version != match[1] {
-			return fmt.Errorf("发布归档版本不一致")
+			return nil, fmt.Errorf("发布归档版本不一致")
 		}
 		if match[2] == windowsPlatform && match[4] != "zip" || match[2] != windowsPlatform && match[4] != "tar.gz" {
-			return fmt.Errorf("归档格式与平台不符：%s", name)
+			return nil, fmt.Errorf("归档格式与平台不符：%s", name)
 		}
 		binary := appName
 		if match[2] == windowsPlatform {
 			binary += executableSuffix
 		}
 		if err := validateArchive(filepath.Join(dist, name), binary); err != nil {
-			return fmt.Errorf("发布归档 %s 无效：%w", name, err)
+			return nil, fmt.Errorf("发布归档 %s 无效：%w", name, err)
 		}
 		sbom := name + ".spdx.json"
 		if _, ok := checksums[sbom]; !ok {
-			return fmt.Errorf("归档缺少已校验 SBOM：%s", name)
+			return nil, fmt.Errorf("归档缺少已校验 SBOM：%s", name)
 		}
 		if err := validateSPDX(filepath.Join(dist, sbom), name); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	if len(targets) != 6 {
-		return fmt.Errorf("必须包含六目标归档及其 SBOM，实际 %d 个", len(targets))
+		return nil, fmt.Errorf("必须包含六目标归档及其 SBOM，实际 %d 个", len(targets))
 	}
-	return nil
+	return &releaseSnapshot{version: version, checksums: checksums}, nil
 }
 func validateSPDX(path, archive string) error {
 	//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
