@@ -111,52 +111,96 @@ func TestRetentionDoesNotFollowArtifactSymlinks(t *testing.T) {
 	_, err = os.Lstat(filepath.Join(run.Path, EventsFile))
 	require.NoError(t, err)
 }
+
+// TestDiagnosticInterruptedCleanupHelper 在首次真实数据删除后握手，持锁等待父进程终止。
+func TestDiagnosticInterruptedCleanupHelper(t *testing.T) {
+	base := os.Getenv(helperRootEnv)
+	if base == "" {
+		return
+	}
+	cfg := Defaults()
+	cfg.RetentionDays = 1
+	cfg.MaxTotalSizeMiB = 0
+	require.NoError(t, cleanup(base, cfg, func(root *os.Root, name string) error {
+		if err := root.Remove(name); err != nil {
+			return err
+		}
+		if artifactPattern.MatchString(name) {
+			fmt.Println(name)
+			_, _ = io.Copy(io.Discard, os.Stdin)
+		}
+		return nil
+	}))
+}
+
 func TestInterruptedCleanupDoesNotOrphanData(t *testing.T) {
 	base := t.TempDir()
 	cfg := Defaults()
 	cfg.RetentionDays = 0
 	cfg.MaxTotalSizeMiB = 0
-	run, err := Open(base, cfg, nil)
-	require.NoError(t, err)
-	require.NoError(t, run.Close())
-	root, err := os.OpenRoot(run.Path)
-	require.NoError(t, err)
-	for i := 1; i <= 4096; i++ {
-		name := fmt.Sprintf("events.%06d.jsonl", i)
-		file, err := root.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	create := func() *Run {
+		run, err := Open(base, cfg, nil)
 		require.NoError(t, err)
-		_, err = file.Write([]byte(strings.Repeat("x", 512)))
-		require.NoError(t, err)
-		require.NoError(t, file.Close())
+		for _, name := range []string{EventsFile, "events.000001.jsonl", "trace.000001.jsonl"} {
+			require.NoError(t, os.WriteFile(filepath.Join(run.Path, name), []byte("{}\n"), 0600))
+		}
+		return run
 	}
-	require.NoError(t, root.Close())
+	expired := create()
+	require.NoError(t, expired.Close())
+	old := time.Now().Add(-48 * time.Hour)
+	require.NoError(t, writeMetadataPath(expired.Path, metadata{Version: metadataVersion, ID: expired.ID, Started: old, Finished: old}))
+	active := create()
+	defer func() { require.NoError(t, active.Close()) }()
+	unknown := create()
+	require.NoError(t, unknown.Close())
+	marker := filepath.Join(unknown.Path, "user.txt")
+	require.NoError(t, os.WriteFile(marker, []byte("保留"), 0600))
+	require.NoError(t, writeMetadataPath(unknown.Path, metadata{Version: metadataVersion, ID: unknown.ID, Started: old, Finished: old}))
+	// 活动目录也过期，确保保留依赖租约而非时间筛选。
+	require.NoError(t, writeMetadataPath(active.Path, metadata{Version: metadataVersion, ID: active.ID, Started: old, Finished: old}))
 	exe, err := os.Executable()
 	require.NoError(t, err)
 	// #nosec G204 -- 仅执行当前测试二进制的清理 helper。
-	child := exec.CommandContext(t.Context(), exe, "-test.run=^TestDiagnosticCleanupHelper$")
+	child := exec.CommandContext(t.Context(), exe, "-test.run=^TestDiagnosticInterruptedCleanupHelper$")
 	child.Env = append(os.Environ(), helperRootEnv+"="+base)
-	require.NoError(t, child.Start())
-	t.Cleanup(func() { _ = child.Process.Kill(); _ = child.Wait() })
-	deadline := time.Now().Add(5 * time.Second)
-	for {
-		_, err = os.Stat(filepath.Join(run.Path, metadataName))
-		if os.IsNotExist(err) {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("清理未移除元数据")
-		}
-		time.Sleep(100 * time.Microsecond)
-	}
-	_ = child.Process.Kill()
-	_ = child.Wait()
-	require.NoError(t, Cleanup(base, Defaults()))
-	entries, err := os.ReadDir(run.Path)
-	if os.IsNotExist(err) {
-		return
-	}
+	input, err := child.StdinPipe()
 	require.NoError(t, err)
-	for _, entry := range entries {
-		require.False(t, artifactPattern.MatchString(entry.Name()), "遗留诊断数据："+entry.Name())
+	output, err := child.StdoutPipe()
+	require.NoError(t, err)
+	require.NoError(t, child.Start())
+	t.Cleanup(func() { _ = input.Close(); _ = child.Process.Kill(); _ = child.Wait() })
+	ready := make(chan string, 1)
+	go func() { line, _ := bufio.NewReader(output).ReadString('\n'); ready <- strings.TrimSpace(line) }()
+	var removed string
+	select {
+	case removed = <-ready:
+	case <-time.After(10 * time.Second):
+		t.Fatal("清理子进程未完成首次数据删除握手")
 	}
+	require.True(t, artifactPattern.MatchString(removed), "握手必须指明已删除的数据文件")
+	require.NoFileExists(t, filepath.Join(expired.Path, removed))
+	require.FileExists(t, filepath.Join(expired.Path, metadataName))
+	entries, err := os.ReadDir(expired.Path)
+	require.NoError(t, err)
+	remaining := 0
+	for _, entry := range entries {
+		if artifactPattern.MatchString(entry.Name()) {
+			remaining++
+		}
+	}
+	require.Equal(t, 2, remaining, "中断前必须还剩两个真实数据文件")
+	require.NoError(t, child.Process.Kill())
+	require.Error(t, child.Wait())
+	cfg.RetentionDays = 1
+	require.NoError(t, Cleanup(base, cfg))
+	require.NoDirExists(t, expired.Path)
+	for _, name := range []string{EventsFile, "events.000001.jsonl", "trace.000001.jsonl", metadataName} {
+		require.FileExists(t, filepath.Join(active.Path, name))
+		require.FileExists(t, filepath.Join(unknown.Path, name))
+	}
+	//nolint:gosec // G304：仅读取本测试临时目录的未知文件。
+	data, err := os.ReadFile(marker)
+	require.NoError(t, err)
+	require.Equal(t, "保留", string(data))
 }

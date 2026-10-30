@@ -23,7 +23,8 @@ const TemplateName = "go-cli-starter"
 // 模板只管理这些文件中的应用标识。
 // 初始化项目时保留本实现及其测试夹具，避免改动初始化基准。
 var managedFiles = []string{
-	".github/workflows/ci.yml",
+	".github/workflows/ci.yml", ".github/workflows/release.yml",
+	"tools/dev/acceptance.go", "tools/dev/release_install.go",
 	"tools/dev/doctor.go", "tools/dev/doctor_test.go", "tools/dev/rules.go", "internal/app/cli/fuzz_test.go",
 	"internal/tools/command/batch.go",
 	"internal/tools/command/catalog.go",

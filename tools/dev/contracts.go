@@ -23,7 +23,7 @@ func captureContract(ctx context.Context) ([]byte, error) {
 	}
 	defer func() { _ = os.RemoveAll(dir) }()
 	results := map[string]any{}
-	for key, args := range map[string][]string{schemaCommand: {schemaCommand}, greetCommand: {greetCommand, "--name", "Codex", "--json"}, versionCommand: {versionCommand, "--json"}} {
+	for key, args := range map[string][]string{schemaCommand: {schemaCommand}, greetCommand: {greetCommand, nameFlag, "Codex", jsonFlag}, versionCommand: {versionCommand, jsonFlag}} {
 		var out, errOut bytes.Buffer
 		code := cli.Run(ctx, args, cli.Options{Name: "contract-cli", Version: "1.0.0", Commit: "abc", Date: "2000-01-01", Out: &out, ErrOut: &errOut, ConfigDir: dir, Directories: &paths.Directories{State: filepath.Join(dir, "state")}, LookupEnv: func(string) (string, bool) { return "", false }})
 		if code != 0 {

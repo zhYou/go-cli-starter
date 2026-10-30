@@ -101,7 +101,7 @@ description = "联网检查受影响的 Go 漏洞，失败保留原因"
 run = "go run ./tools/dev vuln"
 
 [tasks."release:verify"]
-description = "验证六目标归档、SPDX 和最终 SHA-256 清单"
+description = "验证六目标归档、SPDX、SHA-256，并隔离安装宿主归档"
 run = "go run ./tools/dev release-verify"
 
 [tasks."rules:check"]

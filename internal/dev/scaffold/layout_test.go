@@ -103,3 +103,26 @@ func TestInspectRejectsGoVersionNames(t *testing.T) {
 		})
 	}
 }
+
+func TestInitializeAcceptanceIdentityWhitelist(t *testing.T) {
+	root := projectFixture(t, TemplateModule, TemplateName)
+	for _, name := range []string{"tools/dev/acceptance.go", "tools/dev/release_install.go"} {
+		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(root, name)), 0700))
+		content := "package main\nimport _ \"" + TemplateModule + "/internal/base/paths\"\n"
+		require.NoError(t, os.WriteFile(filepath.Join(root, name), []byte(content), 0600))
+	}
+	unknown := filepath.Join(root, "user.toml")
+	require.NoError(t, os.WriteFile(unknown, []byte("name = \""+TemplateName+"\""), 0600))
+	_, err := Initialize(root, "example.com/team/mycli", "mycli")
+	require.NoError(t, err)
+	for _, name := range []string{"tools/dev/acceptance.go", "tools/dev/release_install.go"} {
+		//nolint:gosec // G304：仅读取本测试的临时 fixture。
+		data, err := os.ReadFile(filepath.Join(root, name))
+		require.NoError(t, err)
+		require.Contains(t, string(data), "example.com/team/mycli/internal/base/paths")
+	}
+	//nolint:gosec // G304：仅读取本测试临时目录中的未知文件。
+	data, err := os.ReadFile(unknown)
+	require.NoError(t, err)
+	require.Contains(t, string(data), TemplateName)
+}

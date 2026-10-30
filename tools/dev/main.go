@@ -46,7 +46,7 @@ func runArgs(args []string) error {
 	}
 	switch task {
 	case "release-verify":
-		return checkReleaseSnapshot("dist")
+		return verifyRelease("dist")
 	case "vuln":
 		return checkVulnerabilities(context.Background(), nil)
 	case "rules-check":
@@ -101,11 +101,11 @@ func build() error {
 	if runtime.GOOS == windowsPlatform {
 		name += executableSuffix
 	}
-	version, commit := "dev", "none"
+	version, commit := developmentVersion, developmentCommit
 	if data, err := exec.Command(gitProgram, "describe", "--tags", "--always", "--dirty").Output(); err == nil {
 		version = strings.TrimSpace(string(data))
 	}
-	if data, err := exec.Command(gitProgram, "rev-parse", "--short", "HEAD").Output(); err == nil {
+	if data, err := exec.Command(gitProgram, gitRevParse, "--short", "HEAD").Output(); err == nil {
 		commit = strings.TrimSpace(string(data))
 	}
 	flags := fmt.Sprintf("-s -w -X main.version=%s -X main.commit=%s -X main.date=%s", version, commit, time.Now().UTC().Format(time.RFC3339))

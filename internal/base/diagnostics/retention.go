@@ -25,6 +25,11 @@ type candidate struct {
 
 // Cleanup 非阻塞取得维护锁，只清理有有效标记且未被写入者锁定的运行目录。
 func Cleanup(base string, config Config) error {
+	return cleanup(base, config, (*os.Root).Remove)
+}
+
+// cleanup 的删除操作按调用传入，便于验证文件系统失败或进程中断后的恢复。
+func cleanup(base string, config Config, remove func(*os.Root, string) error) error {
 	if config.RetentionDays == 0 && config.MaxTotalSizeMiB == 0 {
 		return nil
 	}
@@ -70,7 +75,7 @@ func Cleanup(base string, config Config) error {
 		if !expired && !oversized {
 			continue
 		}
-		removed, err := removeCandidate(root, base, c)
+		removed, err := removeCandidate(root, base, c, remove)
 		if err != nil {
 			return err
 		}
@@ -133,7 +138,7 @@ func inspect(root *os.Root, name string) (candidate, error) {
 	}
 	return c, nil
 }
-func removeCandidate(root *os.Root, base string, c candidate) (bool, error) {
+func removeCandidate(root *os.Root, base string, c candidate, remove func(*os.Root, string) error) (bool, error) {
 	leaseInfo, err := root.Lstat(filepath.Join(c.name, leaseName))
 	if err != nil || !leaseInfo.Mode().IsRegular() {
 		return false, nil
@@ -179,7 +184,7 @@ func removeCandidate(root *os.Root, base string, c candidate) (bool, error) {
 			_ = child.Close()
 			return false, nil
 		}
-		if err = child.Remove(e.Name()); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		if err = remove(child, e.Name()); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			_ = child.Close()
 			return false, err
 		}
@@ -195,7 +200,7 @@ func removeCandidate(root *os.Root, base string, c candidate) (bool, error) {
 		return false, nil
 	}
 	// 数据清理全部成功后再移除标记，进程中断或单个删除失败时仍可被下次清理识别。
-	if err = child.Remove(metadataName); err != nil && !errors.Is(err, fs.ErrNotExist) {
+	if err = remove(child, metadataName); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		_ = child.Close()
 		return false, err
 	}

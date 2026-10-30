@@ -34,7 +34,7 @@ func checkRuleFixture(ctx context.Context, kind string) error {
 		}
 	}
 	expected := map[string]int{}
-	source := filepath.Join("tools", "dev", "testdata", "rules", kind)
+	source := filepath.Join("tools", devDirectory, "testdata", "rules", kind)
 	err = filepath.WalkDir(source, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err

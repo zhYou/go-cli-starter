@@ -72,6 +72,9 @@ func verifyTemplate() error {
 	if err := commandEnv(dir, []string{paths.EnvPrefix(project.Name) + "_HOME=" + filepath.Join(dir, ".template-check-home")}, "go", "test", allPackages); err != nil {
 		return err
 	}
+	if err := command(dir, lintProgram, "run", "--allow-serial-runners"); err != nil {
+		return err
+	}
 	if err := command(dir, "go", buildCommand, "-o", filepath.Join(dir, "app-check"), "./"+project.CommandPath); err != nil {
 		return err
 	}
@@ -85,7 +88,7 @@ func verifyTemplate() error {
 	if module != scaffold.TemplateModule && strings.Contains(string(imports), scaffold.TemplateModule) {
 		return fmt.Errorf("生成的项目仍在导入原模板模块")
 	}
-	if err := command(dir, "go", runCommand, "./"+project.CommandPath, schemaCommand, greetCommand); err != nil {
+	if err := verifyExecutable(filepath.Join(dir, "app-check"), dir, project.Name, filepath.Join(dir, configExample), developmentVersion, developmentCommit); err != nil {
 		return err
 	}
 	if err := verifyCommandInstall(dir, project); err != nil {
@@ -94,7 +97,7 @@ func verifyTemplate() error {
 	if err := command(dir, releaseProgram, "check"); err != nil {
 		return err
 	}
-	fmt.Println("模板副本检查通过：初始化、幂等性、测试、构建、命令描述和发布配置。")
+	fmt.Println("模板副本检查通过：初始化、幂等性、测试、lint、构建、双语契约、TOML/环境、go install 和发布配置。")
 	return nil
 }
 
@@ -178,5 +181,8 @@ func verifyCommandInstall(root string, project scaffold.Project) error {
 	if runtime.GOOS == windowsPlatform {
 		name += executableSuffix
 	}
-	return command(root, filepath.Join(installDir, name), schemaCommand, greetCommand)
+	if _, err := os.Stat(filepath.Join(root, configExample)); err == nil {
+		return verifyExecutable(filepath.Join(installDir, name), installDir, project.Name, filepath.Join(root, configExample), developmentVersion, developmentCommit)
+	}
+	return commandEnv(root, []string{paths.EnvPrefix(project.Name) + "_HOME=" + filepath.Join(installDir, "home")}, filepath.Join(installDir, name), schemaCommand, greetCommand)
 }
