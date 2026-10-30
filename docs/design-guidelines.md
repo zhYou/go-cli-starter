@@ -250,4 +250,4 @@ CommandContext 默认取消单个进程，并不承诺清理整棵树；errgroup
 改名后按 paths.EnvPrefix 派生，例如 mycli 使用 MYCLI_HOME。不要写真实用户日志。
 检查只检查，安装由 setup 显式完成。固定工具表、18 lint、2 formatter 与规则 fixture 的运行入口见
 [开发说明](development.md)；平台运行证据、发布摘要与托管设置见[维护清单](maintenance.md)。
-Serena 和 Graphify 尚未集成，范围仅在[项目待办](backlog.md)，不能作为开发前置依赖。
+Serena 和 Graphify 尚未集成，范围仅在带 `backlog` 标签的 GitHub Issues，不能作为开发前置依赖。

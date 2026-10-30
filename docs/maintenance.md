@@ -1,6 +1,6 @@
 # 维护清单
 
-本文列出需要在目标仓库落实的设置。文件已提供不代表平台功能已启用；任务状态仍以[项目待办](backlog.md)为准。
+本文列出需要在目标仓库落实的设置。文件已提供不代表平台功能已启用；任务状态以带 `backlog` 标签的 GitHub Issues 为准。
 
 ## 责任与审查
 
@@ -11,6 +11,7 @@
 
 ## 仓库管理员设置
 
+- 首次启用 GitHub Issues 时创建 `backlog` 标签；Issue 表单和智能体查询依赖这个稳定标识，不把待办写回仓库 Markdown。
 - 为 main 设置规则集，要求 PR、审查通过、分支更新及必需检查。按实际 Actions 检查名称启用 `CI / check`、`CI / platforms (macos-latest)`、`CI / platforms (windows-latest)`、`Security / vulnerability`，首次运行后核对名称。
 - 保护发布标签 `v*`，限制创建和修改权限；采用不可变发布资产策略。
 - 按 [SECURITY](../SECURITY.md) 填写私密报告入口并启用对应功能；发布支持版本和响应安排。
