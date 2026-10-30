@@ -286,18 +286,18 @@ func TestBatchFailFastAndParentCancellation(t *testing.T) {
 }
 func TestErrDot(t *testing.T) {
 	call, options := helper(t, "bytes")
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	relative, err := filepath.Rel(cwd, call.Program)
-	if err != nil {
-		t.Fatal(err)
-	}
-	options.Env = append(options.Env, "PATH="+filepath.Dir(relative))
+	// Windows 工作区和 go-build 临时目录可能不在同一卷，不能计算两者的相对路径。
+	// 相对 PATH 以父进程 cwd 为基准；在真实测试二进制目录内命中它，测试结束自动恢复。
+	t.Chdir(filepath.Dir(call.Program))
+	options.Env = append(options.Env, "PATH=.")
 	call.Program = filepath.Base(call.Program)
+	var output bytes.Buffer
+	options.IO.Out, options.IO.ErrOut = &output, &output
 	if err := Run(t.Context(), call, options); !errors.Is(err, exec.ErrDot) {
 		t.Fatalf("需要 ErrDot: %v", err)
+	}
+	if output.Len() != 0 {
+		t.Fatalf("拒绝相对 PATH 前执行了 helper: %q", output.Bytes())
 	}
 }
 func TestInvalidExecutionDoesNotStart(t *testing.T) {
