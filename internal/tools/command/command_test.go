@@ -169,8 +169,24 @@ func TestCapturePreservesArgsEnvironmentDirectoryAndBytes(t *testing.T) {
 	if !reflect.DeepEqual(args, call.Args[3:]) {
 		t.Fatalf("argv %q", args)
 	}
-	if string(data[1]) != `"new"` || string(data[2]) != strconv.Quote(options.Dir) {
+	if string(data[1]) != `"new"` {
 		t.Fatalf("env/cwd %s", result.Stdout)
+	}
+	var directory string
+	if err := json.Unmarshal(data[2], &directory); err != nil {
+		t.Fatal(err)
+	}
+	actual, err := os.Stat(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected, err := os.Stat(options.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// macOS 的 /var 与 /private/var 等路径别名允许不同拼写，但必须指向同一目录。
+	if !os.SameFile(actual, expected) {
+		t.Fatalf("工作目录不同: got=%q want=%q", directory, options.Dir)
 	}
 	call.Args = []string{"-test.run=^TestHelperProcess$", "--", "bytes"}
 	result = Capture(t.Context(), call, options, CaptureOptions{})
