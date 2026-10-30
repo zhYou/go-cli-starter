@@ -69,7 +69,6 @@ func TestReleaseSnapshotRejectsMissingOrMismatchedSBOM(t *testing.T) {
 			switch mode {
 			case "missing":
 				//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
-				//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 				require.NoError(t, os.Remove(filepath.Join(dir, sbom)))
 			case "hash":
 				//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。

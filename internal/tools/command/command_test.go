@@ -43,7 +43,6 @@ func TestHelperProcess(t *testing.T) {
 	case "gate-fail":
 		signal.Ignore(syscall.SIGTERM)
 		//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
-		//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 		_ = os.WriteFile(args[1], []byte("ready"), 0600)
 		until := time.Now().Add(5 * time.Second)
 		for time.Now().Before(until) {

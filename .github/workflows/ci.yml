@@ -56,5 +56,10 @@ jobs:
         env:
           GO_CLI_STARTER_HOME: ${{ runner.temp }}/native-command-home
         run: mise exec -- go test -count=1 -timeout=90s ./internal/tools/command -run 'Test(Windows|OwnedDescendants|RootExits|CleanupDoes|CancellationRetains)'
+      - name: 原生模板构建与二进制验收
+        env:
+          GO_CLI_STARTER_HOME: ${{ runner.temp }}/template-starter-home
+          MYCLI_HOME: ${{ runner.temp }}/template-mycli-home
+        run: mise exec -- go test -count=1 ./tools/dev -run '^TestTemplateExecutable(Path|Acceptance)$'
       - run: mise run test
       - run: mise run build

@@ -75,9 +75,6 @@ func verifyTemplate() error {
 	if err := command(dir, lintProgram, "run", "--allow-serial-runners"); err != nil {
 		return err
 	}
-	if err := command(dir, "go", buildCommand, "-o", filepath.Join(dir, "app-check"), "./"+project.CommandPath); err != nil {
-		return err
-	}
 	//nolint:gosec // G204：开发任务显式执行固定工具及拆分参数，不经过 shell；参数来自仓库或调用者。
 	check := exec.Command("go", "list", "-deps", "-f", "{{.ImportPath}}", "./"+project.CommandPath)
 	check.Dir = dir
@@ -88,7 +85,7 @@ func verifyTemplate() error {
 	if module != scaffold.TemplateModule && strings.Contains(string(imports), scaffold.TemplateModule) {
 		return fmt.Errorf("生成的项目仍在导入原模板模块")
 	}
-	if err := verifyExecutable(filepath.Join(dir, "app-check"), dir, project.Name, filepath.Join(dir, configExample), developmentVersion, developmentCommit); err != nil {
+	if err := verifyTemplateExecutable(dir, project); err != nil {
 		return err
 	}
 	if err := verifyCommandInstall(dir, project); err != nil {
@@ -185,4 +182,20 @@ func verifyCommandInstall(root string, project scaffold.Project) error {
 		return verifyExecutable(filepath.Join(installDir, name), installDir, project.Name, filepath.Join(root, configExample), developmentVersion, developmentCommit)
 	}
 	return commandEnv(root, []string{paths.EnvPrefix(project.Name) + "_HOME=" + filepath.Join(installDir, "home")}, filepath.Join(installDir, name), schemaCommand, greetCommand)
+}
+
+func templateExecutablePath(dir, platform string) string {
+	name := "app-check"
+	if platform == windowsPlatform {
+		name += executableSuffix
+	}
+	return filepath.Join(dir, name)
+}
+
+func verifyTemplateExecutable(dir string, project scaffold.Project) error {
+	executable := templateExecutablePath(dir, runtime.GOOS)
+	if err := command(dir, "go", buildCommand, "-o", executable, "./"+project.CommandPath); err != nil {
+		return err
+	}
+	return verifyExecutable(executable, dir, project.Name, filepath.Join(dir, configExample), developmentVersion, developmentCommit)
 }

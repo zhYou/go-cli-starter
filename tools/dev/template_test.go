@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -45,7 +46,6 @@ func TestTemplateMetadataAndGuidesSurviveRename(t *testing.T) {
 	dir := t.TempDir()
 	for name, data := range map[string]string{"go.mod": "module " + scaffold.TemplateModule + "\n\ngo 1.27.0\n", "cmd/" + scaffold.TemplateName + "/main.go": "package main\nconst appName = \"" + scaffold.TemplateName + "\"\nfunc main(){}\n", ".template-version": "0.1.0\n"} {
 		//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
-		//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
 		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0755))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(data), 0600))
 	}
@@ -82,4 +82,44 @@ func TestInstallVersionLikeCommandNames(t *testing.T) {
 			require.NoError(t, verifyCommandInstall(root, project))
 		})
 	}
+}
+
+func TestTemplateExecutablePath(t *testing.T) {
+	for _, tc := range []struct {
+		platform string
+		name     string
+	}{
+		{platform: "linux", name: "app-check"},
+		{platform: "darwin", name: "app-check"},
+		{platform: "windows", name: "app-check.exe"},
+	} {
+		t.Run(tc.platform, func(t *testing.T) {
+			dir := t.TempDir()
+			require.Equal(t, filepath.Join(dir, tc.name), templateExecutablePath(dir, tc.platform))
+		})
+	}
+}
+
+// TestTemplateExecutableAcceptance 直接调用模板任务的构建与执行边界，避免测试自行补齐扩展名。
+func TestTemplateExecutableAcceptance(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("GO_CLI_STARTER_HOME", filepath.Join(dir, "starter-home"))
+	t.Setenv("MYCLI_HOME", filepath.Join(dir, "mycli-home"))
+	root, err := filepath.Abs("../..")
+	require.NoError(t, err)
+	cmd := exec.Command("git", "ls-files", "--cached", "--others", "--exclude-standard", "-z")
+	cmd.Dir = root
+	files, err := cmd.Output()
+	require.NoError(t, err)
+	for name := range strings.SplitSeq(string(files), "\x00") {
+		if name != "" {
+			require.NoError(t, copyFile(filepath.Join(root, name), filepath.Join(dir, name)))
+		}
+	}
+	_, err = scaffold.Initialize(dir, "example.com/template-check/mycli", "mycli")
+	require.NoError(t, err)
+	require.NoError(t, prepareFixture(dir))
+	project, err := scaffold.Inspect(dir)
+	require.NoError(t, err)
+	require.NoError(t, verifyTemplateExecutable(dir, project))
 }

@@ -27,7 +27,6 @@ func TestVersionsRejectSubstringAndMissingPlatform(t *testing.T) {
 	require.NoError(t, checkVersions(root))
 	file := filepath.Join(root, "mise.lock")
 	//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
-	//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 	data, err := os.ReadFile(file)
 	require.NoError(t, err)
 	text := string(data)
