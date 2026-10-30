@@ -61,7 +61,7 @@ func createWindows(ctx context.Context, program string, args []string, options E
 		return nil, err
 	}
 	defer func() {
-		if result != nil {
+		if result != nil && job != 0 {
 			_ = windows.CloseHandle(job)
 		}
 	}()
@@ -101,13 +101,19 @@ func createWindows(ctx context.Context, program string, args []string, options E
 	// 根进程仍挂起且原始句柄未关闭，PID 不会在重新打开期间复用。
 	process, err := os.FindProcess(int(info.ProcessId))
 	if err != nil {
-		cleanupErr := terminateWindowsJob(job)
-		_, waitErr := windows.WaitForSingleObject(info.Process, windows.INFINITE)
-		_ = windows.CloseHandle(info.Thread)
-		_ = windows.CloseHandle(info.Process)
-		return nil, errors.Join(err, cleanupErr, waitErr)
+		// 中止函数取得唯一关闭权；不能等根退出后才由 defer 触发 kill-on-close。
+		ownedJob := job
+		job = 0
+		return nil, errors.Join(err, abortWindowsProcess(info, ownedJob))
 	}
 	return &windowsChild{info: info, job: job, process: process, streams: streams}, nil
+}
+
+// abortWindowsProcess 消费尚未交付的原始进程、线程和 Job 句柄。
+func abortWindowsProcess(info windows.ProcessInformation, job windows.Handle) error {
+	cleanupErr := terminateAndCloseWindowsJob(job)
+	_, waitErr := windows.WaitForSingleObject(info.Process, windows.INFINITE)
+	return errors.Join(cleanupErr, waitErr, windows.CloseHandle(info.Thread), windows.CloseHandle(info.Process))
 }
 
 func windowsEnvironment(values []string) ([]uint16, error) {

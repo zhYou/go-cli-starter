@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"time"
 	"unsafe"
 
@@ -57,4 +58,11 @@ func terminateWindowsJob(job windows.Handle) error {
 		}
 		time.Sleep(time.Millisecond)
 	}
+}
+
+// terminateAndCloseWindowsJob 消费 Job 句柄，调用方不得再次关闭。
+// 原生终止或查询失败时仍先触发 kill-on-close，根进程等待不得阻挡此兜底。
+func terminateAndCloseWindowsJob(job windows.Handle) error {
+	terminationErr := terminateWindowsJob(job)
+	return errors.Join(terminationErr, windows.CloseHandle(job))
 }

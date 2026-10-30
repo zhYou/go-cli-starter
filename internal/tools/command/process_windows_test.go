@@ -533,3 +533,79 @@ func TestWindowsIncompatibleHostJobRejectsBeforeBusiness(t *testing.T) {
 		t.Fatalf("不兼容宿主中执行了业务，疑似无Job或breakaway降级: %v", err)
 	}
 }
+
+func TestWindowsTerminationFailureClosesJobBeforeWaiting(t *testing.T) {
+	for _, phase := range []string{"cancel_suspended", "abort_before_wait_handle"} {
+		t.Run(phase, func(t *testing.T) {
+			marker := filepath.Join(t.TempDir(), "marker")
+			call, options := windowsHelper(t, "marker", marker)
+			options.IO = options.IO.WithDefaults()
+			child, err := createWindows(t.Context(), call.Program, call.Args, options)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer child.streams.close()
+			current := windows.CurrentProcess()
+			var restricted, rescue windows.Handle
+			// JOB_OBJECT_QUERY (0x0004) 不含 JOB_OBJECT_TERMINATE；保留真实 Job 的 kill-on-close。
+			if err = windows.DuplicateHandle(current, child.job, current, &restricted, 0x0004, false, 0); err != nil {
+				ctx, cancel := context.WithCancel(t.Context())
+				cancel()
+				_ = child.wait(ctx, DefaultWaitDelay)
+				t.Fatal(err)
+			}
+			// 独立救援句柄让回归在旧实现死锁时仍可终止 helper，不触碰已关闭后可能复用的原始句柄。
+			if err = windows.DuplicateHandle(current, child.info.Process, current, &rescue, 0, false, windows.DUPLICATE_SAME_ACCESS); err != nil {
+				_ = windows.CloseHandle(restricted)
+				ctx, cancel := context.WithCancel(t.Context())
+				cancel()
+				_ = child.wait(ctx, DefaultWaitDelay)
+				t.Fatal(err)
+			}
+			defer func() { _ = windows.CloseHandle(rescue) }()
+			_ = windows.CloseHandle(child.job)
+			child.job = restricted
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+			var finish func() error
+			if phase == "cancel_suspended" {
+				finish = func() error { return child.wait(ctx, DefaultWaitDelay) }
+			} else {
+				// 模拟尚未获得独立 os.Process 等待句柄的创建中止；执行正式 abort 收尾函数。
+				_ = child.process.Release()
+				finish = func() error { return abortWindowsProcess(child.info, child.job) }
+			}
+			done := make(chan error, 1)
+			go func() { done <- finish() }()
+			select {
+			case err = <-done:
+			case <-time.After(3 * time.Second):
+				rescueErr := windows.TerminateProcess(rescue, 1)
+				select {
+				case cleanupErr := <-done:
+					t.Fatalf("终止Job失败后等待根进程死锁，救援=%v，收尾=%v", rescueErr, cleanupErr)
+				case <-time.After(3 * time.Second):
+					t.Fatalf("终止Job失败后未收尾，救援=%v", rescueErr)
+				}
+			}
+			if !errors.Is(err, windows.ERROR_ACCESS_DENIED) {
+				t.Fatalf("丢失Job终止原生错误: %v", err)
+			}
+			if errors.Is(err, windows.ERROR_INVALID_HANDLE) {
+				t.Fatalf("重复关闭原生句柄: %v", err)
+			}
+			if phase == "cancel_suspended" {
+				var exit *exec.ExitError
+				if !errors.Is(err, context.Canceled) || !errors.As(err, &exit) {
+					t.Fatalf("丢失取消/原生退出状态: %v", err)
+				}
+			}
+			if status, waitErr := windows.WaitForSingleObject(rescue, 0); waitErr != nil || status != windows.WAIT_OBJECT_0 {
+				t.Fatalf("收尾返回后根进程仍存活: status=%d err=%v", status, waitErr)
+			}
+			if _, err = os.Stat(marker); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("挂起进程执行业务: %v", err)
+			}
+		})
+	}
+}

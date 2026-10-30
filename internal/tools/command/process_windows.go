@@ -26,10 +26,11 @@ type windowsChild struct {
 	streams *windowsIO
 }
 
-// wait 消费一次创建结果。监控先于 Resume 建立，Job 关闭前必须与监控同步。
+// wait 消费一次创建结果。监控先于 Resume 建立，并独占 Job 终止与关闭权。
+// 主流程等监控完成后再关闭原始进程/线程句柄。
 func (child *windowsChild) wait(ctx context.Context, delay time.Duration) (result error) {
 	defer func() {
-		result = errors.Join(result, windows.CloseHandle(child.info.Thread), windows.CloseHandle(child.info.Process), windows.CloseHandle(child.job))
+		result = errors.Join(result, windows.CloseHandle(child.info.Thread), windows.CloseHandle(child.info.Process))
 		child.streams.close()
 	}()
 	child.streams.start()
@@ -40,7 +41,7 @@ func (child *windowsChild) wait(ctx context.Context, delay time.Duration) (resul
 		case <-ctx.Done():
 		case <-rootDone:
 		}
-		cleaned <- terminateWindowsJob(child.job)
+		cleaned <- terminateAndCloseWindowsJob(child.job)
 	}()
 	var resumeErr error
 	if ctx.Err() != nil {
