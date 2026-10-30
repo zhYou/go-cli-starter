@@ -1,0 +1,60 @@
+name: 项目待办
+description: 记录尚未规划或授权实施的后续工作
+labels:
+  - backlog
+body:
+  - type: markdown
+    attributes:
+      value: |
+        本 Issue 记录后续工作，不代表已经授权实施。Issue 编号是唯一待办 ID，
+        开始工作前须确认背景、范围和验收标准。
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 优先级
+      options:
+        - P0 阻塞使用或发布
+        - P1 重要候选
+        - P2 后续安排
+        - P3 探索
+    validations:
+      required: true
+  - type: dropdown
+    id: size
+    attributes:
+      label: 工作量
+      options:
+        - S 局部修改
+        - M 跨模块修改
+        - L 需要先拆解
+    validations:
+      required: true
+  - type: textarea
+    id: background
+    attributes:
+      label: 背景
+      description: 说明为什么需要这项工作，以及当前状态。
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 范围
+      description: 说明包含和明确排除的内容。
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收标准
+      description: 写出可观察、可验证的完成条件。
+    validations:
+      required: true
+  - type: input
+    id: related
+    attributes:
+      label: 关联 Issue/PR
+      description: 填写相关编号或链接；没有可留空。
+      placeholder: "#123 或 https://github.com/owner/repo/pull/123"
+    validations:
+      required: false

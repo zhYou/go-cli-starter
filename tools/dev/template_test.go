@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 	"github.com/zhYou/go-cli-starter/internal/dev/scaffold"
+	"go.yaml.in/yaml/v3"
 )
 
 func TestCopiedRepositorySupportsGoVCSStamping(t *testing.T) {
@@ -49,7 +50,7 @@ func TestTemplateMetadataAndGuidesSurviveRename(t *testing.T) {
 		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0755))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(data), 0600))
 	}
-	for _, name := range []string{"SECURITY.md", ".github/PULL_REQUEST_TEMPLATE.md", ".github/CODEOWNERS.example", "docs/maintenance.md"} {
+	for _, name := range []string{"SECURITY.md", ".github/PULL_REQUEST_TEMPLATE.md", ".github/CODEOWNERS.example", ".github/ISSUE_TEMPLATE/backlog.yml", "docs/maintenance.md"} {
 		//nolint:gosec // G301：测试路径和权限只来自当前临时 fixture，不读取用户文件。
 		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0755))
 		require.NoError(t, copyFile(filepath.Join("../..", name), filepath.Join(dir, name)))
@@ -65,6 +66,44 @@ func TestTemplateMetadataAndGuidesSurviveRename(t *testing.T) {
 	require.Equal(t, "example.com/copied/tool", origin.Module)
 	require.FileExists(t, filepath.Join(dir, "docs/template-upgrades.md"))
 	require.NoError(t, validateTemplateMetadata(dir))
+}
+
+func TestBacklogIssueTemplate(t *testing.T) {
+	data, err := os.ReadFile("../../.github/ISSUE_TEMPLATE/backlog.yml")
+	require.NoError(t, err)
+	var form struct {
+		Name   string   `yaml:"name"`
+		Labels []string `yaml:"labels"`
+		Body   []struct {
+			Attributes struct {
+				Label string `yaml:"label"`
+			} `yaml:"attributes"`
+			Validations struct {
+				Required bool `yaml:"required"`
+			} `yaml:"validations"`
+		} `yaml:"body"`
+	}
+	require.NoError(t, yaml.Unmarshal(data, &form))
+	require.Equal(t, "项目待办", form.Name)
+	require.Contains(t, form.Labels, "backlog")
+	fields := map[string]bool{
+		"优先级":         true,
+		"工作量":         true,
+		"背景":          true,
+		"范围":          true,
+		"验收标准":        true,
+		"关联 Issue/PR": false,
+	}
+	for _, field := range form.Body {
+		label := field.Attributes.Label
+		required, ok := fields[label]
+		if !ok {
+			continue
+		}
+		require.Equal(t, required, field.Validations.Required, label)
+		delete(fields, label)
+	}
+	require.Empty(t, fields)
 }
 
 func TestInstallVersionLikeCommandNames(t *testing.T) {

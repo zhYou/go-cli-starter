@@ -156,7 +156,7 @@ codex mcp list
 
 RTK 和 superpowers 使用用户目录中的安装。模板不复制全局技能，不写个人路径、模型、认证或权限偏好。`doctor:agent` 报告辅助工具状态；superpowers 是否加载，以 Codex 中的技能列表为准。缺少辅助工具不影响基础检查。
 
-当前仅支持 Codex。Claude Code 和 OpenCode 支持见 [项目待办](docs/backlog.md)；TUI 和 CLI 自身的 MCP 服务暂不在范围内。
+当前仅支持 Codex。Claude Code 和 OpenCode 支持见[项目待办](https://github.com/zhYou/go-cli-starter/issues?q=is%3Aissue+state%3Aopen+label%3Abacklog)；TUI 和 CLI 自身的 MCP 服务暂不在范围内。
 
 隔离 worktree、分支命名、提交署名和 PR 交付规则见 [协作约定](AGENTS.md#隔离开发与交付)。
 
@@ -189,7 +189,7 @@ configs/config.example.toml 配置示例
 test/integration/           真实进程测试与脚本
 test/testdata/contracts/    机器契约基线
 tools/                     初始化与开发任务
-docs/                      使用和维护说明、项目待办
+docs/                      使用和维护说明
 ```
 
 `cmd/<name>` 入口负责信号和退出；`internal/app/cli` 组织命令，`internal/app/config` 加载配置，`internal/app/greeting` 演示业务逻辑；`internal/base` 提供不依赖应用、开发工具或 Cobra 的公共能力；`internal/base/schema` 负责运行时结果结构，`internal/dev/contract` 负责开发期快照比较。`internal/dev/scaffold` 和根目录 `tools` 提供初始化与开发任务。
@@ -198,7 +198,7 @@ docs/                      使用和维护说明、项目待办
 
 `check` 在临时仓库中验证发布配置，无需为内部工具配置 remote。真正发布或运行 `release:check` 前，为目标项目设置自己的 GitHub origin。
 
-新增命令、工具升级和发布步骤见 [开发说明](docs/development.md)，后续工作见 [项目待办](docs/backlog.md)。
+新增命令、工具升级和发布步骤见 [开发说明](docs/development.md)，后续工作见[项目待办](https://github.com/zhYou/go-cli-starter/issues?q=is%3Aissue+state%3Aopen+label%3Abacklog)。
 
 ## 发布
 
