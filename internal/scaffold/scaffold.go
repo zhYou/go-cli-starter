@@ -26,7 +26,6 @@ var managedFiles = []string{
 	"tools/dev/contracts.go",
 	"tools/dev/template_test.go",
 	"tools/dev/mcp.go",
-	"docs/superpowers/plans/2026-10-29-project-layout-plan.md",
 	"internal/cli/result_schema_test.go",
 	"internal/cli/results.go",
 	"internal/cli/dependencies.go",

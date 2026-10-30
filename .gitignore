@@ -35,6 +35,8 @@ go.work.sum
 /bin/
 /dist/
 /.superpowers/
+/docs/superpowers/
+/.worktrees/
 mise.local.toml
 mise.local.lock
 
