@@ -1,0 +1,5 @@
+{
+  "greeting.message": {
+    "other": "你好，{{.Name}}！"
+  }
+}

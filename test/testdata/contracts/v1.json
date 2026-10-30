@@ -38,8 +38,15 @@
                 "required": false,
                 "type": "bool"
               },
+              "lang": {
+                "default": "zh-CN",
+                "inherited": true,
+                "name": "lang",
+                "required": false,
+                "type": "string"
+              },
               "log-level": {
-                "default": "warn",
+                "default": "info",
                 "inherited": true,
                 "name": "log-level",
                 "required": false,
@@ -72,8 +79,15 @@
                 "required": false,
                 "type": "bool"
               },
+              "lang": {
+                "default": "zh-CN",
+                "inherited": true,
+                "name": "lang",
+                "required": false,
+                "type": "string"
+              },
               "log-level": {
-                "default": "warn",
+                "default": "info",
                 "inherited": true,
                 "name": "log-level",
                 "required": false,
@@ -126,8 +140,15 @@
                 "required": false,
                 "type": "bool"
               },
+              "lang": {
+                "default": "zh-CN",
+                "inherited": true,
+                "name": "lang",
+                "required": false,
+                "type": "string"
+              },
               "log-level": {
-                "default": "warn",
+                "default": "info",
                 "inherited": true,
                 "name": "log-level",
                 "required": false,
@@ -160,8 +181,15 @@
                 "required": false,
                 "type": "bool"
               },
+              "lang": {
+                "default": "zh-CN",
+                "inherited": true,
+                "name": "lang",
+                "required": false,
+                "type": "string"
+              },
               "log-level": {
-                "default": "warn",
+                "default": "info",
                 "inherited": true,
                 "name": "log-level",
                 "required": false,
@@ -194,8 +222,15 @@
                 "required": false,
                 "type": "bool"
               },
+              "lang": {
+                "default": "zh-CN",
+                "inherited": true,
+                "name": "lang",
+                "required": false,
+                "type": "string"
+              },
               "log-level": {
-                "default": "warn",
+                "default": "info",
                 "inherited": true,
                 "name": "log-level",
                 "required": false,
@@ -252,8 +287,15 @@
             "required": false,
             "type": "bool"
           },
+          "lang": {
+            "default": "zh-CN",
+            "inherited": false,
+            "name": "lang",
+            "required": false,
+            "type": "string"
+          },
           "log-level": {
-            "default": "warn",
+            "default": "info",
             "inherited": false,
             "name": "log-level",
             "required": false,

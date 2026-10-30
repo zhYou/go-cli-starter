@@ -12,6 +12,12 @@ jobs:
       id-token: write
       attestations: write
     steps:
+      - name: 隔离应用状态目录
+        shell: bash
+        env:
+          GO_CLI_STARTER_HOME: ${{ runner.temp }}/go-cli-starter-home
+        run: |
+          printf 'GO_CLI_STARTER_HOME=%s\n' "$GO_CLI_STARTER_HOME" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0

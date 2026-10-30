@@ -4,7 +4,7 @@
 
 默认输出文本，通过 `--json` 输出结构化结果。包含命令发现、配置、日志、测试、本地环境、项目改名和跨平台发布。
 
-项目交流、文档和 CLI 提示默认使用中文，不随系统区域设置改变。命令名、选项名和机器字段保持稳定；多语言支持记录在 [项目待办](docs/backlog.md)。
+项目交流和文档使用中文。CLI 默认 zh-CN，可显式选择 en，不随系统区域改变；命令名、选项名、机器字段和退出码保持稳定。设计取舍与扩展示例见[设计指南](docs/design-guidelines.md)。
 
 ## 创建新项目
 
@@ -42,13 +42,13 @@ mise run check
 
 有官方 LTS 时使用最新 LTS 补丁版，否则使用最新稳定版；核验后锁定具体版本。本地和 CI 读取相同配置。Go 没有单独的 LTS 渠道，模板采用 1.27 系列，模块最低版本为 1.27.0。
 
-`setup` 只安装项目声明的工具并下载 Go 模块，不安装用户全局配置中的其他工具。日常任务不会自动安装或升级工具；修改依赖后重新运行 `setup`。
+首次使用及 mise/模块锁变更后运行 `setup`：只安装项目锁定工具并下载模块，不安装用户全局配置中的其他工具。普通任务和 exec 均关闭自动安装，`GOTOOLCHAIN=local` 防止隐式下载；日常检查不会安装、升级或修复环境。
 
 ```sh
 mise run doctor
 mise run build
-mise exec -- go run ./cmd/go-cli-starter greet --name Codex
-mise exec -- go run ./cmd/go-cli-starter greet --name Codex --json
+GO_CLI_STARTER_HOME="$(mktemp -d)" mise exec -- go run ./cmd/go-cli-starter greet --name Codex
+GO_CLI_STARTER_HOME="$(mktemp -d)" mise exec -- go run ./cmd/go-cli-starter greet --name Codex --json
 ```
 
 发布产物本身不依赖 mise 或 Go。源码安装入口是 `cmd/go-cli-starter`：
@@ -63,7 +63,7 @@ go install github.com/zhYou/go-cli-starter/cmd/go-cli-starter@latest
 ./bin/go-cli-starter --help
 ./bin/go-cli-starter schema
 ./bin/go-cli-starter schema greet
-./bin/go-cli-starter greet --name Codex --json
+GO_CLI_STARTER_HOME="$(mktemp -d)" ./bin/go-cli-starter greet --name Codex --json
 ./bin/go-cli-starter version --json
 ```
 
@@ -74,7 +74,7 @@ go install github.com/zhYou/go-cli-starter/cmd/go-cli-starter@latest
 ```
 
 - 默认文本；`--json` 不随终端环境改变，也不由配置或环境变量隐式开启。
-- 成功结果写 stdout，日志和错误写 stderr。执行或序列化失败时 stdout 为空，错误输出为文本。底层写入失败可能留下部分字节，消费方须先检查退出码。
+- 成功结果写 stdout，错误和诊断告警写 stderr；日志默认写应用私有状态目录，显式配置后可写 stderr。执行或序列化失败时 stdout 为空，错误输出为文本。底层写入失败可能留下部分字节，消费方须先检查退出码。
 - 缺少必需参数直接失败。
 - `schema [命令路径...]` 总是输出 JSON，包含命令树、用法、示例、参数类型、必填标记、默认值和退出码。greet/version 的 result_schema 公开 Draft 2020-12 结果结构。消费方应忽略新增字段；配置文件仍拒绝未知键。
 - 帮助输出文本，补全输出 shell 脚本；它们不受 `--json` 影响。
@@ -87,17 +87,53 @@ go install github.com/zhYou/go-cli-starter/cmd/go-cli-starter@latest
 | 2 | 命令或参数错误 |
 | 130 | 信号或 context 取消 |
 
-## 配置和日志
+## 配置、语言和诊断
 
-复制 `configs/config.example.yaml` 到系统用户配置目录下的 `go-cli-starter/config.yaml`，或用 `--config` 显式指定文件。用户配置目录由 Go 的 `os.UserConfigDir()` 决定。
+配置只读取一个 `config.toml`，示例在 `configs/config.example.toml`。`--config` 指定任意显式文件，
+否则读取应用私有配置目录；默认文件不存在照常运行，显式文件不存在、未知键、类型或范围错误则失败。
+不自动读取或合并 YAML，旧版本迁移见[模板升级](docs/template-upgrades.md)。
 
-```yaml
-log_level: warn
+```toml
+[logging]
+level = "info"
+output = "file" # file、stderr、none
+
+[telemetry]
+exporter = "none" # none、file
 ```
 
-日志级别支持 debug、info、warn、error，默认 warn。覆盖顺序为显式 `--log-level`、`GO_CLI_STARTER_LOG_LEVEL`、YAML、默认值；空环境变量按未设置处理。
+优先级为显式 flag > 非空环境变量 > TOML > 默认值。模块键映射为大写前缀环境变量，
+例如 `GO_CLI_STARTER_LOGGING_LEVEL`、`GO_CLI_STARTER_LOGGING_OUTPUT`、
+`GO_CLI_STARTER_TELEMETRY_EXPORTER`；兼容入口 `GO_CLI_STARTER_LOG_LEVEL` 优先于新的级别变量，
+`--log-level` 优先于两者。没有给出的 flag 不覆盖文件或环境值。
 
-默认文件不存在时照常运行。显式文件不存在、YAML 格式错误、未知配置项或无效值会报错。帮助、版本、补全和 schema 不读取配置。
+语言独立于配置：`--lang en` > `GO_CLI_STARTER_LANG=en` > zh-CN；zh 是中文别名。
+帮助、schema 描述、结果正文、错误和日志消息使用所选语言，第三方诊断可保留原文。
+帮助、version、completion 和 schema 不读取配置、不创建诊断目录，损坏配置下仍可发现命令。
+
+| 平台 | 配置目录 | 数据 / 状态 / 缓存 |
+| --- | --- | --- |
+| Linux | `$XDG_CONFIG_HOME/go-cli-starter`，默认 `~/.config/go-cli-starter` | 对应 XDG 根；默认 `~/.local/share`、`~/.local/state`、`~/.cache` 下的应用目录 |
+| macOS | `~/Library/Application Support/go-cli-starter` | 配置目录下 data、state；`~/Library/Caches/go-cli-starter` |
+| Windows | `%APPDATA%/go-cli-starter` | `%LOCALAPPDATA%/go-cli-starter` 下 data、state、cache |
+
+配置文件名均为 `config.toml`。`GO_CLI_STARTER_HOME` 可指定绝对私有根：配置文件位于根下，
+数据、状态、缓存位于 data、state、cache；改名为 mycli 后变量是 `MYCLI_HOME`。
+此目录与 mise 的安装位置无关。相对应用 HOME 会报错；Linux 相对 XDG 变量回退到 HOME。
+
+业务命令默认将结构化日志写入 `<state>/logs/<run_id>/events.jsonl`。Trace 默认关闭，file 写同次运行的
+`trace.jsonl`，内容是本地诊断 JSON 流，不承诺 OTLP 兼容或重放。日志出口与 Trace 出口分别配置。
+默认分片软阈值 10 MiB，单条超大记录不拆分；5 个备份、保留 14 天、软总量 200 MiB，后三项可设 0 关闭对应限制。
+清理只处理元数据有效且成功取得系统锁的非活跃运行，未知内容保留；活跃日志可能超过软限额。
+诊断创建、写入或收尾失败会向 stderr 告警并继续业务。不要在日志中写密钥、完整参数、环境或工具原始输出。
+
+以下 POSIX shell 示例隔离配置和状态，适合验证文档：
+
+```sh
+example_home=$(mktemp -d)
+cp configs/config.example.toml "$example_home/config.toml"
+GO_CLI_STARTER_HOME="$example_home" ./bin/go-cli-starter greet --name Codex --lang en --json
+```
 
 ## Codex 开发
 
@@ -130,10 +166,11 @@ RTK 和 superpowers 使用用户目录中的安装。模板不复制全局技能
 | --- | --- |
 | `mise run setup` | 安装锁定工具，下载模块 |
 | `mise run doctor` | 检查工具和版本 |
-| `mise run fmt` | 格式化 Go 文件 |
+| `mise run fmt` / `fmt:check` | gofmt + goimports；后者只读检查差异 |
 | `mise run test` | 单元与命令测试 |
 | `mise run test:race` | 竞态检测，需要 C 编译器 |
-| `mise run lint` | 静态检查 |
+| `mise run lint` / `rules:check` | 18 项静态检查及真实类型边界 fixture |
+| `mise run test:fuzz` / `test:bench` | 有界 argv 模糊测试 / 开销测量，无性能门槛 |
 | `mise run build` | 构建到 bin，注入版本信息 |
 | `mise run check` | 与 CI 相同的完整源码检查 |
 | `mise run template:check` | 在临时副本中验证改名、测试、构建和发布配置 |
@@ -144,17 +181,20 @@ RTK 和 superpowers 使用用户目录中的安装。模板不复制全局技能
 
 ```text
 cmd/<name>/                 程序入口与信号测试
-internal/                   CLI、配置、业务与模板初始化
-configs/config.example.yaml 配置示例
+internal/app/               CLI、配置与业务逻辑
+internal/base/              错误、消息、路径、校验、IO、日志、Trace、诊断、schema
+internal/tools/command/     外部命令与有界并行
+internal/dev/               模板初始化与机器契约比较
+configs/config.example.toml 配置示例
 test/integration/           真实进程测试与脚本
 test/testdata/contracts/    机器契约基线
 tools/                     初始化与开发任务
 docs/                      使用和维护说明、项目待办
 ```
 
-`cmd/<name>` 入口负责信号和退出；`internal/cli` 组织命令，`internal/config` 加载配置，`internal/greeting` 演示业务逻辑；`internal/scaffold` 和 `tools` 提供初始化与开发任务。
+`cmd/<name>` 入口负责信号和退出；`internal/app/cli` 组织命令，`internal/app/config` 加载配置，`internal/app/greeting` 演示业务逻辑；`internal/base` 提供不依赖应用、开发工具或 Cobra 的公共能力；`internal/base/schema` 负责运行时结果结构，`internal/dev/contract` 负责开发期快照比较。`internal/dev/scaffold` 和根目录 `tools` 提供初始化与开发任务。
 
-初始化后的命令目录随 `--name` 改名；模板版本为 0.2.0，已有项目迁移见[模板升级](docs/template-upgrades.md)。发布包仍在根目录提供 `config.example.yaml`。
+初始化后的命令目录随 `--name` 改名；模板版本为 0.3.0，已有项目迁移见[模板升级](docs/template-upgrades.md)。发布包仍在根目录提供 `config.example.toml`。
 
 `check` 在临时仓库中验证发布配置，无需为内部工具配置 remote。真正发布或运行 `release:check` 前，为目标项目设置自己的 GitHub origin。
 
@@ -162,7 +202,7 @@ docs/                      使用和维护说明、项目待办
 
 ## 发布
 
-GitHub Actions 对 PR 和 main 执行检查。Linux 运行完整检查和 race，macOS、Windows 运行测试和构建。发布 workflow 在推送 `v*` 标签时执行。
+GitHub Actions 对 PR 和 main 执行检查。Linux 运行完整检查、race、fuzz 和 benchmark，macOS、Windows 运行原生测试和构建。外部进程的运行保障须以对应平台 CI 为证据，Linux 交叉编译仅证明可构建。发布 workflow 在推送 `v*` 标签时执行。
 
 确认检查和本地 snapshot 通过后，在目标项目创建并推送标签：
 
@@ -192,3 +232,7 @@ gh attestation verify <asset> --repo <owner/repo>
 私有仓库须先确认套餐和组织策略支持 artifact attestations。证明失败会使 release workflow 失败；若资产已发布，重试时使用已发布的原始字节生成证明，不能重新构建或覆盖资产。
 
 维护者从[维护清单](docs/maintenance.md)配置审查、安全报告、依赖更新和托管发布；开发扩展见[开发说明](docs/development.md)，机器接口变更见[兼容性规则](docs/compatibility.md)。
+
+安装已验证的发布归档后可直接解包运行。使用 mise 时按[开发说明中的固定 URL 与 SHA 安装流程](docs/development.md#安装发布程序)
+选择宿主归档，不要把应用 HOME 当作二进制安装目录。`release:verify` 还会用隔离 mise 验证错误 SHA 被拒绝、正确 SHA 安装后运行
+version/help/schema/TOML；该本地安装验收只证明实际执行的宿主平台，其他平台由原生 CI 验证。

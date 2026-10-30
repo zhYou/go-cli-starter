@@ -5,18 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/zhYou/go-cli-starter/internal/scaffold"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"time"
+
+	"github.com/zhYou/go-cli-starter/internal/dev/scaffold"
 )
 
 // checkMCP 验证 Codex 配置中使用的 stdio 命令。
 func checkMCP() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "mise", "exec", "--", "gopls", "mcp")
+	cmd := exec.CommandContext(ctx, "mise", "exec", "--", goplsProgram, "mcp")
 	cmd.Stderr = os.Stderr
 	in, err := cmd.StdinPipe()
 	if err != nil {
@@ -55,7 +56,7 @@ func checkMCP() error {
 	}
 	if _, err := call(1, "initialize", map[string]any{
 		"protocolVersion": "2025-03-26", "capabilities": map[string]any{},
-		"clientInfo": map[string]string{"name": "template-check", "version": "1"},
+		"clientInfo": map[string]string{"name": "template-check", mcpVersionField: "1"},
 	}); err != nil {
 		return err
 	}

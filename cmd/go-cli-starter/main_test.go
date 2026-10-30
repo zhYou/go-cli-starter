@@ -4,16 +4,18 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"github.com/stretchr/testify/require"
-	"github.com/zhYou/go-cli-starter/internal/cli"
-	"github.com/zhYou/go-cli-starter/internal/config"
-	"github.com/zhYou/go-cli-starter/internal/greeting"
 	"io"
 	"os"
 	"os/exec"
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"github.com/zhYou/go-cli-starter/internal/app/cli"
+	"github.com/zhYou/go-cli-starter/internal/app/config"
+	"github.com/zhYou/go-cli-starter/internal/app/greeting"
+	"github.com/zhYou/go-cli-starter/internal/base/paths"
 )
 
 func TestSignalHelper(t *testing.T) {
@@ -28,7 +30,7 @@ func TestSignalHelper(t *testing.T) {
 			return ctx, cancel
 		}
 	}
-	deps := cli.Dependencies{LoadConfig: func(config.Options) (config.Config, error) { return config.Config{LogLevel: "warn"}, nil }, Greet: func(ctx context.Context, _ greeting.Options) (greeting.Result, error) {
+	deps := cli.Dependencies{LoadConfig: func(config.Options) (config.Config, error) { return config.Defaults(), nil }, Greet: func(ctx context.Context, _ greeting.Options) (greeting.Result, error) {
 		_, _ = io.WriteString(os.Stderr, "就绪\n")
 		<-ctx.Done()
 		return greeting.Result{}, ctx.Err()
@@ -38,8 +40,9 @@ func TestSignalHelper(t *testing.T) {
 func TestMainSignalCancellation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	//nolint:gosec // G204：测试只运行当前测试二进制或固定 Git/Go 命令，参数来自临时 fixture。
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestSignalHelper$")
-	cmd.Env = append(os.Environ(), "CLI_SIGNAL_HELPER=1")
+	cmd.Env = append(os.Environ(), "CLI_SIGNAL_HELPER=1", paths.EnvPrefix(appName)+"_HOME="+t.TempDir())
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	stderr, err := cmd.StderrPipe()

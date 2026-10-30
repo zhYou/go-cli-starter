@@ -1,101 +1,156 @@
 # 开发说明
 
-默认使用中文交流，文档、注释、帮助和项目提供的提示也使用中文。命令、选项、环境变量、JSON 字段及枚举值保持稳定。当前 CLI 仅提供中文，不读取系统语言设置；未来国际化见 [项目待办](backlog.md) 中的 BL-001。
+先读 [README](../README.md) 准备环境，再按[设计指南](design-guidelines.md)扩展当前模块。
+项目文档、注释与交流使用中文，CLI 默认中文并支持英文，机器标识保持稳定。
 
-## 协作与文档
+## 协作与环境
 
-修改默认在隔离 worktree 中进行，完成验证后提交、推送并创建 PR。基线选择、命名和提交署名
-遵循 [协作约定](../AGENTS.md#隔离开发与交付)。
+修改默认在独立 worktree 中进行，基线、分支命名、已有修改保护、署名和 PR 交付遵循
+[协作约定](../AGENTS.md#隔离开发与交付)。同一 checkout 串行修改。
+正式文档记录当前能力；superpowers 设计和计划保留在本地忽略目录 `docs/superpowers/`，不提交。
+后续需求只记[项目待办](backlog.md)，待办不是实施授权；完成项移除，历史通过 Git 追溯。
 
-仓库文档记录当前能力、约束、使用和维护方法。superpowers 设计和实施计划只保留在本地忽略
-目录 `docs/superpowers/`，交付时将已实现行为同步到正式文档；历史过程通过 Git 追溯。
+首次使用及锁变更后显式运行 `mise run setup`，然后运行 `mise run doctor`。
+setup 只安装项目声明的锁定工具、下载模块，不更新锁。普通任务与 exec 的自动安装均关闭，
+`GOTOOLCHAIN=local` 禁止 Go 隐式下载工具链。缺工具应报错，检查不能兼任安装、升级或修复。
+Codex、RTK、superpowers 复用用户级安装；模型、认证、权限和插件偏好不进入仓库。
+基础检查无需这些可选智能体工具。`doctor:agent` 只附加报告，加载技能以实际会话列表为准。
 
-## 添加命令
+## 目录和依赖
 
-1. 参考 greet，创建接收 context 和选项的业务函数，返回带 JSON 标签的结果。
-2. 注册参数，在 Args 阶段检查数量和值，必填参数同时调用 MarkFlagRequired。
-3. 显式传入依赖，避免修改包级配置或日志对象。
-4. 根据 --json 选择输出方式，错误直接返回，由入口统一打印和映射退出码。
-5. 注册根命令，补帮助、示例和行为测试。运行 schema 新命令核对自动生成的说明。
-6. 运行 mise run fmt 和 mise run check。
+| 位置 | 职责 |
+| --- | --- |
+| `cmd/<name>/` | 程序入口、信号、退出及入口测试 |
+| `internal/app/cli` | 独立命令树、参数、输出和退出码映射 |
+| `internal/app/config` | 模块配置组合与严格加载 |
+| `internal/app/session` | 自建日志、Trace、诊断及工作收尾 |
+| `internal/app/greeting` | 可移除业务示例 |
+| `internal/base` | fault、messages、paths、validation、IO、logging、telemetry、diagnostics、结果 schema |
+| `internal/tools/command` | 独立 argv、进程所有权、捕获和有界批量执行 |
+| `internal/dev`、根 `tools/` | 模板、契约快照、开发与发布验收 |
+| `configs/`、`test/integration/`、`test/testdata/contracts/` | 配置示例、真实进程脚本、共享契约基线 |
 
-新增配置字段时同步修改结构、环境变量覆盖、参数覆盖、校验、示例和测试。通过 Changed 检查显式 flag，避免参数默认值覆盖环境或文件配置。
+base 不依赖 app、tools、dev 或 Cobra。领域码、文案及结果由所属模块定义；新目录按实际职责增加。
+开发工具用 `scaffold.Inspect` 静态识别唯一入口，不根据模块路径末段猜测命令名。
 
-greet 和对应业务包是可删除示例，替换时同步修改测试。帮助、version、completion 和 schema 始终能在配置损坏时使用。
+## 实现与检查
 
-## 修改模板初始化
+1. 查阅设计指南对应场景，用 gopls 查询 Go 符号、引用和诊断，确认工作区是实际 checkout。
+   先通过 `mise exec -- gopls mcp -instructions` 阅读说明。普通操作按需使用等价 CLI，不机械调用工具填清单。
+2. 参照 greet 分离有类型业务选项、结果及 Validate。CLI 的 Args、必填及组合校验在读取配置和创建资源前完成，
+   业务入口也调用同一校验。新命令补双语帮助、示例和结果注册，不新增交互输入。
+3. 新配置同步模块 Config、defaults、环境映射、TOML、校验和测试。仅 Changed 的 flag 覆盖，
+   禁止逐键 koanf getter；缺译、系统原因和结构化 fault 的规则见指南。
+4. 为行为变化运行针对性测试，观察真实结果，修改后检查 gopls 诊断。保留用户已有修改，格式化限于授权范围。
+5. 交付前运行 `mise run fmt`、`mise run check`，支持的宿主运行 `mise run test:race`。
+   模板/身份变更增加 `template:check`，工具集成增加 `mcp:check`；受信任会话确认 `codex mcp list` 有 gopls。
+   发布变更增加 snapshot 与 verify；无法执行的检查写明原因。
 
-初始化工具维护文件白名单，不扫描替换整个仓库。新文件包含模块导入、命令名或环境变量前缀时，将它加入白名单。保留初始化实现中的原模板身份及测试 fixture，避免新项目重复初始化时误判。
+所有测试及文档示例验证都隔离父进程和 helper 子进程的应用配置、状态和缓存：
 
-mise run template:check 使用 Git 文件清单复制项目，跳过被忽略的缓存、产物和本地配置。它验证独立项目的改名、幂等性、测试、构建、schema 和发布配置；在已初始化项目中验证现有身份。
+```sh
+example_home=$(mktemp -d)
+GO_CLI_STARTER_HOME="$example_home" mise run check
+GO_CLI_STARTER_HOME="$example_home" mise run test:race
+```
 
-## 更新工具
+改名为 mycli 后使用 `MYCLI_HOME`，由 `paths.EnvPrefix(name)+"_HOME"` 派生。
+嵌入调用也可注入 Options.Directories、LookupEnv 与 IO；只设置 ConfigDir 不会隔离日志状态。
+`iostreams.IOStreams.WithDefaults` 返回副本，缺省输入 EOF、输出 io.Discard，不访问或关闭进程标准流。
+真实退出码用构建后的程序验证，go run 会包装非零退出。输出测试检查单 JSON 与独立 stderr，
+坏配置下发现命令不读配置、不落盘。进程测试见 `test/integration`，信号测试见 `cmd/<name>`。
 
-有官方 LTS 时选择最新 LTS 补丁版，否则选择最新稳定版。核对 Go、gopls 和 golangci-lint 的兼容要求，再同步 mise、Go 模块和工具链、doctor 检查、README、CI 和相关稳定版 Actions。
+Session 关闭顺序、借用资源和永久阻塞 IO 的边界见设计指南。工具进程的 Unix 组与 Windows Job
+需要对应 OS 原生 helper；交叉编译不证明运行、取消或句柄回收成功。CI 配置了三 OS 原生测试，
+报告交付结果时以实际 job 结果为准，不把配置存在写成验收完成。
+
+## 静态规则与开发探测
+
+`mise run lint` 启用以下 18 项，生产导出 API 需中文 GoDoc；测试仅豁免 GoDoc，其他边界仍生效：
+
+```text
+errcheck govet ineffassign staticcheck unused bodyclose errorlint gosec godoclint
+contextcheck nilnesserr durationcheck nolintlint thelper usetesting goconst depguard forbidigo
+```
+
+局部 nolint 指明检查器并用中文解释。稳定协议和状态使用语义常量，同值不同义可各自命名。
+koanf 只可在精确的 `internal/app/config/load.go` 导入，且仅整体解码；禁用 typed/Must getter、
+Get、Raw、All 等绕过结构体的入口。zap 只在 base/logging，OTel SDK/exporter 只在 base/telemetry。
+`mise run rules:check` 在临时模块运行真实类型分析，验证违规与合规 fixture，并纳入 check。
+
+`fmt` 使用 golangci-lint 的 gofmt、goimports；`fmt:check` 只展示差异并失败，不改源码。
+check 不改写源码，但会使用 Go 缓存、临时文件和 bin 产物。
+`test:fuzz` 对 NUL 分隔的独立 argv 做五秒模糊测试，覆盖空值、空格、Unicode、`--` 和取消；
+`test:bench` 测量树构造和 greet 调用，没有性能门槛，两者在 Linux CI 执行。
+
+`doctor` 使用共享执行器，最多四项并行，每项三秒，每流 2 KiB，按固定顺序报告精确版本及
+超时、取消、截断。govulncheck 读取本地 Go 构建信息验证命令、模块来源及版本，再执行 `-h`，
+不访问漏洞库。真正联网扫描由 `mise run vuln` 独立执行，不可用或数据库失败同样失败。
+
+## 修改模板与升级工具
+
+初始化只重写 `internal/dev/scaffold/scaffold.go` 的 managedFiles 白名单。
+新增身份文件须明确登记；保留初始化实现的原模板身份和 fixture，禁止全仓替换。
+历史来源引用仅按 `source_references.go` 中的精确文件和完整 Markdown 引用保留，其余文本仍改名；
+来源登记属于初始化实现自身，不参与应用身份改写。
+移动或新增文件先暂存，再运行使用 Git 索引清单复制项目的 `template:check`。
+它验证改名、幂等、测试、真实构建与 go install 后的绝对路径二进制、version/help/schema/TOML。
+旧项目迁移与事务恢复见[模板升级](template-upgrades.md)，初始化不承担升级。
+
+升级选择官方最新 LTS 补丁，无 LTS 则最新稳定版，排除预发布；先查 Go、gopls、golangci-lint 兼容性。
+同步 mise.toml、mise.lock、Go 声明、doctor 预期、README 受检工具表及 CI 引导，再执行：
 
 ```sh
 mise lock --platform linux-x64,linux-arm64,macos-x64,macos-arm64,windows-x64,windows-arm64
 mise run setup
-mise run fmt
-mise run check
-mise run test:race
-mise run mcp:check
-mise run release:snapshot
+mise run doctor
+mise run versions:check
 ```
 
-提交工具锁文件。日常 setup 不更新版本或锁文件。RTK、superpowers 和 Codex 使用用户级安装，维护者通过各自官方稳定渠道更新，仓库不修改全局配置。
+随后按受影响范围运行 check、race、mcp:check 与 snapshot/verify。提交锁；二进制后端核验六平台
+归档，Go 后端锁同一模块版本、在各平台本地编译，不虚构平台归档记录。
+README 的 tool-versions 标记与工具显示标签由 versions:check 解析，修改表格时保留它们。
+Renovate 由管理员启用，权限不足时人工补齐锁，不放宽检查。用户级可选工具通过各自渠道维护。
 
-## 验证与发布
+## 安装发布程序
 
-测试使用注入 IO、临时配置目录和可控环境变量，避免读取用户配置或请求业务网络。输出测试检查可解析 JSON 和独立 stderr。
+源码安装入口是 `go install <module>/cmd/<name>@<version>`，安装产物与命令目录同名。
+直接解包前先核对同一 Release 的 checksums.txt、SPDX 和来源证明。发布程序本身无需 mise/Go。
+应用 HOME 只存运行数据，独立于 go install、解包或 mise 的二进制安装目录。
 
-check 不改写源码，但会写 Go 缓存、临时测试文件和 bin 下的产物。fmt 和 setup 是显式修改或安装操作。本地 snapshot 需要 Git 仓库，不需要发布令牌；创建 Release 由目标项目的标签 workflow 完成。
+若用 mise 管理，参照其 [HTTP 后端](https://mise.jdx.dev/dev-tools/backends/http.html)，
+把下列占位符替换为选定版本、宿主平台归档固定 URL 和该归档的真实最终 SHA-256，再显式安装。
+本地归档可使用绝对 `file:///...` URL；每个平台的摘要分别填写，不要复用：
 
-## 维护待办
+```toml
+[settings]
+auto_install = false
+exec_auto_install = false
 
-后续需求集中记录在 [项目待办](backlog.md)，不分散创建多个状态清单。新增条目分配唯一 ID，填写优先级、状态、工作量和日期，并说明背景、范围及验收条件。
+[tools."http:mycli"]
+version = "<version>"
+url = "<fixed-release-archive-url>"
+checksum = "sha256:<archive-sha256>"
+```
 
-待办不代表已授权实施。确认范围后再开始，开始时更新为进行中；交付时更新状态、更新日期并关联 PR。暂缓条目保留，已完成条目移除，历史记录通过 Git 追溯。
+```sh
+mise install http:mycli@<version>
+mise which mycli
+MYCLI_HOME="$(mktemp -d)" mise exec -- mycli version --json
+```
 
-结果经 writeJSON/writeText 完整渲染后写出。执行和序列化失败保持 stdout 为空；底层写入失败可能已有部分字节，调用者应先检查退出码。
+安装 URL 的 version 只是选择标签，不能替代实际二进制 version/commit 验证。
+`release:verify` 先核对六归档和 SPDX 最终清单，再在两个独立 mise data/cache 中验证错 SHA 明确失败与
+正确 SHA 安装成功，解析绝对安装路径并运行 version/commit/help/schema/TOML。归档必须属于最终清单、
+版本一致且 metadata.commit 等于当前 HEAD；任何提交后都须重新 snapshot，旧产物会被拒绝。
+以上占位安装示例是人工部署流程；自动验收使用实际 URL 和摘要，不会修改全局 mise 配置。
 
-业务选项通过 `validate` 与 `label` 标签声明规则，CLI Args 和业务入口调用同一个 Validate 方法。`validation.New` 的可选注册 callback 在实例使用前配置自定义和条件规则；不要在并发调用后修改注册。
+## 发布与交付
 
-配置由严格 YAML 解码和 koanf 分层合并；环境变量为空时忽略，YAML null 沿用默认值，显式选项仅在 Changed 时覆盖。禁止弱类型转换。
+运行 check、race、vuln、release:snapshot、release:verify，核对六目标归档、配置示例、SPDX 和最终摘要。
+Syft 固定版本且关闭 enrichment、远程许可证查询及更新检查，SBOM 完成后才生成最终 checksums。
+本地不上传证明；受信任 release workflow 对最终资产生成来源证明。证明失败的重试必须使用同一批
+已发布原始字节，不能重构建或覆盖 Release。安全与托管权限见[维护清单](maintenance.md)。
 
-每次调用创建独立 zap logger，默认 warn，诊断写 stderr；logger 不关闭调用者 writer，也不替换全局实例。
-
-命令使用独立构造函数，依赖由 Options.Dependencies 显式注入；装配复制依赖并补默认值，每次调用不共享选项、配置或日志。测试可替换加载器、业务函数与 logger 工厂。
-
-有类型的结果通过 registerResult 注册到本次命令树，使用 google/jsonschema-go 生成 Draft 2020-12。json.Marshaler、encoding.TextMarshaler、字节切片、json string 标签和递归类型须显式覆盖并验证实际 JSON；format 不提供语义校验，业务约束交给 validator。
-
-`test/integration` 的进程测试构建真实二进制，用 testscript 验证 0/1/2、输出流与损坏配置下的发现命令。`cmd/<name>` 入口测试等待就绪后发 Unix 中断，检查真实退出 130；Windows 使用注入 notify 的受控取消，辅助分支只在测试代码中。
-
-初始化持有 `.template-init.lock` 的系统锁；失败时根据 `.template-init/` 日志回滚。相同参数重试会先恢复，不同参数或人工修改会保留现场并报错。不要删除活跃进程的锁文件；锁文件常驻。单文件以同目录临时文件替换，不承诺跨文件或断电原子性。
-
-工具升级后更新 mise.toml、mise.lock、Go 声明、README 当前工具表及 CI 引导版本，再运行 versions:check。二进制工具校验六平台归档；Go 后端锁定同一模块来源版本，跨平台本地编译，不生成虚假的平台归档记录。Renovate 配置需由仓库管理员启用；受信任执行权限不足时维护者自行补齐六平台锁，检查不会放宽。
-
-发布使用固定 Syft 对六个本地归档生成 SPDX JSON，配置关闭 enrichment、远程许可证查询和更新检查；GoReleaser 在 SBOM 后生成最终 checksums.txt。release:verify 校验实际文件，不上传证明。发布证明只在受信任 release job 生成。
-
-提交 PR 时使用仓库模板记录实际行为、兼容记录和验证。安全报告及维护责任按[维护清单](maintenance.md)配置；托管权限和平台功能须由管理员实际启用。
-
-提交完成或回滚完成后先持久记录终态，再逐个清理备份，最后删除 journal。清理中断可继续；仅剩空恢复目录时安全移除，未知内容仍保留并报错。
-
-
-## 目录与入口
-
-程序入口位于 `cmd/<name>/`，配置示例位于 `configs/`，集成测试及其脚本位于
-`test/integration/`，共享契约基线位于 `test/testdata/contracts/`。单元测试留在对应包内。
-`tools/` 保留 Go 开发程序，只有需要独立脚本时才增加 `scripts/`。
-
-开发工具通过 `scaffold.Inspect` 静态识别唯一入口，不根据模块路径末段推测命令名。
-新增文件若包含应用标识，更新初始化受管清单。迁移或删除受管文件后先暂存文件移动，
-再运行使用 Git 索引清单复制源码的 `template:check`。
-
-初始化事务格式为 2，命令目录改名与内容替换一起恢复。源命令目录只允许受管入口文件；
-额外文件、既有目标目录、人工修改或不明确的目录状态会保留现场并报错。格式 1 的日志
-须先由原版本工具恢复。模板初始化不会自动升级旧布局项目。
-
-事务的目标写入临时路径由持久记录的受管文件路径唯一推导，开始前必须不存在。
-真实进程退出后只按日志确认的路径清理临时文件，不按文件名前缀删除其他内容。
-`v2`、`v10` 等会被 Go 当作版本段的名称在初始化写入前拒绝，以保证命令目录和源码安装产物同名。
+PR 按仓库模板说明实际行为、兼容记录和测试证据；提交加 Agent: Codex 尾注，保留审查 worktree。
+合并和发布由维护者决定。机器接口变化先读[兼容性规则](compatibility.md)，不要仅刷新快照。

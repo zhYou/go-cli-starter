@@ -2,15 +2,16 @@ package integration
 
 import (
 	"errors"
-	"github.com/rogpeppe/go-internal/testscript"
-	"github.com/stretchr/testify/require"
-	"github.com/zhYou/go-cli-starter/internal/scaffold"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"testing"
+
+	"github.com/rogpeppe/go-internal/testscript"
+	"github.com/stretchr/testify/require"
+	"github.com/zhYou/go-cli-starter/internal/dev/scaffold"
 )
 
 func TestProcessExitCodes(t *testing.T) {
@@ -23,6 +24,7 @@ func TestProcessExitCodes(t *testing.T) {
 	require.NoError(t, err)
 	project, err := scaffold.Inspect(root)
 	require.NoError(t, err)
+	//nolint:gosec // G204：测试只运行当前测试二进制或固定 Git/Go 命令，参数来自临时 fixture。
 	cmd := exec.Command("go", "build", "-o", binary, "./"+project.CommandPath)
 	cmd.Dir = root
 	data, err := cmd.CombinedOutput()
@@ -32,10 +34,13 @@ func TestProcessExitCodes(t *testing.T) {
 		if err := os.MkdirAll(home, 0700); err != nil {
 			return err
 		}
-		for _, key := range []string{"HOME", "USERPROFILE", "XDG_CONFIG_HOME", "APPDATA"} {
+		for _, key := range []string{"HOME", "USERPROFILE", "XDG_CONFIG_HOME", "APPDATA", "LOCALAPPDATA", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"} {
 			env.Setenv(key, home)
 		}
-		env.Setenv("GO_CLI_STARTER_LOG_LEVEL", "")
+		env.Setenv("GO_CLI_STARTER_HOME", home)
+		for _, key := range []string{"GO_CLI_STARTER_LOG_LEVEL", "GO_CLI_STARTER_LOGGING_LEVEL", "GO_CLI_STARTER_LOGGING_OUTPUT", "GO_CLI_STARTER_LANG", "GO_CLI_STARTER_TELEMETRY_EXPORTER"} {
+			env.Setenv(key, "")
+		}
 		return nil
 	}, Cmds: map[string]func(*testscript.TestScript, bool, []string){"cli": func(ts *testscript.TestScript, neg bool, args []string) {
 		if neg || len(args) == 0 {

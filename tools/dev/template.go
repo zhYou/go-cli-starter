@@ -10,7 +10,8 @@ import (
 	"strings"
 
 	"github.com/spf13/afero"
-	"github.com/zhYou/go-cli-starter/internal/scaffold"
+	"github.com/zhYou/go-cli-starter/internal/base/paths"
+	"github.com/zhYou/go-cli-starter/internal/dev/scaffold"
 )
 
 func verifyTemplate() error {
@@ -24,7 +25,7 @@ func verifyTemplate() error {
 	}
 	defer func() { _ = os.RemoveAll(dir) }()
 	// 利用 Git 文件列表排除本地凭据、缓存和构建产物。
-	cmd := exec.Command("git", "ls-files", "--cached", "--others", "--exclude-standard", "-z")
+	cmd := exec.Command(gitProgram, "ls-files", "--cached", "--others", "--exclude-standard", "-z")
 	cmd.Dir = root
 	files, err := cmd.Output()
 	if err != nil {
@@ -49,7 +50,10 @@ func verifyTemplate() error {
 		return err
 	}
 	if changed, err := scaffold.Initialize(dir, module, name); err != nil || len(changed) != 0 {
-		return fmt.Errorf("初始化不满足幂等性：%v", err)
+		if err != nil {
+			return fmt.Errorf("初始化不满足幂等性：%w", err)
+		}
+		return fmt.Errorf("初始化不满足幂等性：重复调用仍改写文件")
 	}
 	project, err := scaffold.Inspect(dir)
 	if err != nil {
@@ -61,15 +65,17 @@ func verifyTemplate() error {
 	if err := prepareFixture(dir); err != nil {
 		return err
 	}
-	if err := command(dir, "go", "run", "./tools/dev", "fmt-check"); err != nil {
+	if err := command(dir, "go", runCommand, "./tools/dev", "fmt-check"); err != nil {
 		return err
 	}
-	if err := command(dir, "go", "test", "./..."); err != nil {
+	// 子进程使用生成应用的前缀，原模板的 HOME 不会被改名后的程序读取。
+	if err := commandEnv(dir, []string{paths.EnvPrefix(project.Name) + "_HOME=" + filepath.Join(dir, ".template-check-home")}, "go", "test", allPackages); err != nil {
 		return err
 	}
-	if err := command(dir, "go", "build", "-o", filepath.Join(dir, "app-check"), "./"+project.CommandPath); err != nil {
+	if err := command(dir, lintProgram, "run", "--allow-serial-runners"); err != nil {
 		return err
 	}
+	//nolint:gosec // G204：开发任务显式执行固定工具及拆分参数，不经过 shell；参数来自仓库或调用者。
 	check := exec.Command("go", "list", "-deps", "-f", "{{.ImportPath}}", "./"+project.CommandPath)
 	check.Dir = dir
 	imports, err := check.Output()
@@ -79,26 +85,26 @@ func verifyTemplate() error {
 	if module != scaffold.TemplateModule && strings.Contains(string(imports), scaffold.TemplateModule) {
 		return fmt.Errorf("生成的项目仍在导入原模板模块")
 	}
-	if err := command(dir, "go", "run", "./"+project.CommandPath, "schema", "greet"); err != nil {
+	if err := verifyTemplateExecutable(dir, project); err != nil {
 		return err
 	}
 	if err := verifyCommandInstall(dir, project); err != nil {
 		return err
 	}
-	if err := command(dir, "goreleaser", "check"); err != nil {
+	if err := command(dir, releaseProgram, "check"); err != nil {
 		return err
 	}
-	fmt.Println("模板副本检查通过：初始化、幂等性、测试、构建、命令描述和发布配置。")
+	fmt.Println("模板副本检查通过：初始化、幂等性、测试、lint、构建、双语契约、TOML/环境、go install 和发布配置。")
 	return nil
 }
 
 func prepareFixture(dir string) error {
-	if err := command(dir, "git", "-c", "init.templateDir=", "init", "--quiet"); err != nil {
+	if err := command(dir, gitProgram, "-c", "init.templateDir=", "init", "--quiet"); err != nil {
 		return err
 	}
 	// 此仓库只用于临时检查，不修改调用方的远端。
 	// GoReleaser 的 SCM 校验需要 GitHub 格式的 origin，但不会连接该地址。
-	return command(dir, "git", "remote", "add", "origin", "https://github.com/example/template-check.git")
+	return command(dir, gitProgram, "remote", "add", "origin", "https://github.com/example/template-check.git")
 }
 
 func copyFile(source, target string) error {
@@ -109,14 +115,17 @@ func copyFile(source, target string) error {
 	if !info.Mode().IsRegular() {
 		return fmt.Errorf("无法复制非常规模板文件 %s", source)
 	}
+	//nolint:gosec // G301：这是公开构建产物或机器契约文件的既定权限，不包含凭据。
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return err
 	}
+	//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
 	in, err := os.Open(source)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = in.Close() }()
+	//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
 	out, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL, info.Mode().Perm())
 	if err != nil {
 		return err
@@ -158,6 +167,7 @@ func verifyCommandInstall(root string, project scaffold.Project) error {
 		return err
 	}
 	defer func() { _ = os.RemoveAll(installDir) }()
+	//nolint:gosec // G204：开发任务显式执行固定工具及拆分参数，不经过 shell；参数来自仓库或调用者。
 	cmd := exec.Command("go", "install", "./"+project.CommandPath)
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "GOBIN="+installDir)
@@ -165,8 +175,27 @@ func verifyCommandInstall(root string, project scaffold.Project) error {
 		return fmt.Errorf("安装命令失败：%w：%s", err, out)
 	}
 	name := project.Name
-	if runtime.GOOS == "windows" {
-		name += ".exe"
+	if runtime.GOOS == windowsPlatform {
+		name += executableSuffix
 	}
-	return command(root, filepath.Join(installDir, name), "schema", "greet")
+	if _, err := os.Stat(filepath.Join(root, configExample)); err == nil {
+		return verifyExecutable(filepath.Join(installDir, name), installDir, project.Name, filepath.Join(root, configExample), developmentVersion, developmentCommit)
+	}
+	return commandEnv(root, []string{paths.EnvPrefix(project.Name) + "_HOME=" + filepath.Join(installDir, "home")}, filepath.Join(installDir, name), schemaCommand, greetCommand)
+}
+
+func templateExecutablePath(dir, platform string) string {
+	name := "app-check"
+	if platform == windowsPlatform {
+		name += executableSuffix
+	}
+	return filepath.Join(dir, name)
+}
+
+func verifyTemplateExecutable(dir string, project scaffold.Project) error {
+	executable := templateExecutablePath(dir, runtime.GOOS)
+	if err := command(dir, "go", buildCommand, "-o", executable, "./"+project.CommandPath); err != nil {
+		return err
+	}
+	return verifyExecutable(executable, dir, project.Name, filepath.Join(dir, configExample), developmentVersion, developmentCommit)
 }

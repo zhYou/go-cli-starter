@@ -14,7 +14,7 @@ import (
 
 // validateArchive 读取真实归档，核对用户解压后需要的根目录文件。
 func validateArchive(path, binary string) error {
-	required := map[string]bool{binary: false, "README.md": false, "config.example.yaml": false}
+	required := map[string]bool{binary: false, "README.md": false, "config.example.toml": false}
 	accept := func(name string, regular, nonempty bool) error {
 		canonical := archivepath.Clean(strings.ReplaceAll(name, `\`, "/"))
 		if _, needed := required[canonical]; needed && name != canonical {
@@ -44,6 +44,7 @@ func validateArchive(path, binary string) error {
 			if err != nil {
 				return err
 			}
+			//nolint:gosec // G110：仅完整读取本地 snapshot 生成的发布归档以校验 CRC，不接受远端上传。
 			_, readErr := io.Copy(io.Discard, reader)
 			closeErr := reader.Close()
 			if err := errors.Join(readErr, closeErr); err != nil {
@@ -51,6 +52,7 @@ func validateArchive(path, binary string) error {
 			}
 		}
 	} else if strings.HasSuffix(path, ".tar.gz") {
+		//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
 		file, err := os.Open(path)
 		if err != nil {
 			return err
@@ -74,10 +76,12 @@ func validateArchive(path, binary string) error {
 			if err := accept(header.Name, regular, header.Size > 0); err != nil {
 				return err
 			}
+			//nolint:gosec // G110：仅完整读取本地 snapshot 生成的发布归档以校验 CRC，不接受远端上传。
 			if _, err := io.Copy(io.Discard, archive); err != nil {
 				return err
 			}
 		}
+		//nolint:gosec // G110：仅完整读取本地 snapshot 生成的发布归档以校验 CRC，不接受远端上传。
 		if _, err := io.Copy(io.Discard, compressed); err != nil {
 			return fmt.Errorf("归档压缩数据损坏：%w", err)
 		}

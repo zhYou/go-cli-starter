@@ -1,3 +1,4 @@
+// Command go-cli-starter 负责信号处理及进程退出。
 package main
 
 import (
@@ -6,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/zhYou/go-cli-starter/internal/cli"
+	"github.com/zhYou/go-cli-starter/internal/app/cli"
 )
 
 const appName = "go-cli-starter"

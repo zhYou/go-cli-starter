@@ -5,16 +5,21 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
-func releaseFixture(t *testing.T) string { return releaseFixtureMode(t, "", "") }
+func releaseFixture(t *testing.T) string {
+	t.Helper()
+	return releaseFixtureMode(t, "", "")
+}
 
 func releaseFixtureMode(t *testing.T, selected, mode string) string {
+	t.Helper()
 	dir := t.TempDir()
 	var sums strings.Builder
 	for _, target := range []string{"linux_amd64", "linux_arm64", "darwin_amd64", "darwin_arm64", "windows_amd64", "windows_arm64"} {
@@ -50,6 +55,7 @@ func TestReleaseSnapshotRejectsMissingOrMismatchedSBOM(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			dir := releaseFixture(t)
 			sumPath := filepath.Join(dir, "checksums.txt")
+			//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 			data, err := os.ReadFile(sumPath)
 			require.NoError(t, err)
 			lines := strings.Split(strings.TrimSpace(string(data)), "\n")
@@ -62,8 +68,10 @@ func TestReleaseSnapshotRejectsMissingOrMismatchedSBOM(t *testing.T) {
 			}
 			switch mode {
 			case "missing":
+				//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 				require.NoError(t, os.Remove(filepath.Join(dir, sbom)))
 			case "hash":
+				//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 				require.NoError(t, os.WriteFile(filepath.Join(dir, sbom), []byte("{}"), 0600))
 			case "duplicate":
 				data = append(data, []byte(lines[0]+"\n")...)
@@ -71,6 +79,7 @@ func TestReleaseSnapshotRejectsMissingOrMismatchedSBOM(t *testing.T) {
 				data = append(data, []byte(strings.Repeat("0", 64)+"  ../outside\n")...)
 			case "wrong-document":
 				raw, _ := json.Marshal(map[string]any{"spdxVersion": "SPDX-2.3", "name": "wrong"})
+				//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 				require.NoError(t, os.WriteFile(filepath.Join(dir, sbom), raw, 0600))
 				sum := sha256.Sum256(raw)
 				for i, line := range lines {
@@ -81,14 +90,18 @@ func TestReleaseSnapshotRejectsMissingOrMismatchedSBOM(t *testing.T) {
 				data = []byte(strings.Join(lines, "\n") + "\n")
 			case "symlink":
 				outside := filepath.Join(t.TempDir(), "outside")
+				//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 				raw, err := os.ReadFile(filepath.Join(dir, sbom))
 				require.NoError(t, err)
+				//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 				require.NoError(t, os.WriteFile(outside, raw, 0600))
+				//nolint:gosec // G703：测试路径和权限只来自当前临时 fixture，不读取用户文件。
 				require.NoError(t, os.Remove(filepath.Join(dir, sbom)))
 				if err := os.Symlink(outside, filepath.Join(dir, sbom)); err != nil {
 					t.Skipf("符号链接不可用：%v", err)
 				}
 			}
+			//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 			require.NoError(t, os.WriteFile(sumPath, data, 0600))
 			err = checkReleaseSnapshot(dir)
 			if mode == "valid" {

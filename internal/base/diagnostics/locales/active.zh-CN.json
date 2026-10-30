@@ -1,0 +1,9 @@
+{
+  "diagnostics.lease_unavailable": "诊断存活锁不可用",
+  "diagnostics.unknown_artifact": "未知诊断文件",
+  "diagnostics.invalid_maintenance_lock": "诊断维护锁无效",
+  "diagnostics.invalid_directory": "诊断目录无效",
+  "diagnostics.unknown_content": "诊断目录包含未知内容",
+  "diagnostics.invalid_metadata": "诊断元数据无效",
+  "diagnostics.unrecognized_metadata": "无法识别诊断元数据"
+}

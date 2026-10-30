@@ -1,0 +1,17 @@
+{
+  "validation.required": {
+    "other": "{{.Field}} is required"
+  },
+  "validation.notblank": {
+    "other": "{{.Field}} must not be blank"
+  },
+  "validation.oneof": {
+    "other": "{{.Field}} must be one of {{.Param}}"
+  },
+  "validation.rule": {
+    "other": "{{.Field}} must satisfy {{.Rule}} {{.Param}}"
+  },
+  "validation.definition": {
+    "other": "Invalid validation definition"
+  }
+}

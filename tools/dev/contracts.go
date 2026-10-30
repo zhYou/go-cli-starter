@@ -5,11 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/zhYou/go-cli-starter/internal/cli"
-	"github.com/zhYou/go-cli-starter/internal/contract"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/zhYou/go-cli-starter/internal/app/cli"
+	"github.com/zhYou/go-cli-starter/internal/base/paths"
+	"github.com/zhYou/go-cli-starter/internal/dev/contract"
 )
 
 const contractFile = "test/testdata/contracts/v1.json"
@@ -21,9 +23,9 @@ func captureContract(ctx context.Context) ([]byte, error) {
 	}
 	defer func() { _ = os.RemoveAll(dir) }()
 	results := map[string]any{}
-	for key, args := range map[string][]string{"schema": {"schema"}, "greet": {"greet", "--name", "Codex", "--json"}, "version": {"version", "--json"}} {
+	for key, args := range map[string][]string{schemaCommand: {schemaCommand}, greetCommand: {greetCommand, nameFlag, "Codex", jsonFlag}, versionCommand: {versionCommand, jsonFlag}} {
 		var out, errOut bytes.Buffer
-		code := cli.Run(ctx, args, cli.Options{Name: "contract-cli", Version: "1.0.0", Commit: "abc", Date: "2000-01-01", Out: &out, ErrOut: &errOut, ConfigDir: dir, LookupEnv: func(string) (string, bool) { return "", false }})
+		code := cli.Run(ctx, args, cli.Options{Name: "contract-cli", Version: "1.0.0", Commit: "abc", Date: "2000-01-01", Out: &out, ErrOut: &errOut, ConfigDir: dir, Directories: &paths.Directories{State: filepath.Join(dir, "state")}, LookupEnv: func(string) (string, bool) { return "", false }})
 		if code != 0 {
 			return nil, fmt.Errorf("捕获 %s 失败：%s", key, &errOut)
 		}
@@ -31,7 +33,7 @@ func captureContract(ctx context.Context) ([]byte, error) {
 		if err := json.Unmarshal(out.Bytes(), &value); err != nil {
 			return nil, err
 		}
-		if key == "schema" {
+		if key == schemaCommand {
 			results[key] = value
 		} else {
 			if results["results"] == nil {
@@ -87,12 +89,14 @@ func readRecords(against string) ([]contract.Record, error) {
 	}
 	records := []contract.Record{}
 	for _, path := range paths {
+		//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return nil, err
 		}
 		if against != "" {
-			old, err := exec.Command("git", "show", against+":"+filepath.ToSlash(path)).Output()
+			//nolint:gosec // G204：开发工具读取显式项目文件或执行固定 Git 子命令，不经过 shell，不是外部服务入口。
+			old, err := exec.Command(gitProgram, "show", against+":"+filepath.ToSlash(path)).Output()
 			if err == nil && bytes.Equal(old, data) {
 				continue
 			}
@@ -136,8 +140,10 @@ func updateContract(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	//nolint:gosec // G301：这是公开构建产物或机器契约文件的既定权限，不包含凭据。
 	if err := os.MkdirAll(filepath.Dir(contractFile), 0755); err != nil {
 		return err
 	}
+	//nolint:gosec // G306：这是公开构建产物或机器契约文件的既定权限，不包含凭据。
 	return os.WriteFile(contractFile, append(data, '\n'), 0644)
 }

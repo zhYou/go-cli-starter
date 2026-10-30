@@ -1,38 +1,63 @@
 # 模板升级
 
-模板版本记录在 `.template-version`，首版为 0.1.0，当前为 0.2.0，与应用发布版本独立。
-新副本初始化时生成 `.template-origin.json`，记录原模板、模板版本、目标标识及可确认的来源提交。
-复制包或未知 Git 来源使用 unknown；旧项目没有元数据仍可构建和检查，不使用派生项目自己的 HEAD 冒充模板来源。
-已有来源记录在同参初始化时保持字节不变。初始化不是升级工具，不会覆盖业务文件。
+模板版本在 `.template-version`，当前为 0.3.0，与应用发布版本独立。新副本初始化生成
+`.template-origin.json`，记录原模板、版本、目标身份及可确认的来源提交。未知来源使用 unknown，
+不拿派生项目 HEAD 冒充来源。同参初始化保留来源字节；没有元数据的旧项目仍可构建检查。
+初始化仅用于原始模板改名，不覆盖已有业务、不自动升级布局或配置。
 
-## 迁移到 0.1.0
+## 升级前完成旧事务
 
-1. 在干净分支备份并对照模板与业务项目的差异；先阅读来源记录，再选择已审查的模板提交。
-2. 合并 apperror、validation、logging 和 CLI 输出入口。保留业务 Result、参数及退出码；业务直接调用也须校验。greet 是可移除示例，按现有业务人工调整工厂和依赖。
-3. 合并结果注册与 JSON Schema；特殊编码须提供覆盖并验证实际 JSON。审查兼容基线与变更记录，禁止用刷新快照代替迁移说明。
-4. 合并开发任务、工具精确版本、六平台锁和 Renovate 配置；运行 setup、doctor、versions:check、check 与 test:race。
-5. 合并发布 SBOM、校验与证明配置，运行 snapshot 和 release:verify；在目标仓库按维护清单启用必需检查、安全报告和来源证明权限。
-6. 验证业务行为后记录所采用的模板版本和提交。不自动覆盖来源历史或业务文件，不将本地缓存、凭据和个人智能体配置带入项目。
+在旧 checkout、旧工具和原参数下，先完成所有未终结的 `.template-init/` 事务，涵盖所有历史支持格式，
+包括 format 2；不能仅因为新旧都叫 format 2 就用新工具续做。迁移受管文件路径会使旧 journal
+不再对应新白名单。格式 1 同样先用旧工具恢复。备份业务及恢复现场，确认终态清理完成再合并升级。
 
-初始化中断时用相同参数重试；人工修改、参数冲突或损坏日志会停止恢复并保留现场。先备份 `.template-init/`，核对摘要和目标后再人工处理，不能删除现场后盲目重试。
+相同参数重试先恢复；参数不同、摘要冲突、人工修改、未知内容或损坏日志会停下并保留现场。
+命令目录移动只接受受管入口文件；额外文件、既有目标目录和不明确目录状态均拒绝，不覆盖或猜测。
+不要删除锁或 journal 绕过保护。`.template-init.lock` 是常驻锁文件，是否占用取决于系统锁；
+单文件同目录临时替换不等于跨文件/断电原子性。持久化提交完成或回滚完成终态后才逐个清备份，
+最后删 journal；清理中断可继续，未知内容保留。临时路径由受管 journal 唯一推导，不能按前缀批量删文件。
 
+## 历史布局迁移
 
-## 迁移到 0.2.0
+0.1.0 引入校验、日志、输出和结果 schema；保留业务选项、结果及退出码，业务直接调用也校验。
+0.2.0 将根入口移到 `cmd/<name>/`、配置示例移到 `configs/`、进程测试移到 `test/integration/`、
+共享契约移到 `test/testdata/contracts/`。源码运行和安装改用 `./cmd/<name>`；更新静态入口识别、
+受管清单、GoReleaser main 和测试。目录移动本身不要求修改机器接口。
 
-1. 在干净分支备份业务文件。若存在格式 1 的 `.template-init/` 日志，先用原版本工具以
-   原参数完成恢复；新工具不会转换旧日志，不能通过删除恢复现场绕过检查。
-2. 将根目录 `main.go`、`main_test.go` 移到 `cmd/<name>/`，保留入口的信号处理和版本变量。
-   源码运行改为 `go run ./cmd/<name>`，安装改为 `go install <module>/cmd/<name>@latest`。
-3. 合并入口识别及格式 2 目录事务，更新受管文件路径、开发构建、模板副本安装、MCP
-   诊断和 GoReleaser 的 `main`。命令目录名与应用名一致，模块末段可以不同；同参数初始化
-   仍幂等。`v2`、`v10` 等 Go 版本段不能作为新命令名，须改用其他名称；`v0`、`v1`、`v02` 仍可用。初始化只用于原始模板改名，已有项目按本清单人工合并。
-4. 将配置示例移入 `configs/`，归档映射去掉父目录，发布包根目录继续包含
-   `config.example.yaml`。用户配置目录、`--config` 和配置优先级保持原样。
-5. 将进程测试和脚本移到 `test/integration/`，将共享基线原样移到
-   `test/testdata/contracts/`。合并历史快照读取逻辑，新路径缺失时检查旧 Git 路径；
-   损坏、非普通文件和 Git 错误必须失败。不要刷新快照来掩盖行为差异。
-6. 暂存文件移动后运行 `mise run fmt`、`mise run check`、`mise run test:race`、
-   `mise run mcp:check`、`mise run release:snapshot` 和 `mise run release:verify`。
-   核对六目标归档的二进制、README、根目录配置、SPDX 和校验清单。
-7. 记录采用的模板版本与提交，保留来源历史；应用版本、CLI 机器字段和退出码无需因本次
-   目录调整而改变。macOS/Windows 的运行行为由对应平台 CI 验证。
+命令目录与应用名一致，模块末段可不同。初始化提前拒绝 v2、v10 等无前导零且至少为 2 的 Go
+版本段名称，防止 go install 产物名偏离目录；v0、v1、v02 可用。新增源码若含身份，显式登记白名单。
+历史快照缺失时可读取旧 Git 路径，损坏文件和 Git 错误不能当作“没有基线”。
+
+## 迁移到 0.3.0
+
+1. 在干净隔离分支备份业务及来源记录，按上节完成旧事务，再选择已审查的模板提交人工合并。
+   迁移到 app/base/tools/dev 分层：业务和 CLI 在 app，共用机制在 base，进程在 tools/command，
+   初始化与契约检查在 dev。更新导入、受管清单、测试和工具；不要只搬目录而遗漏资源生命周期。
+2. 将旧 `config.yaml` 的 `log_level` 改为唯一 `config.toml` 的 `[logging] level`，
+   发布归档根示例改为 `config.example.toml`。不再自动读取、合并或静默转换 YAML。
+   新加载器拒绝未知键、弱转换及非法范围；显式 flag > 非空环境变量 > TOML > 默认值。
+   旧 `<PREFIX>_LOG_LEVEL` 继续兼容且优先于新 `<PREFIX>_LOGGING_LEVEL`，flag 仍最优先。
+3. 默认日志由 warn/stderr 改为 info/file。需要旧出口时显式配置：
+
+   ```toml
+   [logging]
+   level = "warn"
+   output = "stderr"
+   ```
+
+   none 可关日志；Trace 默认 none，file 仅本地诊断 JSON，非 OTLP/重放格式。
+   合并 Session 的登记、等待与关闭顺序，自有资源由 Session 收尾，借用 logger/IO 不 Sync/Close。
+4. 核对私有目录及权限。Linux 使用 XDG，macOS 使用 Application Support/Caches，Windows 使用
+   APPDATA/LOCALAPPDATA。`GO_CLI_STARTER_HOME` 为绝对应用根，改名 mycli 后为 `MYCLI_HOME`；
+   配置在根下 config.toml，data/state/cache 分开，与安装位置无关。为测试父子进程隔离此变量。
+5. 新增 `--lang` 与 `<PREFIX>_LANG`，按 flag > 环境 > zh-CN，zh 是别名、en 是英语。
+   合并模块双语 JSON 目录与冻结 Bundle；不读取系统区域，不翻译机器标识、字段及退出码。
+6. 审查[本次兼容记录](compatibility/changes/2026-10-30-cli-foundations.json)：
+   schema_version 仍为 1，12 项机器快照差异为各命令 lang 与 info 默认值；
+   TOML、日志落盘和路径另有手工迁移。应用 v0.1.0→v0.2.0 是兼容决策，本次不创建发布标签。
+   模板来源记录和初始化事务格式不因分层迁移升级，不运行 init 覆盖业务。
+7. 暂存移动及新增文件，显式 setup/doctor 后运行 fmt、check、race；涉及 MCP 时运行 mcp:check。
+   提交最终源码后重新 snapshot 与 release:verify，核对六归档、TOML、SPDX、最终摘要及宿主安装。
+   macOS/Windows 运行行为以对应原生 CI 为准。记录采用的模板版本与提交，保留来源历史和个人配置外置。
+
+更多实际 API、示例和所有权边界见[设计指南](design-guidelines.md)，托管安全设置见[维护清单](maintenance.md)。

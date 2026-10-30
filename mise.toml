@@ -1,7 +1,12 @@
 min_version = "2026.10.21"
 
 [settings]
+auto_install = false
+exec_auto_install = false
 task.run_auto_install = false
+
+[env]
+GOTOOLCHAIN = "local"
 
 [tools]
 go = "1.27.3"
@@ -41,7 +46,7 @@ run = "go test -race ./..."
 
 [tasks.lint]
 description = "运行锁定版本的静态检查工具"
-run = "golangci-lint run"
+run = "golangci-lint run --allow-serial-runners"
 
 [tasks.vet]
 description = "运行 Go vet 检查"
@@ -65,7 +70,7 @@ run = "go run ./tools/dev template-check"
 
 [tasks.check]
 description = "运行与 CI 相同的源码检查"
-depends = ["fmt:check", "mod:check", "test", "vet", "lint", "build", "template:check", "contract:check", "versions:check"]
+depends = ["fmt:check", "mod:check", "test", "vet", "lint", "build", "template:check", "contract:check", "versions:check", "rules:check"]
 
 [tasks.init]
 description = "重命名原始模板：mise run init --module github.com/acme/mycli --name mycli"
@@ -96,5 +101,17 @@ description = "联网检查受影响的 Go 漏洞，失败保留原因"
 run = "go run ./tools/dev vuln"
 
 [tasks."release:verify"]
-description = "验证六目标归档、SPDX 和最终 SHA-256 清单"
+description = "验证六目标归档、SPDX、SHA-256，并隔离安装宿主归档"
 run = "go run ./tools/dev release-verify"
+
+[tasks."rules:check"]
+description = "用真实类型分析验证配置、日志和 Trace 边界"
+run = "go run ./tools/dev rules-check"
+
+[tasks."test:fuzz"]
+description = "对独立 CLI 参数做有界模糊测试"
+run = "go test ./internal/app/cli -run=^$ -fuzz=FuzzArgv -fuzztime=5s"
+
+[tasks."test:bench"]
+description = "测量 CLI 构造与调用开销，不设置性能门槛"
+run = "go test ./internal/app/cli -run=^$ -bench=. -benchmem"

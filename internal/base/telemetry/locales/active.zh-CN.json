@@ -1,0 +1,5 @@
+{
+  "telemetry.writer_unavailable": "Trace 写入器不可用",
+  "telemetry.unknown_exporter": "未知 Trace 导出器",
+  "telemetry.sdk_environment": "SDK 环境变量格式无效，已禁用本地 Trace"
+}

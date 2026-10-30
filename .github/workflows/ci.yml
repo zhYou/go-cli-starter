@@ -9,6 +9,12 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      - name: 隔离应用状态目录
+        shell: bash
+        env:
+          GO_CLI_STARTER_HOME: ${{ runner.temp }}/go-cli-starter-home
+        run: |
+          printf 'GO_CLI_STARTER_HOME=%s\n' "$GO_CLI_STARTER_HOME" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -16,6 +22,10 @@ jobs:
         with:
           version: 2026.10.21
       - run: mise run setup
+      - name: 原生进程树、取消与资源所有权验收
+        env:
+          GO_CLI_STARTER_HOME: ${{ runner.temp }}/native-command-home
+        run: mise exec -- go test -count=1 -timeout=90s ./internal/tools/command -run 'Test(Windows|OwnedDescendants|RootExits|CleanupDoes|CancellationRetains)'
       - run: mise run check
       - name: 比较事件基准的机器契约
         env:
@@ -24,6 +34,8 @@ jobs:
           if [ -n "$CONTRACT_BASE" ] && [ "$CONTRACT_BASE" != "0000000000000000000000000000000000000000" ]; then
             mise run contract:check -- --against "$CONTRACT_BASE"
           fi
+      - run: mise run test:fuzz
+      - run: mise run test:bench
       - run: mise run test:race
       - run: mise run mcp:check
       - run: mise run release:snapshot
@@ -35,6 +47,12 @@ jobs:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
+      - name: 隔离应用状态目录
+        shell: bash
+        env:
+          GO_CLI_STARTER_HOME: ${{ runner.temp }}/go-cli-starter-home
+        run: |
+          printf 'GO_CLI_STARTER_HOME=%s\n' "$GO_CLI_STARTER_HOME" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -42,5 +60,14 @@ jobs:
         with:
           version: 2026.10.21
       - run: mise run setup
+      - name: 原生进程树、取消与资源所有权验收
+        env:
+          GO_CLI_STARTER_HOME: ${{ runner.temp }}/native-command-home
+        run: mise exec -- go test -count=1 -timeout=90s ./internal/tools/command -run 'Test(Windows|OwnedDescendants|RootExits|CleanupDoes|CancellationRetains)'
+      - name: 原生模板构建与二进制验收
+        env:
+          GO_CLI_STARTER_HOME: ${{ runner.temp }}/template-starter-home
+          MYCLI_HOME: ${{ runner.temp }}/template-mycli-home
+        run: mise exec -- go test -count=1 ./tools/dev -run '^TestTemplateExecutable(Path|Acceptance)$'
       - run: mise run test
       - run: mise run build
