@@ -13,3 +13,16 @@ type Config struct {
 func Defaults() Config {
 	return Config{MaxSizeMiB: 10, MaxBackups: 5, RetentionDays: 14, MaxTotalSizeMiB: 200}
 }
+
+const (
+	// EventsFile 是结构化日志的当前分片。
+	EventsFile = "events.jsonl"
+	// TraceFile 是本地 Trace 的当前分片。
+	TraceFile                   = "trace.jsonl"
+	mebibyte              int64 = 1024 * 1024
+	metadataName                = ".run.json"
+	leaseName                   = ".lock"
+	maintenanceName             = ".cleanup.lock"
+	metadataVersion             = 1
+	metadataTemporaryName       = ".run.tmp"
+)

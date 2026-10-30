@@ -32,7 +32,7 @@ func TestExitCodeAndUnwrap(t *testing.T) {
 
 func TestBusinessErrorWithCustomPreRun(t *testing.T) {
 	cause := errors.New("业务执行失败")
-	root := NewRoot(Options{Out: io.Discard, ErrOut: io.Discard})
+	root := metadataRoot(Options{Out: io.Discard, ErrOut: io.Discard})
 	root.AddCommand(&cobra.Command{
 		Use:               "fail",
 		PersistentPreRunE: func(*cobra.Command, []string) error { return nil },
@@ -45,7 +45,7 @@ func TestBusinessErrorWithCustomPreRun(t *testing.T) {
 }
 
 func TestCobraRequiredFlagIsUsageError(t *testing.T) {
-	root := NewRoot(Options{Out: io.Discard, ErrOut: io.Discard})
+	root := metadataRoot(Options{Out: io.Discard, ErrOut: io.Discard})
 	command := &cobra.Command{Use: "required", RunE: wrapRun(func(*cobra.Command, []string) error { return nil })}
 	command.Flags().String("token", "", "令牌")
 	require.NoError(t, command.MarkFlagRequired("token"))

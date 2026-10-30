@@ -8,6 +8,7 @@ import (
 	"github.com/zhYou/go-cli-starter/internal/app/cli"
 	"github.com/zhYou/go-cli-starter/internal/app/config"
 	"github.com/zhYou/go-cli-starter/internal/app/greeting"
+	"github.com/zhYou/go-cli-starter/internal/base/paths"
 	"io"
 	"os"
 	"os/exec"
@@ -39,7 +40,7 @@ func TestMainSignalCancellation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestSignalHelper$")
-	cmd.Env = append(os.Environ(), "CLI_SIGNAL_HELPER=1")
+	cmd.Env = append(os.Environ(), "CLI_SIGNAL_HELPER=1", paths.EnvPrefix(appName)+"_HOME="+t.TempDir())
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	stderr, err := cmd.StderrPipe()

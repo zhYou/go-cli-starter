@@ -151,5 +151,6 @@
   },
   "help.detail": {
     "other": "使用 {{.Command}} 查看命令的详细帮助。"
-  }
+  },
+  "cli.warning": "警告：{{.Message}}"
 }

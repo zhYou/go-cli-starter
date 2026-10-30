@@ -2,28 +2,28 @@ package logging
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/require"
+	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
-type sink struct {
-	bytes.Buffer
-	closed bool
+type failedSink struct{}
+
+func (failedSink) Write([]byte) (int, error) { return 0, errors.New("fixture write failure") }
+func (failedSink) Sync() error               { return errors.New("fixture sync failure") }
+
+func TestWriterFailuresReachReporterAndSyncCaller(t *testing.T) {
+	warnings := 0
+	logger := New(RunInfo{}, Options{Config: Defaults(), Writer: failedSink{}, RunID: "fixture"}, func(error) { warnings++ })
+	logger.Infow("cannot write")
+	require.Error(t, logger.Sync())
+	require.Positive(t, warnings)
 }
 
-func (s *sink) Close() error { s.closed = true; return nil }
-func TestLogLevelsAndSinkOwnership(t *testing.T) {
-	for _, level := range []string{"warn", "debug"} {
-		s := &sink{}
-		logger, err := New(s, level)
-		require.NoError(t, err)
-		logger.Debug("调试消息")
-		logger.Warn("警告消息")
-		require.NoError(t, logger.Sync())
-		require.False(t, s.closed)
-		require.Contains(t, s.String(), "警告消息")
-		require.Equal(t, level == "debug", bytes.Contains(s.Bytes(), []byte("调试消息")))
-	}
-	_, err := New(&bytes.Buffer{}, "noisy")
-	require.Error(t, err)
+type countedSink struct {
+	bytes.Buffer
+	syncs int
 }
+
+func (s *countedSink) Sync() error { s.syncs++; return nil }

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/zhYou/go-cli-starter/internal/app/cli"
+	"github.com/zhYou/go-cli-starter/internal/base/paths"
 	"github.com/zhYou/go-cli-starter/internal/dev/contract"
 	"os"
 	"os/exec"
@@ -23,7 +24,7 @@ func captureContract(ctx context.Context) ([]byte, error) {
 	results := map[string]any{}
 	for key, args := range map[string][]string{"schema": {"schema"}, "greet": {"greet", "--name", "Codex", "--json"}, "version": {"version", "--json"}} {
 		var out, errOut bytes.Buffer
-		code := cli.Run(ctx, args, cli.Options{Name: "contract-cli", Version: "1.0.0", Commit: "abc", Date: "2000-01-01", Out: &out, ErrOut: &errOut, ConfigDir: dir, LookupEnv: func(string) (string, bool) { return "", false }})
+		code := cli.Run(ctx, args, cli.Options{Name: "contract-cli", Version: "1.0.0", Commit: "abc", Date: "2000-01-01", Out: &out, ErrOut: &errOut, ConfigDir: dir, Directories: &paths.Directories{State: filepath.Join(dir, "state")}, LookupEnv: func(string) (string, bool) { return "", false }})
 		if code != 0 {
 			return nil, fmt.Errorf("捕获 %s 失败：%s", key, &errOut)
 		}

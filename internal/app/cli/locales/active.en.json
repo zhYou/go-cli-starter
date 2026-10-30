@@ -151,5 +151,6 @@
   },
   "help.detail": {
     "other": "Use {{.Command}} for detailed command help."
-  }
+  },
+  "cli.warning": "Warning: {{.Message}}"
 }

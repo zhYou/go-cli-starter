@@ -8,11 +8,15 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/zhYou/go-cli-starter/internal/app/config"
+	"github.com/zhYou/go-cli-starter/internal/app/session"
 	"github.com/zhYou/go-cli-starter/internal/base/fault"
 	"github.com/zhYou/go-cli-starter/internal/base/iostreams"
+	"github.com/zhYou/go-cli-starter/internal/base/logging"
+	"github.com/zhYou/go-cli-starter/internal/base/paths"
 	"io"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Options 提供进程依赖；每次调用均创建新的命令树。
@@ -21,17 +25,27 @@ type Options struct {
 	In                          io.Reader
 	Out, ErrOut                 io.Writer
 	ConfigDir                   string
-	Language                    string
-	LookupEnv                   func(string) (string, bool)
-	Dependencies                *Dependencies
+	// Directories 显式覆写应用目录，供嵌入调用及测试隔离；ConfigDir 仅选择配置目录。
+	Directories  *paths.Directories
+	Language     string
+	LookupEnv    func(string) (string, bool)
+	Dependencies *Dependencies
 }
 
 // Run 执行一次命令并返回约定的退出码，不直接退出进程。
-func Run(ctx context.Context, args []string, opts Options) int {
+func Run(ctx context.Context, args []string, opts Options) (code int) {
+	code = 1
+	started := time.Now()
+	var executionErr error
 	opts = defaults(opts)
 	sink := &recordingWriter{writer: opts.Out}
 	opts.Out = sink
 	root, call := buildRoot(opts)
+	defer func() {
+		if call.session != nil {
+			call.session.Finish(ctx, logging.CommandResult{ExitCode: code, Duration: time.Since(started), Err: executionErr})
+		}
+	}()
 	envLang := languageEnvironment(opts)
 	if opts.Language != "" {
 		envLang = opts.Language
@@ -47,6 +61,7 @@ func Run(ctx context.Context, args []string, opts Options) int {
 		err = (fault.Definition{Code: "cli.write", Kind: fault.Runtime}).Wrap(sink.Err())
 	}
 	err = classifyExecutionError(err)
+	executionErr = err
 	if err == nil {
 		return 0
 	}
@@ -61,9 +76,6 @@ func Run(ctx context.Context, args []string, opts Options) int {
 	_, _ = fmt.Fprintln(opts.ErrOut, call.localizer.Text("cli.error", map[string]any{"Message": call.localizer.Render(err)}))
 	return exitCode(err)
 }
-
-// NewRoot 提供命令构造入口，供扩展和嵌入式测试使用。
-func NewRoot(opts Options) *cobra.Command { root, _ := buildRoot(defaults(opts)); return root }
 
 func defaults(opts Options) Options {
 	if opts.Name == "" {
@@ -122,13 +134,14 @@ func buildRoot(opts Options) (*cobra.Command, *invocation) {
 		if err != nil {
 			return (fault.Definition{Code: "cli.config_failed", Kind: fault.Configuration}).Wrap(err)
 		}
-		if cfg.Logging.Output != "stderr" {
-			return nil
-		}
-		call.logger, err = call.deps.NewLogger(opts.ErrOut, cfg.Logging.Level)
-		if err != nil {
-			return (fault.Definition{Code: "cli.log_config", Kind: fault.Configuration}).Wrap(err)
-		}
+		ctx, owned := session.Begin(cmd.Context(), cfg, logging.RunInfo{Component: opts.Name, Command: cmd.CommandPath(), Version: opts.Version, Commit: opts.Commit}, session.Options{
+			Paths: paths.Options{AppName: opts.Name, LookupEnv: opts.LookupEnv}, Directories: opts.Directories, Stderr: opts.ErrOut, ExternalLogger: call.deps.Logger, NewLogger: call.deps.NewLogger, Localizer: call.localizer,
+		}, func(err error) {
+			_, _ = fmt.Fprintln(opts.ErrOut, call.localizer.Text("cli.warning", map[string]any{"Message": call.localizer.Render(err)}))
+		})
+		call.session = owned
+		call.logger = owned.Logger
+		cmd.SetContext(ctx)
 		return nil
 	}
 	root.CompletionOptions.DisableDefaultCmd = true

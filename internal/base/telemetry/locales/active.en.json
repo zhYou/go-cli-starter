@@ -1,0 +1,5 @@
+{
+  "telemetry.writer_unavailable": "Trace writer unavailable",
+  "telemetry.unknown_exporter": "Unknown trace exporter",
+  "telemetry.sdk_environment": "Malformed SDK environment; local trace disabled"
+}

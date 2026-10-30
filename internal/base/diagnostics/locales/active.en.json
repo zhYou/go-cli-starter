@@ -1,0 +1,9 @@
+{
+  "diagnostics.lease_unavailable": "Diagnostic lease unavailable",
+  "diagnostics.unknown_artifact": "Unknown diagnostic artifact",
+  "diagnostics.invalid_maintenance_lock": "Invalid diagnostic maintenance lock",
+  "diagnostics.invalid_directory": "Invalid diagnostic directory",
+  "diagnostics.unknown_content": "Unknown diagnostic directory content",
+  "diagnostics.invalid_metadata": "Invalid diagnostic metadata",
+  "diagnostics.unrecognized_metadata": "Unrecognized diagnostic metadata"
+}

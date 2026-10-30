@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/zhYou/go-cli-starter/internal/base/paths"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,7 +24,7 @@ func invokeContext(t *testing.T, ctx context.Context, args ...string) (int, stri
 	var out, errOut bytes.Buffer
 	code := Run(ctx, args, Options{
 		Name: "testcli", Version: "v1.2.3", Commit: "abc123", Date: "2026-10-28",
-		Out: &out, ErrOut: &errOut, ConfigDir: t.TempDir(),
+		Out: &out, ErrOut: &errOut, ConfigDir: t.TempDir(), Directories: &paths.Directories{State: t.TempDir()},
 		LookupEnv: func(string) (string, bool) { return "", false },
 	})
 	return code, out.String(), errOut.String()
@@ -132,7 +133,7 @@ func TestDebugLogsDoNotPolluteJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, out, errOut := invoke(t, "greet", "--name", "Codex", "--json", "--log-level", "debug", "--config", path)
-	if code != 0 || !json.Valid([]byte(out)) || !strings.Contains(errOut, "DEBUG") {
+	if code != 0 || !json.Valid([]byte(out)) || !strings.Contains(errOut, `"level":"debug"`) {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, out, errOut)
 	}
 }
@@ -181,7 +182,7 @@ func TestVersionJSON(t *testing.T) {
 
 func TestSchemaReflectsRegisteredCommands(t *testing.T) {
 	var out bytes.Buffer
-	root := NewRoot(Options{Name: "testcli", Out: &out})
+	root := metadataRoot(Options{Name: "testcli", Out: &out})
 	extra := &cobra.Command{Use: "extra", Short: "新增的命令"}
 	extra.Flags().String("token", "", "示例选项")
 	if err := extra.MarkFlagRequired("token"); err != nil {
@@ -226,10 +227,13 @@ func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("output u
 func TestOutputFailureIsRuntimeError(t *testing.T) {
 	var errOut bytes.Buffer
 	code := Run(context.Background(), []string{"greet", "--name", "x"}, Options{
-		Name: "testcli", Out: failingWriter{}, ErrOut: &errOut, ConfigDir: t.TempDir(),
+		Name: "testcli", Out: failingWriter{}, ErrOut: &errOut, ConfigDir: t.TempDir(), Directories: &paths.Directories{State: t.TempDir()},
 		LookupEnv: func(string) (string, bool) { return "", false },
 	})
 	if code != 1 || !strings.Contains(errOut.String(), "output unavailable") {
 		t.Fatalf("code=%d stderr=%q", code, errOut.String())
 	}
 }
+
+// metadataRoot 仅用于无业务执行的命令元数据测试。业务测试统一通过 Run 托管资源。
+func metadataRoot(opts Options) *cobra.Command { root, _ := buildRoot(defaults(opts)); return root }

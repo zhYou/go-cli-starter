@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 	"github.com/zhYou/go-cli-starter/internal/app/config"
+	"github.com/zhYou/go-cli-starter/internal/base/paths"
 	"os"
 	"path/filepath"
 	"strings"
@@ -56,7 +57,7 @@ func TestLanguageScanRespectsFlagValuesAndSeparator(t *testing.T) {
 func TestRequiredAndGroupsBeforeConfiguration(t *testing.T) {
 	for _, group := range []bool{false, true} {
 		count := 0
-		root := NewRoot(Options{Out: &bytes.Buffer{}, ErrOut: &bytes.Buffer{}, Dependencies: &Dependencies{
+		root := metadataRoot(Options{Out: &bytes.Buffer{}, ErrOut: &bytes.Buffer{}, Dependencies: &Dependencies{
 			LoadConfig: func(config.Options) (config.Config, error) { count++; return config.Config{}, nil },
 		}})
 		cmd := &cobra.Command{Use: "extra", RunE: func(*cobra.Command, []string) error { count++; return nil }}
@@ -90,7 +91,7 @@ func TestLanguagePrecedenceAndIsolation(t *testing.T) {
 				args = append(args, "--lang", "zh")
 				want = "你好，Ada！"
 			}
-			code := Run(context.Background(), args, Options{Name: "sample", ConfigDir: t.TempDir(), Out: &out, ErrOut: &stderr, LookupEnv: func(k string) (string, bool) { return lang, k == "SAMPLE_LANG" }})
+			code := Run(context.Background(), args, Options{Name: "sample", ConfigDir: t.TempDir(), Directories: &paths.Directories{State: t.TempDir()}, Out: &out, ErrOut: &stderr, LookupEnv: func(k string) (string, bool) { return lang, k == "SAMPLE_LANG" }})
 			require.Zero(t, code, stderr.String())
 			require.Contains(t, out.String(), want)
 		})
@@ -102,7 +103,7 @@ func TestLanguagePrecedenceAndIsolation(t *testing.T) {
 	require.Contains(t, errOut, "de")
 }
 func TestMetadataLanguageScanForNewFlags(t *testing.T) {
-	root := NewRoot(Options{})
+	root := metadataRoot(Options{})
 	cmd := &cobra.Command{Use: "extra"}
 	cmd.Flags().StringP("source", "s", "", "来源")
 	root.AddCommand(cmd)
@@ -189,7 +190,7 @@ func TestLanguageSelectionMatchesTargetFlagMetadata(t *testing.T) {
 		{"分隔符", []string{"-s", "value", "extra", "--", "--lang=en"}, "value", "zh-CN", false, []string{"--lang=en"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			root := NewRoot(Options{Out: &bytes.Buffer{}, ErrOut: &bytes.Buffer{}})
+			root := metadataRoot(Options{Out: &bytes.Buffer{}, ErrOut: &bytes.Buffer{}})
 			var source string
 			var toggle bool
 			var positional []string

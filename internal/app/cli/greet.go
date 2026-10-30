@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/zhYou/go-cli-starter/internal/app/greeting"
-	"go.uber.org/zap"
+	"go.opentelemetry.io/otel/codes"
 	"io"
 )
 
@@ -21,11 +21,15 @@ func newGreetCommand(opts Options, call *invocation) *cobra.Command {
 			return (greeting.Options{Name: name, Localizer: call.localizer}).Validate(cmd.Context(), call.deps.Validator)
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			result, err := call.deps.Greet(cmd.Context(), greeting.Options{Name: name, Localizer: call.localizer})
+			ctx, span := call.session.Tracer.Start(cmd.Context(), "greeting.run")
+			defer span.End()
+			result, err := call.deps.Greet(ctx, greeting.Options{Name: name, Localizer: call.localizer})
 			if err != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, call.localizer.Text("session.failed", nil))
 				return err
 			}
-			call.logger.Debug(call.localizer.Text("cli.greet_log", nil), zap.String("name", name))
+			call.logger.WithContext(ctx).Debugw(call.localizer.Text("cli.greet_log", nil), "event", "greeting_finished")
 			if call.asJSON {
 				return writeJSON(cmd.OutOrStdout(), result)
 			}

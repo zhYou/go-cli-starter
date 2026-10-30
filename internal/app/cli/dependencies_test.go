@@ -8,8 +8,6 @@ import (
 	"github.com/zhYou/go-cli-starter/internal/app/config"
 	"github.com/zhYou/go-cli-starter/internal/app/greeting"
 	"github.com/zhYou/go-cli-starter/internal/base/logging"
-	"go.uber.org/zap"
-	"io"
 	"testing"
 )
 
@@ -22,15 +20,19 @@ func TestTwoInvocationsDoNotShareDependencies(t *testing.T) {
 			if o.LogLevel != nil {
 				level = *o.LogLevel
 			}
-			return config.Config{Logging: logging.Config{Level: level, Output: "stderr"}}, nil
+			cfg := config.Defaults()
+			cfg.Logging = logging.Config{Level: level, Output: "stderr"}
+			return cfg, nil
 		}, Greet: func(_ context.Context, o greeting.Options) (greeting.Result, error) {
 			return greeting.Result{Message: label + o.Name}, nil
-		}, NewLogger: func(w io.Writer, l string) (*zap.Logger, error) { levels = append(levels, l); return logging.New(w, l) }}
-		root := NewRoot(Options{Out: out, Dependencies: &deps})
+		}, NewLogger: func(info logging.RunInfo, o logging.Options, warn func(error)) *logging.Logger {
+			levels = append(levels, o.Config.Level)
+			return logging.New(info, o, warn)
+		}}
+		opts := Options{Out: out, ErrOut: &bytes.Buffer{}, Dependencies: &deps}
 		require.Nil(t, deps.Validator)
 		return &invocationFixture{run: func(args ...string) {
-			root.SetArgs(args)
-			require.NoError(t, root.ExecuteContext(context.Background()))
+			require.Zero(t, Run(context.Background(), args, opts))
 		}}
 	}
 	a := makeRoot("甲", &outA)
