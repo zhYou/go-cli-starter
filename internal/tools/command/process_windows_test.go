@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 	"unsafe"
@@ -54,6 +55,14 @@ func TestWindowsHelper(t *testing.T) {
 			}
 			_ = child.Process.Release()
 			time.Sleep(10 * time.Millisecond)
+		}
+	case "incompatible-host-job":
+		if err := json.NewEncoder(os.Stdout).Encode(windowsIncompatibleHostJob(args[1])); err != nil {
+			os.Exit(9)
+		}
+	case "marker-exit":
+		if err := os.WriteFile(args[1], []byte("executed"), 0600); err != nil {
+			os.Exit(9)
 		}
 	case "marker":
 		_ = os.WriteFile(args[1], []byte("executed"), 0600)
@@ -412,5 +421,115 @@ func TestWindowsResumeFailureCleansSuspendedProcess(t *testing.T) {
 	}
 	if _, err = os.Stat(marker); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("Resume失败后执行业务: %v", err)
+	}
+}
+
+// 夹具结果明确区分受限宿主建立失败和正式后端拒绝创建，避免未覆盖被当成成功。
+type windowsHostJobResult struct {
+	Stage        string `json:"stage"`
+	SetupError   string `json:"setup_error"`
+	RunError     string `json:"run_error"`
+	NativeError  uint32 `json:"native_error"`
+	HasExitState bool   `json:"has_exit_state"`
+	Canceled     bool   `json:"canceled"`
+	Active       uint32 `json:"active"`
+	QueryError   string `json:"query_error"`
+}
+
+// 只由独立 helper 调用，主 go test 进程永远不加入此 Job。
+// https://learn.microsoft.com/windows/win32/procthread/nested-jobs
+func windowsIncompatibleHostJob(marker string) (result windowsHostJobResult) {
+	result.Stage = "create_host_job"
+	host, err := windows.CreateJobObject(nil, nil)
+	if err != nil {
+		result.SetupError = err.Error()
+		return result
+	}
+	assigned := false
+	defer func() {
+		if !assigned {
+			_ = windows.CloseHandle(host)
+		}
+	}()
+	// 不启用 SILENT_BREAKAWAY：正常创建必须继承宿主。
+	// 显式允许 BREAKAWAY 是验收陷阱：错误后端若偷偷设置该标志，就会执行业务而被 marker 捕获。
+	limits := windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION{}
+	limits.BasicLimitInformation.LimitFlags = windows.JOB_OBJECT_LIMIT_BREAKAWAY_OK | windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+	result.Stage = "set_breakaway_trap"
+	if _, err = windows.SetInformationJobObject(host, windows.JobObjectExtendedLimitInformation, uintptr(unsafe.Pointer(&limits)), uint32(unsafe.Sizeof(limits))); err != nil {
+		result.SetupError = err.Error()
+		return result
+	}
+	restrictions := windows.JOBOBJECT_BASIC_UI_RESTRICTIONS{UIRestrictionsClass: windows.JOB_OBJECT_UILIMIT_HANDLES}
+	result.Stage = "set_ui_restrictions"
+	if _, err = windows.SetInformationJobObject(host, windows.JobObjectBasicUIRestrictions, uintptr(unsafe.Pointer(&restrictions)), uint32(unsafe.Sizeof(restrictions))); err != nil {
+		result.SetupError = err.Error()
+		return result
+	}
+	result.Stage = "assign_helper_to_host"
+	if err = windows.AssignProcessToJobObject(host, windows.CurrentProcess()); err != nil {
+		result.SetupError = err.Error()
+		return result
+	}
+	// 归属成功后由 helper 进程寿命持有 Job 句柄：先序列化结果，再 os.Exit。
+	// 提前 Close 会终止当前 helper；进程退出或父测试超时终止时，内核关闭句柄并清理遗留后代。
+	assigned = true
+	// 两个 Job 中任一个设置 UI 限制就不允许嵌套；创建时绑定自有 Job 应在恢复业务前失败。
+	executable, err := os.Executable()
+	if err != nil {
+		result.SetupError = err.Error()
+		return result
+	}
+	result.Stage = "run_backend"
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	err = Run(ctx, Invocation{Program: executable, Args: []string{"-test.run=^TestWindowsHelper$", "--", "marker-exit", marker}}, Execution{Dir: filepath.Dir(marker), Env: os.Environ()})
+	if err != nil {
+		result.RunError = err.Error()
+	}
+	if native, ok := errors.AsType[syscall.Errno](err); ok {
+		result.NativeError = uint32(native)
+	}
+	var exit *exec.ExitError
+	result.HasExitState = errors.As(err, &exit)
+	result.Canceled = errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+	result.Active, err = jobActiveProcesses(host)
+	if err != nil {
+		result.QueryError = err.Error()
+	}
+	result.Stage = "complete"
+	return result
+}
+
+func TestWindowsIncompatibleHostJobRejectsBeforeBusiness(t *testing.T) {
+	marker := filepath.Join(t.TempDir(), "business-marker")
+	call, options := windowsHelper(t, "incompatible-host-job", marker)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	// 使用原生独立 helper 构造宿主；不经过被测后端，不改主测试进程的 Job 归属。
+	fixture := exec.CommandContext(ctx, call.Program, call.Args...)
+	fixture.Dir, fixture.Env = options.Dir, options.Env
+	fixture.WaitDelay = DefaultWaitDelay
+	output, err := fixture.CombinedOutput()
+	if err != nil {
+		t.Fatalf("受限宿主夹具未完成，未覆盖该场景: %v；%s", err, output)
+	}
+	var result windowsHostJobResult
+	if err = json.Unmarshal(output, &result); err != nil {
+		t.Fatalf("夹具结果无效，未覆盖该场景: %v；%s", err, output)
+	}
+	if result.SetupError != "" {
+		// CI可能已把helper放入外层Job，导致Windows禁止再加入带UI限制的Job。
+		// 这种环境不能证明拒绝路径；明确失败，不Skip，更不能把准备失败当作被测后端成功。
+		t.Fatalf("未覆盖不兼容宿主Job：夹具在 %s 阶段失败，helper可能已继承外层Job限制: %s", result.Stage, result.SetupError)
+	}
+	if result.Stage != "complete" || result.RunError == "" || result.NativeError != uint32(windows.ERROR_ACCESS_DENIED) || result.HasExitState || result.Canceled {
+		t.Fatalf("未在创建时拒绝不兼容宿主Job: %+v", result)
+	}
+	if result.QueryError != "" || result.Active != 1 {
+		t.Fatalf("宿主除helper外仍有活动进程: %+v", result)
+	}
+	if _, err = os.Stat(marker); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("不兼容宿主中执行了业务，疑似无Job或breakaway降级: %v", err)
 	}
 }
