@@ -2,10 +2,11 @@ package cli
 
 import (
 	"fmt"
+	"io"
+
 	"github.com/spf13/cobra"
 	"github.com/zhYou/go-cli-starter/internal/app/greeting"
 	"go.opentelemetry.io/otel/codes"
-	"io"
 )
 
 func newGreetCommand(opts Options, call *invocation) *cobra.Command {
@@ -36,8 +37,8 @@ func newGreetCommand(opts Options, call *invocation) *cobra.Command {
 			return writeText(cmd.OutOrStdout(), func(w io.Writer) error { _, err := fmt.Fprintln(w, result.Message); return err })
 		},
 	}
-	greet.Flags().StringVar(&name, "name", "", "问候对象的姓名")
-	if err := greet.MarkFlagRequired("name"); err != nil {
+	greet.Flags().StringVar(&name, flagName, "", "问候对象的姓名")
+	if err := greet.MarkFlagRequired(flagName); err != nil {
 		panic(err)
 	}
 

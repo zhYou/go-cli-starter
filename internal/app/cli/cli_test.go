@@ -5,11 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/zhYou/go-cli-starter/internal/base/paths"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/zhYou/go-cli-starter/internal/base/paths"
 
 	"github.com/spf13/cobra"
 )

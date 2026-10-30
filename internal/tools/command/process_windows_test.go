@@ -46,6 +46,7 @@ func TestWindowsHelper(t *testing.T) {
 		executable, _ := os.Executable()
 		deadline := time.Now().Add(5 * time.Second)
 		for time.Now().Before(deadline) {
+			//nolint:gosec // G204：辅助进程只执行自身测试二进制；路径来自当前测试生成的临时目录。
 			child := exec.Command(executable, "-test.run=^TestHelperProcess$", "--", "heartbeat", args[1])
 			child.Env = os.Environ()
 			child.Stdout = os.Stdout
@@ -61,10 +62,12 @@ func TestWindowsHelper(t *testing.T) {
 			os.Exit(9)
 		}
 	case "marker-exit":
+		//nolint:gosec // G703：辅助进程只执行自身测试二进制；路径来自当前测试生成的临时目录。
 		if err := os.WriteFile(args[1], []byte("executed"), 0600); err != nil {
 			os.Exit(9)
 		}
 	case "marker":
+		//nolint:gosec // G703：辅助进程只执行自身测试二进制；路径来自当前测试生成的临时目录。
 		_ = os.WriteFile(args[1], []byte("executed"), 0600)
 		time.Sleep(5 * time.Second)
 	case "handle":
@@ -165,8 +168,10 @@ func TestWindowsCancelAfterResumeAndDuringSpawn(t *testing.T) {
 			if !errors.Is(err, context.Canceled) || !errors.As(err, &exit) {
 				t.Fatalf("取消退出错误: %v", err)
 			}
+			//nolint:gosec // G304：辅助进程只执行自身测试二进制；路径来自当前测试生成的临时目录。
 			before, _ := os.ReadFile(marker)
 			time.Sleep(80 * time.Millisecond)
+			//nolint:gosec // G304：辅助进程只执行自身测试二进制；路径来自当前测试生成的临时目录。
 			after, _ := os.ReadFile(marker)
 			if !bytes.Equal(before, after) {
 				t.Fatal("取消后后代继续写入")
@@ -252,6 +257,7 @@ func processHandleCount(t *testing.T) uint32 {
 	t.Helper()
 	var count uint32
 	proc := windows.NewLazySystemDLL("kernel32.dll").NewProc("GetProcessHandleCount")
+	//nolint:gosec // G103：测试调用同步 Win32 API，传入固定原生布局与局部对象的有效地址。
 	ok, _, err := proc.Call(uintptr(windows.CurrentProcess()), uintptr(unsafe.Pointer(&count)))
 	if ok == 0 {
 		t.Fatal(err)
@@ -318,6 +324,7 @@ func TestWindowsUnexpectedSuspendCountStopsBeforeBusiness(t *testing.T) {
 	// 真正增加挂起计数，验证 Resume 返回2时不会误报成功或遗留挂起进程。
 	proc := windows.NewLazySystemDLL("kernel32.dll").NewProc("SuspendThread")
 	previous, _, suspendErr := proc.Call(uintptr(child.info.Thread))
+	//nolint:gosec // G115：Win32 返回 DWORD；uintptr 来自系统 ABI，低 32 位保留文档规定的结果或错误码。
 	if uint32(previous) == 0xffffffff {
 		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
@@ -456,12 +463,14 @@ func windowsIncompatibleHostJob(marker string) (result windowsHostJobResult) {
 	limits := windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION{}
 	limits.BasicLimitInformation.LimitFlags = windows.JOB_OBJECT_LIMIT_BREAKAWAY_OK | windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
 	result.Stage = "set_breakaway_trap"
+	//nolint:gosec // G103：测试调用同步 Win32 API，传入固定原生布局与局部对象的有效地址。
 	if _, err = windows.SetInformationJobObject(host, windows.JobObjectExtendedLimitInformation, uintptr(unsafe.Pointer(&limits)), uint32(unsafe.Sizeof(limits))); err != nil {
 		result.SetupError = err.Error()
 		return result
 	}
 	restrictions := windows.JOBOBJECT_BASIC_UI_RESTRICTIONS{UIRestrictionsClass: windows.JOB_OBJECT_UILIMIT_HANDLES}
 	result.Stage = "set_ui_restrictions"
+	//nolint:gosec // G103：测试调用同步 Win32 API，传入固定原生布局与局部对象的有效地址。
 	if _, err = windows.SetInformationJobObject(host, windows.JobObjectBasicUIRestrictions, uintptr(unsafe.Pointer(&restrictions)), uint32(unsafe.Sizeof(restrictions))); err != nil {
 		result.SetupError = err.Error()
 		return result
@@ -488,6 +497,7 @@ func windowsIncompatibleHostJob(marker string) (result windowsHostJobResult) {
 		result.RunError = err.Error()
 	}
 	if native, ok := errors.AsType[syscall.Errno](err); ok {
+		//nolint:gosec // G115：Win32 返回 DWORD；uintptr 来自系统 ABI，低 32 位保留文档规定的结果或错误码。
 		result.NativeError = uint32(native)
 	}
 	var exit *exec.ExitError
@@ -507,6 +517,7 @@ func TestWindowsIncompatibleHostJobRejectsBeforeBusiness(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 	// 使用原生独立 helper 构造宿主；不经过被测后端，不改主测试进程的 Job 归属。
+	//nolint:gosec // G204：辅助进程只执行自身测试二进制；路径来自当前测试生成的临时目录。
 	fixture := exec.CommandContext(ctx, call.Program, call.Args...)
 	fixture.Dir, fixture.Env = options.Dir, options.Env
 	fixture.WaitDelay = DefaultWaitDelay

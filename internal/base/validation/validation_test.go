@@ -3,9 +3,10 @@ package validation
 import (
 	"context"
 	"errors"
+	"testing"
+
 	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestValidationChineseFields(t *testing.T) {

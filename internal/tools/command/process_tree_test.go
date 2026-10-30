@@ -47,11 +47,13 @@ func TestOwnedDescendantsStopOnEveryReturn(t *testing.T) {
 				if outcome == "wait" && !errors.Is(r.Err, context.Canceled) {
 					t.Fatal(r.Err)
 				}
+				//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 				before, err := os.ReadFile(heartbeat)
 				if err != nil {
 					t.Fatal(err)
 				}
 				time.Sleep(60 * time.Millisecond)
+				//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 				after, err := os.ReadFile(heartbeat)
 				if err != nil {
 					t.Fatal(err)
@@ -67,6 +69,7 @@ func TestCleanupDoesNotKillSibling(t *testing.T) {
 	sibling, opts := helper(t, "heartbeat")
 	path := filepath.Join(opts.Dir, "sibling")
 	sibling.Args = append(sibling.Args, path)
+	//nolint:gosec // G204：测试只运行当前测试二进制或固定 Git/Go 命令，参数来自临时 fixture。
 	process := exec.Command(sibling.Program, sibling.Args...)
 	process.Env = opts.Env
 	if err := process.Start(); err != nil {
@@ -81,11 +84,13 @@ func TestCleanupDoesNotKillSibling(t *testing.T) {
 	}
 	call, options := helper(t, "exit")
 	_ = Run(t.Context(), call, options)
+	//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 	before, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(60 * time.Millisecond)
+	//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 	after, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -103,11 +108,13 @@ func TestRootExitsBeforeGrandchildHoldingPipes(t *testing.T) {
 	if r.Err != nil && !errors.Is(r.Err, exec.ErrWaitDelay) {
 		t.Fatal(r.Err)
 	}
+	//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 	before, err := os.ReadFile(heartbeat)
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(60 * time.Millisecond)
+	//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 	after, err := os.ReadFile(heartbeat)
 	if err != nil {
 		t.Fatal(err)

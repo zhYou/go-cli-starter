@@ -5,12 +5,14 @@ import (
 	"encoding"
 	"encoding/json"
 	"fmt"
-	"github.com/google/jsonschema-go/jsonschema"
 	"reflect"
 	"slices"
 	"strings"
+
+	"github.com/google/jsonschema-go/jsonschema"
 )
 
+// Draft 是公开结果结构采用的 JSON Schema 方言。
 const Draft = "https://json-schema.org/draft/2020-12/schema"
 
 // FromType 从 Go 类型推导结果结构；显式覆盖用于特殊编码，禁止加载外部引用。

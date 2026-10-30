@@ -3,15 +3,16 @@ package cli
 import (
 	"bytes"
 	"context"
-	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/require"
-	"github.com/zhYou/go-cli-starter/internal/app/config"
-	"github.com/zhYou/go-cli-starter/internal/base/paths"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/require"
+	"github.com/zhYou/go-cli-starter/internal/app/config"
+	"github.com/zhYou/go-cli-starter/internal/base/paths"
 )
 
 func TestEnglishInvocation(t *testing.T) {

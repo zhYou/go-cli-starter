@@ -1,21 +1,26 @@
+// Package contract 提供开发期机器契约比较和兼容记录检查。
 package contract
 
 import (
 	"encoding/json"
 	"fmt"
-	"golang.org/x/mod/semver"
 	"reflect"
 	"slices"
 	"sort"
 	"strings"
+
+	"golang.org/x/mod/semver"
 )
 
+// Change 描述两个机器契约之间的一项路径差异。
 type Change struct {
 	Path   string          `json:"path"`
 	Kind   string          `json:"kind"`
 	Before json.RawMessage `json:"before,omitempty"`
 	After  json.RawMessage `json:"after,omitempty"`
 }
+
+// Record 记录机器契约变更的兼容性和迁移说明。
 type Record struct {
 	ID              string   `json:"id"`
 	Compatibility   string   `json:"compatibility"`
@@ -26,6 +31,7 @@ type Record struct {
 	Migration       string   `json:"migration"`
 }
 
+// Normalize 移除人类说明并规范化机器契约结构。
 func Normalize(data []byte) ([]byte, error) {
 	var value any
 	if err := json.Unmarshal(data, &value); err != nil {
@@ -51,7 +57,7 @@ func normalizeCommand(command map[string]any) any {
 	out := map[string]any{}
 	for key, value := range command {
 		switch key {
-		case "description", "examples", "use":
+		case descriptionField, "examples", "use":
 			continue
 		case "commands":
 			out[key] = normalizeNamed(value, "path", normalizeCommand)
@@ -59,7 +65,7 @@ func normalizeCommand(command map[string]any) any {
 			out[key] = normalizeNamed(value, "name", func(flag map[string]any) any {
 				copy := map[string]any{}
 				for key, value := range flag {
-					if key != "description" {
+					if key != descriptionField {
 						copy[key] = value
 					}
 				}
@@ -116,7 +122,7 @@ func normalizeSchema(value any) any {
 	out := map[string]any{}
 	for key, value := range schema {
 		switch key {
-		case "description", "examples":
+		case descriptionField, "examples":
 			continue
 		case "properties", "patternProperties", "$defs", "definitions", "dependentSchemas", "dependencies":
 			if children, ok := value.(map[string]any); ok {
@@ -147,6 +153,7 @@ func normalizeSchema(value any) any {
 	return out
 }
 
+// Diff 比较规范化契约，按路径返回差异。
 func Diff(before, after []byte) ([]Change, error) {
 	var a, b any
 	if err := json.Unmarshal(before, &a); err != nil {
@@ -185,14 +192,14 @@ func Diff(before, after []byte) ([]Change, error) {
 		if !oldOK {
 			kind = "added"
 		} else if !newOK || strings.Contains(path, "/exit_codes/") || strings.HasSuffix(path, "/exit_codes") || strings.HasSuffix(path, "/type") || strings.HasSuffix(path, "/types") || strings.Contains(path, "/results/") || strings.HasSuffix(path, "/required") {
-			kind = "breaking"
+			kind = breakingChange
 		}
 		if !oldOK {
 			if strings.HasSuffix(path, "/required") {
-				kind = "breaking"
+				kind = breakingChange
 			}
 			if object, ok := new.(map[string]any); ok && object["required"] == true {
-				kind = "breaking"
+				kind = breakingChange
 			}
 		}
 		prev, _ := json.Marshal(old)
@@ -202,6 +209,8 @@ func Diff(before, after []byte) ([]Change, error) {
 	visit("", a, b, true, true)
 	return changes, nil
 }
+
+// ValidateRecords 检查每项契约差异是否有有效的兼容变更记录。
 func ValidateRecords(changes []Change, records []Record, initial bool) error {
 	if initial {
 		found := false
@@ -220,7 +229,7 @@ func ValidateRecords(changes []Change, records []Record, initial bool) error {
 			if r.ID == "" || r.Summary == "" || r.Migration == "" || !semver.IsValid(r.TargetVersion) {
 				return fmt.Errorf("兼容变更记录字段不完整：%s", r.ID)
 			}
-			if r.Compatibility != "compatible" && r.Compatibility != "breaking" && r.Compatibility != "review-required" {
+			if r.Compatibility != "compatible" && r.Compatibility != breakingCompatibility && r.Compatibility != "review-required" {
 				return fmt.Errorf("兼容性声明无效：%s", r.ID)
 			}
 			if r.PreviousVersion != "" && (!semver.IsValid(r.PreviousVersion) || semver.Compare(r.TargetVersion, r.PreviousVersion) <= 0) {
@@ -232,8 +241,8 @@ func ValidateRecords(changes []Change, records []Record, initial bool) error {
 			if !matches {
 				continue
 			}
-			if change.Kind == "breaking" {
-				if r.Compatibility != "breaking" {
+			if change.Kind == breakingChange {
+				if r.Compatibility != breakingCompatibility {
 					return fmt.Errorf("潜在破坏变更 %s 不能声明为兼容", change.Path)
 				}
 				if r.PreviousVersion == "" {

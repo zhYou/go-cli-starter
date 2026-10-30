@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"go.opentelemetry.io/otel/trace"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -12,6 +11,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/gofrs/flock"
 	"github.com/stretchr/testify/require"

@@ -16,6 +16,7 @@ func newWindowsJob() (windows.Handle, error) {
 	limits := windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION{}
 	// 不允许 breakaway；nil SECURITY_ATTRIBUTES 保证 Job 句柄不可继承。
 	limits.BasicLimitInformation.LimitFlags = windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+	//nolint:gosec // G103：同步 Win32 Job API 按固定原生结构大小访问栈对象，不跨调用保存指针。
 	_, err = windows.SetInformationJobObject(job, windows.JobObjectExtendedLimitInformation, uintptr(unsafe.Pointer(&limits)), uint32(unsafe.Sizeof(limits)))
 	if err != nil {
 		_ = windows.CloseHandle(job)
@@ -34,6 +35,7 @@ type jobAccounting struct {
 
 func jobActiveProcesses(job windows.Handle) (uint32, error) {
 	var info jobAccounting
+	//nolint:gosec // G103：同步 Win32 Job API 按固定原生结构大小访问栈对象，不跨调用保存指针。
 	err := windows.QueryInformationJobObject(job, windows.JobObjectBasicAccountingInformation, uintptr(unsafe.Pointer(&info)), uint32(unsafe.Sizeof(info)), nil)
 	return info.ActiveProcesses, err
 }

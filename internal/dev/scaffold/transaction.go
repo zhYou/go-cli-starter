@@ -8,13 +8,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/spf13/afero"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/spf13/afero"
 )
 
 const journalDir = ".template-init"
@@ -46,10 +47,10 @@ func (i *Initializer) save(root string, tx transaction) error {
 	if err != nil {
 		return err
 	}
-	return i.atomicWrite(change{filepath.Join(root, journalDir, "journal.json"), data, 0600})
+	return i.atomicWrite(change{filepath.Join(root, journalDir, journalFile), data, 0600})
 }
 func (i *Initializer) prepare(root, module, name string, changes []change, move *commandMove) (transaction, error) {
-	tx := transaction{Move: move, FormatVersion: 2, Module: module, Name: name, OriginalModule: TemplateModule, OriginalName: TemplateName, Phase: "prepared"}
+	tx := transaction{Move: move, FormatVersion: 2, Module: module, Name: name, OriginalModule: TemplateModule, OriginalName: TemplateName, Phase: phasePrepared}
 	if err := i.preflightCommandMove(root, move); err != nil {
 		return tx, err
 	}
@@ -101,23 +102,23 @@ func (i *Initializer) validateTransaction(root string, tx transaction) error {
 	if tx.FormatVersion == 1 {
 		return errors.New("请使用原版本工具恢复格式 1 的初始化日志，已保留现场")
 	}
-	if tx.FormatVersion != 2 || tx.OriginalModule != TemplateModule || tx.OriginalName != TemplateName || len(tx.Files) == 0 || !slices.Contains([]string{"prepared", "applying", "committed"}, tx.Phase) {
+	if tx.FormatVersion != 2 || tx.OriginalModule != TemplateModule || tx.OriginalName != TemplateName || len(tx.Files) == 0 || !slices.Contains([]string{phasePrepared, phaseApplying, phaseCommitted}, tx.Phase) {
 		return errors.New("恢复记录格式或阶段无效")
 	}
-	if tx.RollbackComplete && tx.Phase != "prepared" {
+	if tx.RollbackComplete && tx.Phase != phasePrepared {
 		return errors.New("回滚终态与恢复阶段矛盾")
 	}
 	if _, err := i.commandLocation(root, tx); err != nil {
 		return err
 	}
-	terminal := tx.Phase == "committed" || tx.RollbackComplete
+	terminal := tx.Phase == phaseCommitted || tx.RollbackComplete
 	seen := map[string]bool{}
 	for index, file := range tx.Files {
-		if !file.Existed && (file.Path != ".template-origin.json" || file.Before != digest(nil)) {
+		if !file.Existed && (file.Path != originFile || file.Before != digest(nil)) {
 			return errors.New("恢复记录的原文件存在性与路径或内容矛盾")
 		}
 
-		if !slices.Contains(managedFiles, file.Path) && file.Path != ".template-origin.json" {
+		if !slices.Contains(managedFiles, file.Path) && file.Path != originFile {
 			return fmt.Errorf("恢复路径不在受管清单：%q", file.Path)
 		}
 		if seen[file.Path] || file.Mode&^os.FileMode(0777) != 0 {
@@ -170,7 +171,7 @@ func (i *Initializer) validateTransaction(root string, tx transaction) error {
 		}
 		before := exists == file.Existed && digest(data) == file.Before
 		after := exists && digest(data) == file.After
-		if !before && !after || tx.Phase == "prepared" && !before || tx.Phase == "committed" && !after {
+		if !before && !after || tx.Phase == phasePrepared && !before || tx.Phase == phaseCommitted && !after {
 			return fmt.Errorf("目标文件已被修改，保留恢复现场：%s", file.Path)
 		}
 	}
@@ -225,7 +226,7 @@ func (i *Initializer) rollback(root string, tx transaction) error {
 			}
 		}
 	}
-	tx.Phase = "prepared"
+	tx.Phase = phasePrepared
 	tx.RollbackComplete = true
 	if err := i.save(root, tx); err != nil {
 		return err
@@ -272,7 +273,7 @@ func (i *Initializer) recover(root, module, name string) error {
 	if err := i.validateTransaction(root, tx); err != nil {
 		return err
 	}
-	if tx.Phase == "committed" || tx.RollbackComplete {
+	if tx.Phase == phaseCommitted || tx.RollbackComplete {
 		return i.cleanup(root, tx)
 	}
 	return i.rollback(root, tx)
@@ -288,7 +289,7 @@ func (i *Initializer) apply(ctx context.Context, root, module, name string, chan
 	if err != nil {
 		return nil, errors.Join(err, i.FS.RemoveAll(filepath.Join(root, journalDir)))
 	}
-	tx.Phase = "applying"
+	tx.Phase = phaseApplying
 	if err := i.save(root, tx); err != nil {
 		return nil, errors.Join(err, i.rollback(root, tx))
 	}
@@ -334,9 +335,9 @@ func (i *Initializer) apply(ctx context.Context, root, module, name string, chan
 	if err := i.validateTransaction(root, tx); err != nil {
 		return nil, err
 	}
-	tx.Phase = "committed"
+	tx.Phase = phaseCommitted
 	if err := i.save(root, tx); err != nil {
-		tx.Phase = "applying"
+		tx.Phase = phaseApplying
 		return fail(err)
 	}
 	if err := i.cleanup(root, tx); err != nil {
@@ -397,7 +398,7 @@ func (i *Initializer) cleanup(root string, tx transaction) error {
 		return err
 	}
 	for _, entry := range entries {
-		if entry.Name() == "journal.json" {
+		if entry.Name() == journalFile {
 			continue
 		}
 		// 崩溃可能留下写 journal 的临时文件；不删除其他未知内容。
@@ -408,7 +409,7 @@ func (i *Initializer) cleanup(root string, tx transaction) error {
 			return err
 		}
 	}
-	if err := i.FS.Remove(filepath.Join(dir, "journal.json")); err != nil && !errors.Is(err, os.ErrNotExist) {
+	if err := i.FS.Remove(filepath.Join(dir, journalFile)); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 	// 此处若中断，只留下空目录；重试可安全移除。

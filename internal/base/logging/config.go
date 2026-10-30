@@ -6,4 +6,5 @@ type Config struct {
 	Output string `mapstructure:"output" validate:"oneof=file stderr none"`
 }
 
+// Defaults 返回本模块的默认配置。
 func Defaults() Config { return Config{Level: "info", Output: "file"} }

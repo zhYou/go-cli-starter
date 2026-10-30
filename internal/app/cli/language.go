@@ -1,6 +1,11 @@
 package cli
 
 import (
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/zhYou/go-cli-starter/internal/app/config"
@@ -14,10 +19,6 @@ import (
 	"github.com/zhYou/go-cli-starter/internal/base/telemetry"
 	"github.com/zhYou/go-cli-starter/internal/base/validation"
 	"github.com/zhYou/go-cli-starter/internal/tools/command"
-	"os"
-	"strconv"
-	"strings"
-	"sync"
 )
 
 var loadBundle = sync.OnceValues(func() (*messages.Bundle, error) {
@@ -33,8 +34,8 @@ func newLocalizer(lang string) *messages.Localizer {
 }
 func canonicalLanguage(value string) (string, bool) {
 	switch value {
-	case "zh", "zh-CN":
-		return "zh-CN", true
+	case "zh", languageChinese:
+		return languageChinese, true
 	case "en":
 		return "en", true
 	default:
@@ -60,7 +61,7 @@ func languageEnvironment(opts Options) string {
 func selectLanguage(root *cobra.Command, args []string, env string) (string, error) {
 	selected := env
 	if selected == "" {
-		selected = "zh-CN"
+		selected = languageChinese
 	}
 	// 与 Execute 使用相同的命令查找，子命令选项也可能位于命令名之前。
 	// Find 不执行选项 Set；查找错误留给实际执行路径处理。
@@ -103,7 +104,7 @@ func selectLanguage(root *cobra.Command, args []string, env string) (string, err
 				i++
 				value = scan[i]
 			}
-			if name == "lang" {
+			if name == flagLanguage {
 				selected = value
 			}
 		} else if strings.HasPrefix(arg, "-") && arg != "-" {
@@ -131,11 +132,11 @@ func selectLanguage(root *cobra.Command, args []string, env string) (string, err
 	if lang, ok := canonicalLanguage(selected); ok {
 		return lang, nil
 	}
-	fallback := "zh-CN"
+	fallback := languageChinese
 	if lang, ok := canonicalLanguage(env); ok {
 		fallback = lang
 	}
-	return fallback, usageProblem("language", fault.Params{"Value": strconv.Quote(selected)})
+	return fallback, usageProblem("language", fault.Params{paramValue: strconv.Quote(selected)})
 }
 
 type languageValue struct {
@@ -148,7 +149,7 @@ func (v *languageValue) Type() string   { return "string" }
 func (v *languageValue) Set(s string) error {
 	lang, ok := canonicalLanguage(s)
 	if !ok {
-		return usageProblem("language", fault.Params{"Value": strconv.Quote(s)})
+		return usageProblem("language", fault.Params{paramValue: strconv.Quote(s)})
 	}
 	v.call.localizer = newLocalizer(lang)
 	localizeTree(v.root, v.call.localizer)
@@ -159,16 +160,16 @@ func localizeTree(root *cobra.Command, l *messages.Localizer) {
 	visit = func(cmd *cobra.Command) {
 		key := cmd.Name()
 		if cmd == root {
-			key = "root"
+			key = commandRoot
 		}
-		ids := map[string]string{"root": "root", "greet": "greet", "help": "help", "schema": "schema", "completion": "completion", "version": "version"}
+		ids := map[string]string{commandRoot: commandRoot, commandGreet: commandGreet, commandHelp: commandHelp, commandSchemaName: commandSchemaName, commandCompletion: commandCompletion, commandVersion: commandVersion}
 		if id, ok := ids[key]; ok {
 			cmd.Short = l.Text("cli."+id, nil)
 		}
-		if key == "greet" || key == "help" || key == "schema" {
+		if key == commandGreet || key == commandHelp || key == commandSchemaName {
 			cmd.Use = l.Text("cli."+key+"_use", nil)
 		}
-		flagIDs := map[string]string{"json": "json", "config": "config", "log-level": "log_level", "lang": "lang", "name": "name", "help": "help_flag", "version": "version_flag"}
+		flagIDs := map[string]string{flagJSON: flagJSON, flagConfig: flagConfig, flagLogLevel: "log_level", flagLanguage: flagLanguage, flagName: flagName, flagHelp: "help_flag", flagVersion: "version_flag"}
 		for _, set := range []*pflag.FlagSet{cmd.Flags(), cmd.PersistentFlags()} {
 			set.VisitAll(func(f *pflag.Flag) {
 				if id, ok := flagIDs[f.Name]; ok {

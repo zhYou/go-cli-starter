@@ -2,10 +2,11 @@ package greeting
 
 import (
 	"context"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/zhYou/go-cli-starter/internal/base/fault"
 	"github.com/zhYou/go-cli-starter/internal/base/validation"
-	"testing"
 )
 
 func TestGreetingDirectCallRejectsWhitespace(t *testing.T) {

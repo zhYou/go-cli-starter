@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/stretchr/testify/require"
 	"io"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestJSONMarshalFailureLeavesOutputEmpty(t *testing.T) {

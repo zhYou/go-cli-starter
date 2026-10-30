@@ -1,3 +1,98 @@
 version: "2"
+
+run:
+  relative-path-mode: gomod
+
 linters:
-  default: standard
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - bodyclose
+    - errorlint
+    - gosec
+    - godoclint
+    - contextcheck
+    - nilnesserr
+    - durationcheck
+    - nolintlint
+    - thelper
+    - usetesting
+    - goconst
+    - depguard
+    - forbidigo
+  exclusions:
+    rules:
+      # GoDoc 约束生产代码；测试名称已描述各自场景。
+      - path: _test\.go$
+        linters:
+          - godoclint
+  settings:
+    goconst:
+      min-len: 3
+      min-occurrences: 3
+      ignore-tests: true
+      ignore-calls: false
+      match-constant: true
+      numbers: false
+      # 同值不同语义可以分别声明常量，不按值强制合并。
+      find-duplicates: false
+    depguard:
+      rules:
+        koanf-boundary:
+          # 仅豁免精确配置加载文件，同名文件与测试不能绕过边界。
+          files:
+            - '$all'
+            - '!${base-path}/internal/app/config/load.go'
+          deny:
+            - pkg: github.com/knadh/koanf/v2$
+              desc: 仅允许登记的配置加载文件引入 koanf
+        zap-boundary:
+          files:
+            - '$all'
+            - '!${base-path}/internal/base/logging/*.go'
+          deny:
+            - pkg: go.uber.org/zap
+              desc: zap 后端与编码仅允许在 logging 包内使用
+        telemetry-boundary:
+          files:
+            - '$all'
+            - '!${base-path}/internal/base/telemetry/*.go'
+          deny:
+            - pkg: go.opentelemetry.io/otel/sdk
+              desc: OTel SDK 生命周期仅允许在 telemetry 包内管理
+            - pkg: go.opentelemetry.io/otel/exporters
+              desc: OTel 出口仅允许在 telemetry 包内创建
+    forbidigo:
+      analyze-types: true
+      forbid:
+        # 覆盖锁定 koanf 的 typed/Must getter、容器导出和逐键检查；仅允许整体解码。
+        - pattern: '^koanf\.Koanf\.(Must.*|Int.*|Float.*|String.*|Bool.*|Bytes|Duration|Time|Get|Raw|All|Keys|KeyMap|Sprint|Print|Cut|Copy|Marshal|Slices|Exists|MapKeys)$'
+          pkg: '^github\.com/knadh/koanf/v2$'
+          msg: 配置必须统一解码到强类型结构体，禁止逐键读取或导出配置容器
+    godoclint:
+      default: basic
+      enable:
+        - require-pkg-doc
+        - require-doc
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    thelper:
+      test:
+        first: false
+        name: false
+      benchmark:
+        first: false
+        name: false
+      tb:
+        first: false
+        name: false
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

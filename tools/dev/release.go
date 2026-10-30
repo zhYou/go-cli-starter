@@ -33,6 +33,7 @@ func checkReleaseSnapshot(dist string) error {
 	if err != nil {
 		return err
 	}
+	//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
 	file, err := os.Open(path)
 	if err != nil {
 		return err
@@ -55,6 +56,7 @@ func checkReleaseSnapshot(dist string) error {
 		if err != nil {
 			return err
 		}
+		//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
 		input, err := os.Open(path)
 		if err != nil {
 			return err
@@ -94,12 +96,12 @@ func checkReleaseSnapshot(dist string) error {
 		} else if version != match[1] {
 			return fmt.Errorf("发布归档版本不一致")
 		}
-		if match[2] == "windows" && match[4] != "zip" || match[2] != "windows" && match[4] != "tar.gz" {
+		if match[2] == windowsPlatform && match[4] != "zip" || match[2] != windowsPlatform && match[4] != "tar.gz" {
 			return fmt.Errorf("归档格式与平台不符：%s", name)
 		}
 		binary := appName
-		if match[2] == "windows" {
-			binary += ".exe"
+		if match[2] == windowsPlatform {
+			binary += executableSuffix
 		}
 		if err := validateArchive(filepath.Join(dist, name), binary); err != nil {
 			return fmt.Errorf("发布归档 %s 无效：%w", name, err)
@@ -118,6 +120,7 @@ func checkReleaseSnapshot(dist string) error {
 	return nil
 }
 func validateSPDX(path, archive string) error {
+	//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err

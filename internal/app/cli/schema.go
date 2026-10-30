@@ -31,7 +31,7 @@ func newSchemaCommand(root *cobra.Command, registry *resultRegistry) *cobra.Comm
 	var target *cobra.Command
 	return &cobra.Command{
 		Use: "schema [命令路径...]", Short: "以 JSON 格式描述命令和选项",
-		Annotations: map[string]string{"skip-config": "true"},
+		Annotations: map[string]string{annotationSkipConfig: annotationEnabled},
 		Args: func(_ *cobra.Command, args []string) error {
 			var err error
 			target, err = resolveCommand(root, args)
@@ -43,7 +43,7 @@ func newSchemaCommand(root *cobra.Command, registry *resultRegistry) *cobra.Comm
 				OutputFormats []string        `json:"output_formats"`
 				ExitCodes     map[string]int  `json:"exit_codes"`
 				Commands      []commandSchema `json:"commands"`
-			}{1, []string{"text", "json"}, map[string]int{"success": 0, "runtime": 1, "usage": 2, "cancelled": 130}, []commandSchema{describeCommand(target, registry)}})
+			}{1, []string{"text", outputJSON}, map[string]int{"success": 0, "runtime": 1, "usage": 2, "cancelled": 130}, []commandSchema{describeCommand(target, registry)}})
 		},
 	}
 }

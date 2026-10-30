@@ -40,7 +40,7 @@ func (i *Initializer) commandMembers(root, relative string, temporary ...string)
 	}
 	main := false
 	for _, entry := range entries {
-		if entry.Name() != "main.go" && entry.Name() != "main_test.go" && !allowedTemporary[entry.Name()] {
+		if entry.Name() != mainFile && entry.Name() != "main_test.go" && !allowedTemporary[entry.Name()] {
 			return nil, fmt.Errorf("命令目录包含非受管内容：%s", entry.Name())
 		}
 		file, err := i.safePath(root, path.Join(relative, entry.Name()))
@@ -54,7 +54,7 @@ func (i *Initializer) commandMembers(root, relative string, temporary ...string)
 		if !info.Mode().IsRegular() {
 			return nil, fmt.Errorf("命令目录包含非常规文件：%s", file)
 		}
-		main = main || entry.Name() == "main.go"
+		main = main || entry.Name() == mainFile
 	}
 	if !main {
 		return nil, fmt.Errorf("命令目录缺少 main.go")
@@ -111,7 +111,7 @@ func (i *Initializer) commandLocation(root string, tx transaction) (string, erro
 		return "", fmt.Errorf("命令目录存在状态不明确，保留恢复现场")
 	}
 	location := locations[0]
-	if (tx.Phase == "prepared" && location != tx.Move.From) || (tx.Phase == "committed" && location != tx.Move.To) {
+	if (tx.Phase == phasePrepared && location != tx.Move.From) || (tx.Phase == phaseCommitted && location != tx.Move.To) {
 		return "", fmt.Errorf("命令目录与恢复阶段不一致")
 	}
 	expected := map[string]bool{}
@@ -130,7 +130,7 @@ func (i *Initializer) commandLocation(root string, tx transaction) (string, erro
 	for _, entry := range entries {
 		if expected[entry.Name()] {
 			observed[entry.Name()] = true
-		} else if entry.Name() == "main.go" || entry.Name() == "main_test.go" {
+		} else if entry.Name() == mainFile || entry.Name() == "main_test.go" {
 			return "", fmt.Errorf("命令目录出现未记录的文件：%s", entry.Name())
 		}
 	}

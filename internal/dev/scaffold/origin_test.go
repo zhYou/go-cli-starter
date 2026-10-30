@@ -3,11 +3,12 @@ package scaffold
 import (
 	"context"
 	"errors"
-	"github.com/spf13/afero"
-	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/require"
 )
 
 func TestOriginWithoutGitAndLegacyProject(t *testing.T) {

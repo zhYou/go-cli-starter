@@ -4,12 +4,14 @@ package validation
 import (
 	"context"
 	"errors"
-	"github.com/go-playground/validator/v10"
-	"github.com/zhYou/go-cli-starter/internal/base/fault"
 	"reflect"
 	"strings"
+
+	"github.com/go-playground/validator/v10"
+	"github.com/zhYou/go-cli-starter/internal/base/fault"
 )
 
+// Validator 持有构造后冻结的类型校验规则。
 type Validator struct{ engine *validator.Validate }
 
 // New 在并发使用前完成规则注册；可通过 callback 组合条件和业务规则。
@@ -32,6 +34,8 @@ func New(register ...func(*validator.Validate)) *Validator {
 	}
 	return &Validator{engine: engine}
 }
+
+// Struct 使用调用上下文校验有类型的结构体。
 func (v *Validator) Struct(ctx context.Context, value any) error {
 	if err := ctx.Err(); err != nil {
 		return err

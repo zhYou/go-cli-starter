@@ -2,11 +2,12 @@ package scaffold
 
 import (
 	"context"
-	"github.com/spf13/afero"
-	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRecoveryRejectsRealSymlink(t *testing.T) {
@@ -28,6 +29,7 @@ func TestRecoveryRejectsRealSymlink(t *testing.T) {
 	}
 	_, err := Initialize(root, "example.com/tool", "tool")
 	require.Error(t, err)
+	//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 	data, err := os.ReadFile(outside)
 	require.NoError(t, err)
 	require.Equal(t, "人工内容", string(data))

@@ -2,8 +2,9 @@ package logging
 
 import (
 	"embed"
-	"github.com/zhYou/go-cli-starter/internal/base/fault"
 	"io/fs"
+
+	"github.com/zhYou/go-cli-starter/internal/base/fault"
 )
 
 //go:embed locales/*.json

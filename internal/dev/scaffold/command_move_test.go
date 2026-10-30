@@ -59,6 +59,7 @@ func TestCommandMoveRecoversHardExitTemporaryFile(t *testing.T) {
 			root := projectFixture(t, TemplateModule, TemplateName)
 			source := "package main\nimport _ \"" + TemplateModule + "/internal/app/cli\"\nconst appName=\"" + TemplateName + "\"\nfunc main(){}\n"
 			require.NoError(t, os.WriteFile(filepath.Join(root, "cmd", TemplateName, "main.go"), []byte(source), 0600))
+			//nolint:gosec // G204：测试只运行当前测试二进制或固定 Git/Go 命令，参数来自临时 fixture。
 			cmd := exec.Command(os.Args[0], "-test.run=^TestCommandMoveHardExitHelper$")
 			cmd.Env = append(os.Environ(), "LAYOUT_HARD_EXIT_HELPER=1", "LAYOUT_HARD_EXIT_ROOT="+root, "LAYOUT_HARD_EXIT_POINT="+point)
 			err := cmd.Run()
@@ -254,6 +255,7 @@ func TestCommandMovePreflightRejectsSymlink(t *testing.T) {
 	}
 	i := (&Initializer{}).defaults()
 	require.Error(t, i.preflightCommandMove(root, &commandMove{"cmd/" + TemplateName, "cmd/my-cli"}))
+	//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 	data, err := os.ReadFile(outside)
 	require.NoError(t, err)
 	require.Equal(t, "人工内容", string(data))
@@ -278,6 +280,7 @@ func TestCommandMoveRecoveryRejectsDirectoryLink(t *testing.T) {
 	i := &Initializer{FS: base}
 	move := &commandMove{"cmd/" + TemplateName, "cmd/my-cli"}
 	file := filepath.Join(root, move.From, "main.go")
+	//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 	data, err := os.ReadFile(file)
 	require.NoError(t, err)
 	i.FS = faultFS{Fs: base, rename: func(a, b string) error {
@@ -297,6 +300,7 @@ func TestCommandMoveRecoveryRejectsDirectoryLink(t *testing.T) {
 		t.Skipf("当前平台无法创建链接：%v", err)
 	}
 	require.Error(t, i.recover(root, "example.com/tool", "my-cli"))
+	//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 	actual, err := os.ReadFile(filepath.Join(outside, "main.go"))
 	require.NoError(t, err)
 	require.Equal(t, strings.ReplaceAll(string(data), TemplateName, "my-cli"), string(actual))

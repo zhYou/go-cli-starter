@@ -66,6 +66,7 @@ type ToolCall struct {
 	Err                      error
 }
 
+// Emit 记录工具结束事件，不包含原始参数和输出。
 func (e ToolCall) Emit(l *Logger) {
 	fields := []any{"event", "tool_finished", "operation", e.Operation, fieldTool, e.Tool, "outcome", e.Outcome, fieldExitCode, e.ExitCode, fieldDuration, e.Duration}
 	for _, f := range errorFields(e.Err) {

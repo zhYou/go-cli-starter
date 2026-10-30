@@ -2,11 +2,12 @@ package schema
 
 import (
 	"encoding/json"
+	"reflect"
+	"testing"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/stretchr/testify/require"
-	"reflect"
-	"testing"
 )
 
 type encoded string

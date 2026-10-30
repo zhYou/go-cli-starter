@@ -2,10 +2,11 @@ package messages
 
 import (
 	"errors"
-	"github.com/stretchr/testify/require"
-	"github.com/zhYou/go-cli-starter/internal/base/fault"
 	"testing"
 	"testing/fstest"
+
+	"github.com/stretchr/testify/require"
+	"github.com/zhYou/go-cli-starter/internal/base/fault"
 )
 
 func TestBundleIsolationFallbackAndErrorCauses(t *testing.T) {

@@ -71,10 +71,12 @@ func createWindows(ctx context.Context, program string, args []string, options E
 	}
 	defer attributes.Delete()
 	jobs := []windows.Handle{job}
+	//nolint:gosec // G103：Win32 属性列表要求指针及精确字节长度；x/sys 和下方 KeepAlive 保证句柄切片存活到 CreateProcess 返回。
 	if err = attributes.Update(procThreadAttributeJobList, unsafe.Pointer(&jobs[0]), unsafe.Sizeof(jobs[0])); err != nil {
 		return nil, err
 	}
 	handles := streams.handles
+	//nolint:gosec // G103：Win32 属性列表要求指针及精确字节长度；x/sys 和下方 KeepAlive 保证句柄切片存活到 CreateProcess 返回。
 	if err = attributes.Update(windows.PROC_THREAD_ATTRIBUTE_HANDLE_LIST, unsafe.Pointer(&handles[0]), uintptr(len(handles))*unsafe.Sizeof(handles[0])); err != nil {
 		return nil, err
 	}

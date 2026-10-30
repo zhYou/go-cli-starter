@@ -3,11 +3,12 @@ package cli
 import (
 	"errors"
 	"fmt"
-	"github.com/zhYou/go-cli-starter/internal/base/fault"
-	"github.com/zhYou/go-cli-starter/internal/base/messages"
 	"strconv"
 	"strings"
 	"text/tabwriter"
+
+	"github.com/zhYou/go-cli-starter/internal/base/fault"
+	"github.com/zhYou/go-cli-starter/internal/base/messages"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -15,7 +16,7 @@ import (
 
 func noArgs(_ *cobra.Command, args []string) error {
 	if len(args) != 0 {
-		return usageProblem("no_args", fault.Params{"Value": strconv.Quote(args[0])})
+		return usageProblem("no_args", fault.Params{paramValue: strconv.Quote(args[0])})
 	}
 	return nil
 }
@@ -32,13 +33,13 @@ func localizedFlagError(_ *cobra.Command, err error) error {
 	var syntax *pflag.InvalidSyntaxError
 	switch {
 	case errors.As(err, &missing):
-		return usageProblem("unknown_flag", fault.Params{"Flag": strconv.Quote(missing.GetSpecifiedName())})
+		return usageProblem("unknown_flag", fault.Params{paramFlag: strconv.Quote(missing.GetSpecifiedName())})
 	case errors.As(err, &required):
-		return usageProblem("required_flag", fault.Params{"Flag": required.GetFlag().Name})
+		return usageProblem("required_flag", fault.Params{paramFlag: required.GetFlag().Name})
 	case errors.As(err, &invalid):
-		return usageProblem("invalid_flag", fault.Params{"Flag": invalid.GetFlag().Name, "Value": strconv.Quote(invalid.GetValue()), "Type": invalid.GetFlag().Value.Type()})
+		return usageProblem("invalid_flag", fault.Params{paramFlag: invalid.GetFlag().Name, paramValue: strconv.Quote(invalid.GetValue()), "Type": invalid.GetFlag().Value.Type()})
 	case errors.As(err, &syntax):
-		return usageProblem("syntax", fault.Params{"Value": strconv.Quote(syntax.GetSpecifiedFlag())})
+		return usageProblem("syntax", fault.Params{paramValue: strconv.Quote(syntax.GetSpecifiedFlag())})
 	default:
 		return (fault.Definition{Code: "cli.parse", Kind: fault.Usage}).Wrap(err)
 	}
@@ -46,10 +47,10 @@ func localizedFlagError(_ *cobra.Command, err error) error {
 
 func configureHelp(cmd *cobra.Command, call *invocation) {
 	cmd.InitDefaultHelpFlag()
-	cmd.Flags().Lookup("help").Usage = "显示帮助"
+	cmd.Flags().Lookup(flagHelp).Usage = "显示帮助"
 	if cmd.Version != "" {
 		cmd.InitDefaultVersionFlag()
-		cmd.Flags().Lookup("version").Usage = "显示版本信息"
+		cmd.Flags().Lookup(flagVersion).Usage = "显示版本信息"
 	}
 	cmd.SetVersionTemplate("{{.Name}} 版本 {{.Version}}\n")
 	cmd.SetFlagErrorFunc(localizedFlagError)
@@ -98,7 +99,7 @@ func localizedHelp(cmd *cobra.Command, description bool, l *messages.Localizer) 
 		fmt.Fprintln(&out, "\n"+l.Text("help.commands", nil))
 		columns := tabwriter.NewWriter(&out, 0, 4, 2, ' ', 0)
 		for _, child := range cmd.Commands() {
-			if child.IsAvailableCommand() || child.Name() == "help" {
+			if child.IsAvailableCommand() || child.Name() == commandHelp {
 				_, _ = fmt.Fprintf(columns, "  %s\t%s\n", child.Name(), child.Short)
 			}
 		}
@@ -131,14 +132,14 @@ func writeLocalizedFlags(out *strings.Builder, title string, flags *pflag.FlagSe
 			label += " <" + flag.Value.Type() + ">"
 		}
 		description := flag.Usage
-		if flag.Name == "help" {
+		if flag.Name == flagHelp {
 			description = l.Text("cli.help_flag", nil)
 		}
 		if len(flag.Annotations[cobra.BashCompOneRequiredFlag]) > 0 {
 			description += l.Text("help.required", nil)
 		}
 		if flag.DefValue != "" && flag.DefValue != "false" && flag.DefValue != "0" {
-			description += l.Text("help.default", map[string]any{"Value": strconv.Quote(flag.DefValue)})
+			description += l.Text("help.default", map[string]any{paramValue: strconv.Quote(flag.DefValue)})
 		}
 		_, _ = fmt.Fprintf(columns, "  %s\t%s\n", label, description)
 	})

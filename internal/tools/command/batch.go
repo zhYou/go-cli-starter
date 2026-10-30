@@ -57,6 +57,7 @@ func RunBatch(parent context.Context, calls []Invocation, execution Execution, o
 			defer stop()
 			results[i] = Capture(itemCtx, call, execution, options.Capture)
 			// 独立 cause 标记避免与同时到来的父期限/内部 fail-fast 取消混淆。
+			//nolint:errorlint // 独立 cause 哨兵用于区分本项期限与批量取消，必须比较精确身份。
 			if results[i].Status == Skipped && context.Cause(itemCtx) == (itemDeadlineCause{}) {
 				results[i].Status = Canceled
 			}
@@ -87,6 +88,7 @@ func RunBatch(parent context.Context, calls []Invocation, execution Execution, o
 		failures = append(failures, first)
 	}
 	// WithCancelCause 原子保留首先触发批量终止的原因；收尾期间的父取消不能覆盖 fail-fast 首因。
+	//nolint:errorlint // 比较同一个首因对象，保留 fail-fast 与父取消的先后关系。
 	if parent.Err() != nil && (!options.FailFast || context.Cause(ctx) != first) {
 		failures = append(failures, contextError(parent))
 	}
@@ -102,6 +104,7 @@ func batchFailure(index int, err error) error {
 	return batchItemFailed.Wrap(cause, fault.WithParams(fault.Params{"Index": index + 1}))
 }
 func withoutCancellation(err error) error {
+	//nolint:errorlint // 这里只移除取消叶子；包装节点必须继续递归以保留真实原因。
 	if err == nil || err == context.Canceled || err == context.DeadlineExceeded {
 		return nil
 	}

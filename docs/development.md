@@ -119,3 +119,16 @@ CLI 继续接受 `Options.In`、`Options.Out` 和 `Options.ErrOut`，通过该�
 Windows 只向子进程继承本次标准流的自有副本，借用的 reader、writer 和文件由调用者关闭。`WaitDelay` 控制根进程退出后复制管道的排空宽限，默认 250ms；到期关闭自有管道并返回 `exec.ErrWaitDelay`。任意自定义 reader/writer 如果自身永久阻塞，无法在不关闭借用资源的同时保证硬截止，调用者须提供可结束的 IO。
 
 CI 在 Linux、macOS 和 Windows 上显式执行进程树与取消 helper 验收。Windows 额外验证创建后恢复前取消、异常挂起计数、句柄继承白名单、并发 Job 隔离、IO/argv/env 及句柄回收；交叉编译不代表原生验收通过。
+
+
+## 静态边界与开发探测
+
+`mise run lint` 固定启用 `.golangci.yml` 中的 18 项检查。生产 API 需要中文 GoDoc；测试文件仅豁免 GoDoc，安全、类型和导入边界检查仍生效。必要的局部 `nolint` 必须标明具体检查器并用中文说明依据。
+
+koanf 容器只可在精确的 `internal/app/config/load.go` 引入，并通过整体解码生成配置结构体；禁止 typed/Must getter、Get、Raw、All 以及容器导出。zap 后端只位于 `internal/base/logging`，OpenTelemetry SDK 与 exporter 只位于 `internal/base/telemetry`。`mise run rules:check` 在临时模块中运行真实类型分析，验证违规和合规 fixture；它也是 `check` 的组成部分。
+
+`mise run fmt` 统一执行 gofmt 与 goimports。`mise run fmt:check` 仅展示差异并返回失败，不改写源码。EditorConfig 约定 UTF-8、LF、文件末尾换行以及 Go 的制表符缩进。
+
+开发命令 `mise run doctor` 以共享执行器并发探测工具，最多四项并行，每项三秒，每个输出流最多捕获 2 KiB。结果按固定顺序汇总，超时、取消及截断均明确报告。govulncheck 通过本地 Go 构建信息核验命令路径、模块来源和精确版本，再执行 `-h` 检查可用性，不访问漏洞数据库。可选 Codex 辅助工具仅在 `doctor:agent` 中报告。mise 的普通任务与 exec 均关闭自动安装，`GOTOOLCHAIN=local` 防止隐式下载 Go；工具安装仍由显式 `setup` 完成。
+
+`mise run test:fuzz` 对以 NUL 分隔的独立 argv 做五秒模糊测试，保留空值、空格、Unicode、`--` 与取消输入，检查退出码、输出流及无状态副作用。`mise run test:bench` 测量命令树构造与 greet 调用开销，不设置性能门槛。测试与生成项目的子测试使用临时应用 HOME；生成项目按自己的环境前缀隔离状态。

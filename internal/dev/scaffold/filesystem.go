@@ -4,15 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/gofrs/flock"
-	"github.com/spf13/afero"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/gofrs/flock"
+	"github.com/spf13/afero"
 )
 
+// Initializer 显式持有模板事务所用的文件系统、命令与锁。
 type Initializer struct {
 	FS         afero.Fs
 	RunCommand func(context.Context, string, ...string) ([]byte, error)
@@ -20,6 +22,7 @@ type Initializer struct {
 }
 
 func realCommand(ctx context.Context, name string, args ...string) ([]byte, error) {
+	//nolint:gosec // G204：开发任务显式执行固定工具及拆分参数，不经过 shell；参数来自仓库或调用者。
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Env = append(os.Environ(), "GOWORK=off")
 	return cmd.CombinedOutput()

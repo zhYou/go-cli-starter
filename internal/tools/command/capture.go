@@ -10,11 +10,17 @@ import (
 type Status string
 
 const (
+	// Succeeded 表示进程已成功执行。
 	Succeeded Status = "succeeded"
-	Failed    Status = "failed"
-	Canceled  Status = "canceled"
-	Skipped   Status = "skipped"
+	// Failed 表示进程或启动失败。
+	Failed Status = "failed"
+	// Canceled 表示已启动的项因上下文终止。
+	Canceled Status = "canceled"
+	// Skipped 表示项在开始前已取消。
+	Skipped Status = "skipped"
 )
+
+// DefaultCaptureLimit 是每个输出流默认的最大捕获字节数。
 const DefaultCaptureLimit = 1 << 20
 
 // CaptureOptions.Limit 是每路输出的字节上限，0 使用 1 MiB；达到上限后持续排空。

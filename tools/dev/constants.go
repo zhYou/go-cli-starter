@@ -1,0 +1,26 @@
+package main
+
+// 本包协议、状态与命令标识保持稳定，避免局部拼写漂移。
+const (
+	greetCommand           = "greet"
+	gitProgram             = "git"
+	govulncheckTool        = "go:golang.org/x/vuln/cmd/govulncheck"
+	versionFlag            = "--version"
+	govulncheckProgram     = "govulncheck"
+	buildCommand           = "build"
+	taskBuild              = "build"
+	lockVersionField       = "version"
+	miseActionVersionField = "version"
+	mcpVersionField        = "version"
+	windowsPlatform        = "windows"
+	executableSuffix       = ".exe"
+	lintProgram            = "golangci-lint"
+	goplsProgram           = "gopls"
+	versionCommand         = "version"
+	moduleFile             = "go.mod"
+	allPackages            = "./..."
+	runCommand             = "run"
+	releaseProgram         = "goreleaser"
+
+	schemaCommand = "schema"
+)

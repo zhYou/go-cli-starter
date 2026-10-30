@@ -2,9 +2,10 @@ package cli
 
 import (
 	"encoding/json"
+	"reflect"
+
 	"github.com/spf13/cobra"
 	"github.com/zhYou/go-cli-starter/internal/base/schema"
-	"reflect"
 )
 
 type resultRegistry map[*cobra.Command]json.RawMessage

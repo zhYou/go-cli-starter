@@ -1,3 +1,4 @@
+// Command go-cli-starter 负责信号处理及进程退出。
 package main
 
 import (

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+
 	"github.com/zhYou/go-cli-starter/internal/app/config"
 	"github.com/zhYou/go-cli-starter/internal/app/greeting"
 	"github.com/zhYou/go-cli-starter/internal/app/session"
@@ -45,5 +46,5 @@ func newInvocation(provided *Dependencies) *invocation {
 	if deps.NewLogger == nil {
 		deps.NewLogger = logging.New
 	}
-	return &invocation{deps: deps, logLevel: "info", logger: logging.NewNop()}
+	return &invocation{deps: deps, logLevel: defaultLogLevel, logger: logging.NewNop()}
 }

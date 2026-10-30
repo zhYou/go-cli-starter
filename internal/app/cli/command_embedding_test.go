@@ -3,11 +3,12 @@ package cli
 import (
 	"bytes"
 	"context"
-	"github.com/zhYou/go-cli-starter/internal/app/greeting"
-	"github.com/zhYou/go-cli-starter/internal/tools/command"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/zhYou/go-cli-starter/internal/app/greeting"
+	"github.com/zhYou/go-cli-starter/internal/tools/command"
 )
 
 func TestCommandEmbeddingHelper(t *testing.T) {

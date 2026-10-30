@@ -1,19 +1,22 @@
 package main
 
 import (
+	"debug/buildinfo"
 	"fmt"
-	"github.com/pelletier/go-toml/v2"
-	"go.yaml.in/yaml/v3"
-	"golang.org/x/mod/modfile"
-	"golang.org/x/mod/semver"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/pelletier/go-toml/v2"
+	"go.yaml.in/yaml/v3"
+	"golang.org/x/mod/modfile"
+	"golang.org/x/mod/semver"
 )
 
+// VersionSet 保存项目声明的工具版本及发布平台。
 type VersionSet struct {
 	MiseMinimum string
 	Tools       map[string]string
@@ -21,6 +24,7 @@ type VersionSet struct {
 }
 
 func loadVersions(root string) (VersionSet, error) {
+	//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
 	data, err := os.ReadFile(filepath.Join(root, "mise.toml"))
 	if err != nil {
 		return VersionSet{}, err
@@ -52,17 +56,17 @@ type toolSpec struct {
 func versionTool(key string) (toolSpec, error) {
 	switch key {
 	case "go":
-		return toolSpec{"go", "Go", `\bgo([0-9]+\.[0-9]+\.[0-9]+)\b`, []string{"version"}}, nil
+		return toolSpec{"go", "Go", `\bgo([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`, []string{versionCommand}}, nil
 	case "go:golang.org/x/tools/gopls":
-		return toolSpec{"gopls", "gopls", `(?m)^golang.org/x/tools/gopls v([0-9]+\.[0-9]+\.[0-9]+)\b`, []string{"version"}}, nil
-	case "golangci-lint":
-		return toolSpec{"golangci-lint", "golangci-lint", `\bgolangci-lint has version ([0-9]+\.[0-9]+\.[0-9]+)\b`, []string{"version"}}, nil
-	case "goreleaser":
-		return toolSpec{"goreleaser", "GoReleaser", `(?m)^GitVersion:\s+v?([0-9]+\.[0-9]+\.[0-9]+)\b`, []string{"--version"}}, nil
-	case "go:golang.org/x/vuln/cmd/govulncheck":
-		return toolSpec{"govulncheck", "govulncheck", `(?m)^Scanner:\s+govulncheck@v([0-9]+\.[0-9]+\.[0-9]+)\b`, []string{"-version"}}, nil
+		return toolSpec{goplsProgram, goplsProgram, `(?m)^golang.org/x/tools/gopls v([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`, []string{versionCommand}}, nil
+	case lintProgram:
+		return toolSpec{lintProgram, lintProgram, `\bgolangci-lint has version ([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`, []string{versionCommand}}, nil
+	case releaseProgram:
+		return toolSpec{releaseProgram, "GoReleaser", `(?m)^GitVersion:\s+v?([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`, []string{versionFlag}}, nil
+	case govulncheckTool:
+		return toolSpec{govulncheckProgram, govulncheckProgram, `(?m)^Scanner:\s+govulncheck@v([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`, []string{"-h"}}, nil
 	case "syft":
-		return toolSpec{"syft", "Syft", `(?m)^Version:\s+v?([0-9]+\.[0-9]+\.[0-9]+)\b`, []string{"version"}}, nil
+		return toolSpec{"syft", "Syft", `(?m)^Version:\s+v?([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`, []string{versionCommand}}, nil
 	default:
 		return toolSpec{}, fmt.Errorf("缺少工具 %s 的版本提取器", key)
 	}
@@ -83,6 +87,7 @@ func checkVersions(root string) error {
 	if err != nil {
 		return err
 	}
+	//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
 	data, err := os.ReadFile(filepath.Join(root, "mise.lock"))
 	if err != nil {
 		return err
@@ -102,7 +107,7 @@ func checkVersions(root string) error {
 	}
 	for key, want := range versions.Tools {
 		entries := lock.Tools[key]
-		if len(entries) != 1 || entries[0]["version"] != want {
+		if len(entries) != 1 || entries[0][lockVersionField] != want {
 			return fmt.Errorf("%s 锁版本不符", key)
 		}
 		// Go 后端从固定模块版本构建，各平台使用同一来源；没有下载归档的平台记录。
@@ -124,11 +129,12 @@ func checkVersions(root string) error {
 			}
 		}
 	}
-	data, err = os.ReadFile(filepath.Join(root, "go.mod"))
+	//nolint:gosec // G304：开发工具读取显式项目文件或执行固定 Git 子命令，不经过 shell，不是外部服务入口。
+	data, err = os.ReadFile(filepath.Join(root, moduleFile))
 	if err != nil {
 		return err
 	}
-	module, err := modfile.Parse("go.mod", data, nil)
+	module, err := modfile.Parse(moduleFile, data, nil)
 	if err != nil {
 		return err
 	}
@@ -136,6 +142,7 @@ func checkVersions(root string) error {
 	if module.Go == nil || module.Toolchain == nil || module.Toolchain.Name != "go"+goVersion || semver.Compare("v"+module.Go.Version, "v"+goVersion) > 0 || semver.MajorMinor("v"+module.Go.Version) != semver.MajorMinor("v"+goVersion) {
 		return fmt.Errorf("模块最低 Go 版本、工具链与 mise 不一致")
 	}
+	//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
 	data, err = os.ReadFile(filepath.Join(root, "README.md"))
 	if err != nil {
 		return err
@@ -166,6 +173,7 @@ func checkVersions(root string) error {
 			return fmt.Errorf("README 工具 %s 的当前声明不一致", key)
 		}
 	}
+	//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
 	data, err = os.ReadFile(filepath.Join(root, "AGENTS.md"))
 	if err != nil {
 		return err
@@ -180,6 +188,7 @@ func checkVersions(root string) error {
 	}
 	count := 0
 	for _, path := range paths {
+		//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
@@ -199,7 +208,7 @@ func checkVersions(root string) error {
 			for _, step := range job.Steps {
 				if strings.HasPrefix(step.Uses, "jdx/mise-action@") {
 					count++
-					if step.With["version"] != versions.MiseMinimum {
+					if step.With[miseActionVersionField] != versions.MiseMinimum {
 						return fmt.Errorf("%s 的 CI mise 版本不一致", path)
 					}
 				}
@@ -221,4 +230,12 @@ func sortedTools(v VersionSet) []string {
 	})
 	sort.Strings(keys)
 	return keys
+}
+
+// matchGovulncheckBuildInfo 离线核验真实 Go 可执行文件，避免 -version 访问漏洞库。
+func matchGovulncheckBuildInfo(info *buildinfo.BuildInfo, want string) error {
+	if info.Path != "golang.org/x/vuln/cmd/govulncheck" || info.Main.Path != "golang.org/x/vuln" || info.Main.Version != "v"+want || info.Main.Replace != nil {
+		return fmt.Errorf("govulncheck 与锁定来源和版本 %s 不符，请运行 mise run setup", want)
+	}
+	return nil
 }

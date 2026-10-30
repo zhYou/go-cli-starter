@@ -25,7 +25,7 @@ func Inspect(root string) (Project, error) {
 
 func (i *Initializer) inspect(root string) (Project, error) {
 	var project Project
-	modulePath, err := i.safePath(root, "go.mod")
+	modulePath, err := i.safePath(root, moduleFile)
 	if err != nil {
 		return project, err
 	}
@@ -33,7 +33,7 @@ func (i *Initializer) inspect(root string) (Project, error) {
 	if err != nil {
 		return project, err
 	}
-	module, err := modfile.Parse("go.mod", data, nil)
+	module, err := modfile.Parse(moduleFile, data, nil)
 	if err != nil {
 		return project, fmt.Errorf("解析模块身份失败：%w", err)
 	}
@@ -61,7 +61,7 @@ func (i *Initializer) inspect(root string) (Project, error) {
 		if !entry.IsDir() {
 			continue
 		}
-		file, err := i.safePath(root, path.Join(relative, "main.go"))
+		file, err := i.safePath(root, path.Join(relative, mainFile))
 		if err != nil {
 			return project, err
 		}

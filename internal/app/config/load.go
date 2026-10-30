@@ -4,6 +4,13 @@ package config
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/knadh/koanf/providers/confmap"
 	"github.com/knadh/koanf/v2"
@@ -14,19 +21,16 @@ import (
 	"github.com/zhYou/go-cli-starter/internal/base/paths"
 	"github.com/zhYou/go-cli-starter/internal/base/telemetry"
 	"github.com/zhYou/go-cli-starter/internal/base/validation"
-	"os"
-	"path/filepath"
-	"reflect"
-	"strconv"
-	"strings"
-	"time"
 )
 
+// Config 保存模块组合后的强类型配置。
 type Config struct {
 	Logging     logging.Config     `mapstructure:"logging"`
 	Diagnostics diagnostics.Config `mapstructure:"diagnostics"`
 	Telemetry   telemetry.Config   `mapstructure:"telemetry"`
 }
+
+// Options 声明本次调用的显式依赖与覆盖选项。
 type Options struct {
 	AppName, Path, UserConfigDir string
 	LookupEnv                    func(string) (string, bool)
@@ -36,6 +40,7 @@ type Options struct {
 	Explicit                     bool
 }
 
+// Defaults 返回本模块的默认配置。
 func Defaults() Config {
 	return Config{Logging: logging.Defaults(), Diagnostics: diagnostics.Defaults(), Telemetry: telemetry.Defaults()}
 }
@@ -86,7 +91,7 @@ func Load(opts Options) (Config, error) {
 		file = filepath.Join(opts.UserConfigDir, opts.AppName, "config.toml")
 	}
 	defaults := map[string]any{
-		"logging.level": cfg.Logging.Level, "logging.output": cfg.Logging.Output,
+		loggingLevelKey: cfg.Logging.Level, "logging.output": cfg.Logging.Output,
 		"diagnostics.max_size_mib": cfg.Diagnostics.MaxSizeMiB, "diagnostics.max_backups": cfg.Diagnostics.MaxBackups,
 		"diagnostics.retention_days": cfg.Diagnostics.RetentionDays, "diagnostics.max_total_size_mib": cfg.Diagnostics.MaxTotalSizeMiB,
 		"telemetry.exporter": cfg.Telemetry.Exporter, "telemetry.export_timeout": cfg.Telemetry.ExportTimeout,
@@ -96,8 +101,9 @@ func Load(opts Options) (Config, error) {
 	k := koanf.New(".")
 	layer := func(values map[string]any) error { return k.Load(confmap.Provider(values, "."), nil) }
 	if err := layer(defaults); err != nil {
-		return cfg, problem("decode", err, nil)
+		return cfg, problem(decodeProblem, err, nil)
 	}
+	//nolint:gosec // G304：配置路径由用户明确选择；加载器必须支持任意显式配置文件。
 	data, err := os.ReadFile(file)
 	if err != nil {
 		if opts.Explicit || opts.Path != "" || !errors.Is(err, os.ErrNotExist) {
@@ -115,14 +121,14 @@ func Load(opts Options) (Config, error) {
 		decoderConfig.Result = &typed
 		decoder, err := mapstructure.NewDecoder(decoderConfig)
 		if err != nil {
-			return cfg, problem("decode", err, nil)
+			return cfg, problem(decodeProblem, err, nil)
 		}
 		if err := decoder.Decode(values); err != nil {
-			return cfg, problem("decode", err, nil)
+			return cfg, problem(decodeProblem, err, nil)
 		}
 		// TOML 解析器已经展开合法点号语法；文件数据不再做键展开。
 		if err := k.Load(confmap.Provider(values, ""), nil); err != nil {
-			return cfg, problem("decode", err, nil)
+			return cfg, problem(decodeProblem, err, nil)
 		}
 	}
 	for key, def := range defaults {
@@ -140,21 +146,21 @@ func Load(opts Options) (Config, error) {
 			typed = number
 		}
 		if err := layer(map[string]any{key: typed}); err != nil {
-			return cfg, problem("decode", err, nil)
+			return cfg, problem(decodeProblem, err, nil)
 		}
 	}
 	if value, ok := lookup(paths.EnvPrefix(opts.AppName) + "_LOG_LEVEL"); ok && value != "" {
-		if err := layer(map[string]any{"logging.level": value}); err != nil {
-			return cfg, problem("decode", err, nil)
+		if err := layer(map[string]any{loggingLevelKey: value}); err != nil {
+			return cfg, problem(decodeProblem, err, nil)
 		}
 	}
 	if opts.LogLevel != nil {
-		if err := layer(map[string]any{"logging.level": *opts.LogLevel}); err != nil {
-			return cfg, problem("decode", err, nil)
+		if err := layer(map[string]any{loggingLevelKey: *opts.LogLevel}); err != nil {
+			return cfg, problem(decodeProblem, err, nil)
 		}
 	}
 	if err := decode(k, &cfg); err != nil {
-		return cfg, problem("decode", err, nil)
+		return cfg, problem(decodeProblem, err, nil)
 	}
 	v := opts.Validator
 	if v == nil {

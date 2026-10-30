@@ -76,6 +76,7 @@ func TestCleanupPreservesUnknownFileAddedDuringRevalidation(t *testing.T) {
 	cleanupErr := Cleanup(base, cfg)
 	require.NoError(t, <-inserted)
 	require.NoError(t, cleanupErr)
+	//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 	content, err := os.ReadFile(marker)
 	require.NoError(t, err)
 	require.Equal(t, "保留用户内容", string(content))

@@ -42,9 +42,12 @@ func TestHelperProcess(t *testing.T) {
 		os.Exit(7)
 	case "gate-fail":
 		signal.Ignore(syscall.SIGTERM)
+		//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
+		//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 		_ = os.WriteFile(args[1], []byte("ready"), 0600)
 		until := time.Now().Add(5 * time.Second)
 		for time.Now().Before(until) {
+			//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 			if _, err := os.Stat(args[2]); err == nil {
 				os.Exit(7)
 			}
@@ -55,9 +58,11 @@ func TestHelperProcess(t *testing.T) {
 		received := make(chan os.Signal, 1)
 		signal.Notify(received, syscall.SIGTERM)
 		defer signal.Stop(received)
+		//nolint:gosec // G703：测试路径和权限只来自当前临时 fixture，不读取用户文件。
 		_ = os.WriteFile(args[1], []byte("ready"), 0600)
 		select {
 		case <-received:
+			//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 			_ = os.WriteFile(args[2], []byte("term"), 0600)
 		case <-time.After(5 * time.Second):
 			os.Exit(8)
@@ -77,11 +82,13 @@ func TestHelperProcess(t *testing.T) {
 		timer := time.AfterFunc(10*time.Second, func() { os.Exit(10) })
 		defer timer.Stop()
 		for {
+			//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 			_ = os.WriteFile(args[1], []byte(strconv.FormatInt(time.Now().UnixNano(), 10)), 0600)
 			time.Sleep(10 * time.Millisecond)
 		}
 	case "branch":
 		executable, _ := os.Executable()
+		//nolint:gosec // G204：测试只运行当前测试二进制或固定 Git/Go 命令，参数来自临时 fixture。
 		child := exec.Command(executable, "-test.run=^TestHelperProcess$", "--", "spawn", args[1], args[2], "success")
 		child.Env = os.Environ()
 		child.Stdout = os.Stdout
@@ -91,6 +98,7 @@ func TestHelperProcess(t *testing.T) {
 		}
 	case "spawn":
 		executable, _ := os.Executable()
+		//nolint:gosec // G204：测试只运行当前测试二进制或固定 Git/Go 命令，参数来自临时 fixture。
 		child := exec.Command(executable, "-test.run=^TestHelperProcess$", "--", "heartbeat", args[1])
 		child.Env = os.Environ()
 		if args[2] == "pipes" {
@@ -101,6 +109,7 @@ func TestHelperProcess(t *testing.T) {
 			os.Exit(9)
 		}
 		for i := 0; i < 200; i++ {
+			//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 			if _, err := os.Stat(args[1]); err == nil {
 				break
 			}
@@ -199,6 +208,7 @@ func TestPathUsesInvocationEnvironment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	//nolint:gosec // G306：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
 	if err = os.WriteFile(filepath.Join(options.Dir, name), data, 0700); err != nil {
 		t.Fatal(err)
 	}

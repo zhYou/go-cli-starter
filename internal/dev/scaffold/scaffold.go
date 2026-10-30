@@ -5,20 +5,26 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/spf13/afero"
 	"go/format"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/spf13/afero"
 )
 
+// TemplateModule 是原始模板的模块路径。
 const TemplateModule = "github.com/zhYou/go-cli-starter"
+
+// TemplateName 是原始模板的应用标识。
 const TemplateName = "go-cli-starter"
 
 // 模板只管理这些文件中的应用标识。
 // 初始化项目时保留本实现及其测试夹具，避免改动初始化基准。
 var managedFiles = []string{
+	".github/workflows/ci.yml",
+	"tools/dev/doctor.go", "tools/dev/doctor_test.go", "tools/dev/rules.go", "internal/app/cli/fuzz_test.go",
 	"internal/tools/command/batch.go",
 	"internal/tools/command/catalog.go",
 	"internal/tools/command/catalog_test.go",
@@ -50,7 +56,7 @@ var managedFiles = []string{
 	"internal/base/messages/messages.go", "internal/base/messages/messages_test.go",
 	"internal/base/paths/paths.go", "internal/base/paths/paths_test.go",
 
-	"go.mod", "cmd/" + TemplateName + "/main.go", "cmd/" + TemplateName + "/main_test.go", "internal/app/cli/cli.go",
+	moduleFile, "cmd/" + TemplateName + "/main.go", "cmd/" + TemplateName + "/main_test.go", "internal/app/cli/cli.go",
 	"internal/app/cli/errors.go",
 	"test/integration/process_test.go",
 	"test/integration/testdata/process/language.txtar",
@@ -88,6 +94,8 @@ type change struct {
 func Initialize(root, module, name string) ([]string, error) {
 	return (&Initializer{}).Initialize(context.Background(), root, module, name)
 }
+
+// Initialize 以事务方式重命名模板，并返回变更文件列表。
 func (original *Initializer) Initialize(ctx context.Context, root, module, name string) ([]string, error) {
 	copy := original.defaults()
 	i := &copy

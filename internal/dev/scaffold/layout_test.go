@@ -16,6 +16,7 @@ import _ "` + TemplateModule + `/internal/app/cli"
 const appName = "` + TemplateName + `"
 func main() {}
 `
+	//nolint:gosec // G306：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
 	require.NoError(t, os.WriteFile(filepath.Join(root, "cmd", TemplateName, "main.go"), []byte(source), 0640))
 	changed, err := Initialize(root, "example.com/team/repository", "my-cli")
 	require.NoError(t, err)
@@ -24,6 +25,7 @@ func main() {}
 	require.NoError(t, err)
 	require.Equal(t, Project{"example.com/team/repository", "my-cli", "cmd/my-cli"}, project)
 	require.NoDirExists(t, filepath.Join(root, "cmd", TemplateName))
+	//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 	data, err := os.ReadFile(filepath.Join(root, "cmd/my-cli/main.go"))
 	require.NoError(t, err)
 	require.Contains(t, string(data), "example.com/team/repository/internal/app/cli")
@@ -47,6 +49,7 @@ func TestOriginUsesCommandEntry(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(root, ".template-version"), []byte("0.1.0\n"), 0600))
 	git := func(args ...string) string {
 		t.Helper()
+		//nolint:gosec // G204：测试只运行当前测试二进制或固定 Git/Go 命令，参数来自临时 fixture。
 		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, "%s", out)
@@ -69,10 +72,12 @@ func TestInitializeRejectsGoVersionNamesBeforeWriting(t *testing.T) {
 	for _, name := range []string{"v2", "v10", "v999999999999999999999999999999999999999"} {
 		t.Run(name, func(t *testing.T) {
 			root := projectFixture(t, TemplateModule, TemplateName)
+			//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 			before, err := os.ReadFile(filepath.Join(root, "go.mod"))
 			require.NoError(t, err)
 			_, err = Initialize(root, "example.com/tool", name)
 			require.Error(t, err)
+			//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 			after, err := os.ReadFile(filepath.Join(root, "go.mod"))
 			require.NoError(t, err)
 			require.Equal(t, before, after)

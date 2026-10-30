@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/zhYou/go-cli-starter/internal/app/config"
 	"github.com/zhYou/go-cli-starter/internal/app/greeting"
-	"testing"
 )
 
 func TestSchemaGenerationDoesNotExecuteCommands(t *testing.T) {

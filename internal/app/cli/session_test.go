@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/zhYou/go-cli-starter/internal/app/greeting"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/zhYou/go-cli-starter/internal/app/greeting"
 
 	"github.com/stretchr/testify/require"
 )

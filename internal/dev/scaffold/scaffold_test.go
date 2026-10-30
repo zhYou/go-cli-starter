@@ -17,6 +17,7 @@ func fixture(t *testing.T) string {
 		"user.txt":                         "go-cli-starter\n",
 	}
 	for name, content := range files {
+		//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
 		if err := os.MkdirAll(filepath.Dir(filepath.Join(root, name)), 0755); err != nil {
 			t.Fatal(err)
 		}
@@ -36,6 +37,7 @@ func read(t *testing.T, root, name string) string {
 		}
 		name, _ = filepath.Rel(root, matches[0])
 	}
+	//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 	data, err := os.ReadFile(filepath.Join(root, name))
 	if err != nil {
 		t.Fatal(err)

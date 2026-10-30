@@ -5,6 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/zhYou/go-cli-starter/internal/app/config"
@@ -13,10 +18,6 @@ import (
 	"github.com/zhYou/go-cli-starter/internal/base/iostreams"
 	"github.com/zhYou/go-cli-starter/internal/base/logging"
 	"github.com/zhYou/go-cli-starter/internal/base/paths"
-	"io"
-	"strconv"
-	"strings"
-	"time"
 )
 
 // Options 提供进程依赖；每次调用均创建新的命令树。
@@ -42,6 +43,7 @@ func Run(ctx context.Context, args []string, opts Options) (code int) {
 	opts.ErrOut = iostreams.Synchronize(opts.ErrOut, nil)
 	sink := &recordingWriter{writer: opts.Out}
 	opts.Out = sink
+	//nolint:contextcheck // Cobra 构造阶段不执行请求，下面 ExecuteContextC 才注入调用者 ctx。
 	root, call := buildRoot(opts)
 	defer func() {
 		if call.session != nil {
@@ -72,10 +74,10 @@ func Run(ctx context.Context, args []string, opts Options) (code int) {
 		if errors.Is(err, context.DeadlineExceeded) {
 			message = call.localizer.Text("cli.deadline", nil)
 		}
-		_, _ = fmt.Fprintln(opts.ErrOut, call.localizer.Text("cli.error", map[string]any{"Message": message}))
+		_, _ = fmt.Fprintln(opts.ErrOut, call.localizer.Text("cli.error", map[string]any{paramMessage: message}))
 		return 130
 	}
-	_, _ = fmt.Fprintln(opts.ErrOut, call.localizer.Text("cli.error", map[string]any{"Message": call.localizer.Render(err)}))
+	_, _ = fmt.Fprintln(opts.ErrOut, call.localizer.Text("cli.error", map[string]any{paramMessage: call.localizer.Render(err)}))
 	return exitCode(err)
 }
 
@@ -106,18 +108,18 @@ func buildRoot(opts Options) (*cobra.Command, *invocation) {
 	if normalized, ok := canonicalLanguage(lang); ok {
 		lang = normalized
 	} else {
-		lang = "zh-CN"
+		lang = languageChinese
 	}
 	call.localizer = newLocalizer(lang)
 	root := &cobra.Command{Use: opts.Name, Short: "供用户和自动化工具使用的 CLI 模板", Version: opts.Version, Args: noArgs, SilenceErrors: true, SilenceUsage: true, RunE: func(cmd *cobra.Command, _ []string) error { return cmd.Help() }}
 	root.SetIn(opts.In)
 	root.SetOut(opts.Out)
 	root.SetErr(opts.ErrOut)
-	root.PersistentFlags().BoolVar(&call.asJSON, "json", false, "以 JSON 格式输出结果")
-	root.PersistentFlags().StringVar(&call.configPath, "config", "", "从指定的 TOML 文件读取配置")
-	root.PersistentFlags().StringVar(&call.logLevel, "log-level", "info", "日志级别：debug、info、warn、error")
-	root.PersistentFlags().Var(&languageValue{call: call, root: root}, "lang", "显示语言")
-	root.PersistentFlags().Lookup("lang").DefValue = "zh-CN"
+	root.PersistentFlags().BoolVar(&call.asJSON, flagJSON, false, "以 JSON 格式输出结果")
+	root.PersistentFlags().StringVar(&call.configPath, flagConfig, "", "从指定的 TOML 文件读取配置")
+	root.PersistentFlags().StringVar(&call.logLevel, flagLogLevel, defaultLogLevel, "日志级别：debug、info、warn、error")
+	root.PersistentFlags().Var(&languageValue{call: call, root: root}, flagLanguage, "显示语言")
+	root.PersistentFlags().Lookup(flagLanguage).DefValue = languageChinese
 	root.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
 		if err := validateFlags(cmd, call); err != nil {
 			return err
@@ -129,17 +131,17 @@ func buildRoot(opts Options) (*cobra.Command, *invocation) {
 			return nil
 		}
 		var override *string
-		if cmd.Flags().Changed("log-level") {
+		if cmd.Flags().Changed(flagLogLevel) {
 			override = &call.logLevel
 		}
-		cfg, err := call.deps.LoadConfig(config.Options{AppName: opts.Name, Path: call.configPath, Explicit: cmd.Flags().Changed("config"), UserConfigDir: opts.ConfigDir, Context: cmd.Context(), Validator: call.deps.Validator, LookupEnv: opts.LookupEnv, LogLevel: override})
+		cfg, err := call.deps.LoadConfig(config.Options{AppName: opts.Name, Path: call.configPath, Explicit: cmd.Flags().Changed(flagConfig), UserConfigDir: opts.ConfigDir, Context: cmd.Context(), Validator: call.deps.Validator, LookupEnv: opts.LookupEnv, LogLevel: override})
 		if err != nil {
 			return (fault.Definition{Code: "cli.config_failed", Kind: fault.Configuration}).Wrap(err)
 		}
 		ctx, owned := session.Begin(cmd.Context(), cfg, logging.RunInfo{Component: opts.Name, Command: cmd.CommandPath(), Version: opts.Version, Commit: opts.Commit}, session.Options{
 			Paths: paths.Options{AppName: opts.Name, LookupEnv: opts.LookupEnv}, Directories: opts.Directories, Stderr: opts.ErrOut, ExternalLogger: call.deps.Logger, NewLogger: call.deps.NewLogger, Localizer: call.localizer,
 		}, func(err error) {
-			_, _ = fmt.Fprintln(opts.ErrOut, call.localizer.Text("cli.warning", map[string]any{"Message": call.localizer.Render(err)}))
+			_, _ = fmt.Fprintln(opts.ErrOut, call.localizer.Text("cli.warning", map[string]any{paramMessage: call.localizer.Render(err)}))
 		})
 		call.session = owned
 		call.logger = owned.Logger
@@ -159,11 +161,11 @@ func buildRoot(opts Options) (*cobra.Command, *invocation) {
 	return root, call
 }
 func skipsConfig(cmd, root *cobra.Command) bool {
-	if cmd == root || cmd.Annotations["skip-config"] == "true" {
+	if cmd == root || cmd.Annotations[annotationSkipConfig] == annotationEnabled {
 		return true
 	}
 	for c := cmd; c != nil; c = c.Parent() {
-		if c.Name() == "completion" || c.Name() == cobra.ShellCompRequestCmd || c.Name() == cobra.ShellCompNoDescRequestCmd {
+		if c.Name() == commandCompletion || c.Name() == cobra.ShellCompRequestCmd || c.Name() == cobra.ShellCompNoDescRequestCmd {
 			return true
 		}
 	}
@@ -172,11 +174,11 @@ func skipsConfig(cmd, root *cobra.Command) bool {
 
 // validateFlags 在配置/资源入口前根据 Cobra 元数据检查必填和组合。
 func validateFlags(cmd *cobra.Command, call *invocation) error {
-	if f := cmd.Flags().Lookup("log-level"); f != nil && f.Changed {
+	if f := cmd.Flags().Lookup(flagLogLevel); f != nil && f.Changed {
 		switch f.Value.String() {
-		case "debug", "info", "warn", "error":
+		case "debug", defaultLogLevel, "warn", "error":
 		default:
-			return usageProblem("invalid_flag", fault.Params{"Flag": "log-level", "Value": strconv.Quote(f.Value.String()), "Type": "debug|info|warn|error"})
+			return usageProblem("invalid_flag", fault.Params{paramFlag: flagLogLevel, paramValue: strconv.Quote(f.Value.String()), "Type": "debug|info|warn|error"})
 		}
 	}
 

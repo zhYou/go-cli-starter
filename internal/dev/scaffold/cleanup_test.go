@@ -3,11 +3,12 @@ package scaffold
 import (
 	"context"
 	"errors"
-	"github.com/spf13/afero"
-	"github.com/stretchr/testify/require"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/require"
 )
 
 type cleanupFaultFS struct {

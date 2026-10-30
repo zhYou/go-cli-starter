@@ -13,6 +13,7 @@ func projectFixture(t *testing.T, module, name string) string {
 	root := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(root, "go.mod"), []byte("module "+module+"\n\ngo 1.27.0\n"), 0600))
 	dir := filepath.Join(root, "cmd", name)
+	//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
 	require.NoError(t, os.MkdirAll(dir, 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\nconst appName = \""+name+"\"\nfunc main() {}\n"), 0600))
 	return root
@@ -34,6 +35,7 @@ func TestInspectRejectsAmbiguousOrInvalidEntry(t *testing.T) {
 			case "missing":
 				require.NoError(t, os.Remove(file))
 			case "multiple":
+				//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
 				require.NoError(t, os.MkdirAll(filepath.Join(root, "cmd", "other"), 0755))
 				require.NoError(t, os.WriteFile(filepath.Join(root, "cmd", "other", "main.go"), []byte("package main\nconst appName=\"other\"\nfunc main(){}"), 0600))
 			default:

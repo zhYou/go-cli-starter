@@ -8,6 +8,8 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    env:
+      GO_CLI_STARTER_HOME: ${{ runner.temp }}/go-cli-starter-home
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -28,6 +30,8 @@ jobs:
           if [ -n "$CONTRACT_BASE" ] && [ "$CONTRACT_BASE" != "0000000000000000000000000000000000000000" ]; then
             mise run contract:check -- --against "$CONTRACT_BASE"
           fi
+      - run: mise run test:fuzz
+      - run: mise run test:bench
       - run: mise run test:race
       - run: mise run mcp:check
       - run: mise run release:snapshot
@@ -38,6 +42,8 @@ jobs:
       matrix:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      GO_CLI_STARTER_HOME: ${{ runner.temp }}/go-cli-starter-home
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

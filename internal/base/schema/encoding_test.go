@@ -2,10 +2,11 @@ package schema
 
 import (
 	"encoding/json"
-	"github.com/google/jsonschema-go/jsonschema"
-	"github.com/stretchr/testify/require"
 	"reflect"
 	"testing"
+
+	"github.com/google/jsonschema-go/jsonschema"
+	"github.com/stretchr/testify/require"
 )
 
 type textEncoded int

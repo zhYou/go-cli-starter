@@ -3,10 +3,11 @@ package scaffold
 import (
 	"context"
 	"encoding/json"
-	"github.com/spf13/afero"
-	"github.com/stretchr/testify/require"
 	"path/filepath"
 	"testing"
+
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRecoveryRejectsInconsistentExistence(t *testing.T) {

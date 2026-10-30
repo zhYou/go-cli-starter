@@ -5,13 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/zhYou/go-cli-starter/internal/base/fault"
-	"github.com/zhYou/go-cli-starter/internal/base/logging"
-	"github.com/zhYou/go-cli-starter/internal/base/messages"
 	"os/exec"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/zhYou/go-cli-starter/internal/base/fault"
+	"github.com/zhYou/go-cli-starter/internal/base/logging"
+	"github.com/zhYou/go-cli-starter/internal/base/messages"
 )
 
 func TestCommandErrorsHaveOwnedBilingualDefinitions(t *testing.T) {

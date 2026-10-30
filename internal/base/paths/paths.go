@@ -2,21 +2,28 @@
 package paths
 
 import (
-	"github.com/zhYou/go-cli-starter/internal/base/fault"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/zhYou/go-cli-starter/internal/base/fault"
 )
 
+// Directories 保存应用私有配置、数据、状态与缓存目录。
 type Directories struct{ Config, Data, State, Cache string }
+
+// Options 声明本次调用的显式依赖与覆盖选项。
 type Options struct {
 	AppName, GOOS string
 	LookupEnv     func(string) (string, bool)
 }
 
+// EnvPrefix 从应用名生成稳定的环境变量前缀。
 func EnvPrefix(app string) string { return strings.ToUpper(strings.ReplaceAll(app, "-", "_")) }
+
+// Resolve 解析应用目录，不创建文件或修改环境。
 func Resolve(opts Options) (Directories, error) {
 	platform := opts.GOOS
 	if platform == "" {
@@ -70,7 +77,7 @@ func Resolve(opts Options) (Directories, error) {
 			return fail(homeKey)
 		}
 		home = join(home)
-		return Directories{home, join(home, "data"), join(home, "state"), join(home, "cache")}, nil
+		return Directories{home, join(home, dataDirectory), join(home, stateDirectory), join(home, cacheDirectory)}, nil
 	}
 	if platform == "windows" {
 		roaming, local := env("APPDATA"), env("LOCALAPPDATA")
@@ -80,15 +87,15 @@ func Resolve(opts Options) (Directories, error) {
 		if !absolute(local) {
 			return fail("LOCALAPPDATA")
 		}
-		return Directories{join(roaming, opts.AppName), join(local, opts.AppName, "data"), join(local, opts.AppName, "state"), join(local, opts.AppName, "cache")}, nil
+		return Directories{join(roaming, opts.AppName), join(local, opts.AppName, dataDirectory), join(local, opts.AppName, stateDirectory), join(local, opts.AppName, cacheDirectory)}, nil
 	}
-	home := env("HOME")
+	home := env(homeEnvironment)
 	if platform == "darwin" {
 		if !absolute(home) {
-			return fail("HOME")
+			return fail(homeEnvironment)
 		}
 		support := join(home, "Library", "Application Support", opts.AppName)
-		return Directories{support, join(support, "data"), join(support, "state"), join(home, "Library", "Caches", opts.AppName)}, nil
+		return Directories{support, join(support, dataDirectory), join(support, stateDirectory), join(home, "Library", "Caches", opts.AppName)}, nil
 	}
 	roots := []struct{ env, suffix string }{{"XDG_CONFIG_HOME", ".config"}, {"XDG_DATA_HOME", ".local/share"}, {"XDG_STATE_HOME", ".local/state"}, {"XDG_CACHE_HOME", ".cache"}}
 	values := make([]string, 4)
@@ -97,7 +104,7 @@ func Resolve(opts Options) (Directories, error) {
 		// XDG 规范要求忽略相对路径，回退到 HOME。
 		if !absolute(value) {
 			if !absolute(home) {
-				return fail("HOME")
+				return fail(homeEnvironment)
 			}
 			value = join(home, root.suffix)
 		}
@@ -105,4 +112,6 @@ func Resolve(opts Options) (Directories, error) {
 	}
 	return Directories{values[0], values[1], values[2], values[3]}, nil
 }
+
+// ConfigFile 返回私有配置文件的完整路径。
 func (d Directories) ConfigFile() string { return filepath.Join(d.Config, "config.toml") }

@@ -4,14 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/spf13/afero"
-	"golang.org/x/mod/semver"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/spf13/afero"
+	"golang.org/x/mod/semver"
 )
 
+// Origin 保存模板来源及生成项目的身份。
 type Origin struct {
 	FormatVersion   int    `json:"format_version"`
 	Template        string `json:"template"`
@@ -21,10 +23,11 @@ type Origin struct {
 	Name            string `json:"name"`
 }
 
+// ReadOrigin 读取并校验项目来源记录。
 func ReadOrigin(fs afero.Fs, root string) (Origin, error) {
 	var origin Origin
 	i := Initializer{FS: fs}
-	path, err := i.safePath(root, ".template-origin.json")
+	path, err := i.safePath(root, originFile)
 	if err != nil {
 		return origin, err
 	}
@@ -72,7 +75,7 @@ func (i *Initializer) origin(ctx context.Context, root, module, name string) (Or
 	if remote != "https://github.com/zhYou/go-cli-starter" && remote != "git@github.com:zhYou/go-cli-starter" {
 		return origin, nil
 	}
-	if run("show", "HEAD:.template-version") != version || !strings.Contains(run("show", "HEAD:go.mod"), "module "+TemplateModule) || !strings.Contains(run("show", "HEAD:cmd/"+TemplateName+"/main.go"), "appName = "+fmt.Sprintf("%q", TemplateName)) {
+	if run(gitShow, "HEAD:.template-version") != version || !strings.Contains(run(gitShow, "HEAD:go.mod"), "module "+TemplateModule) || !strings.Contains(run(gitShow, "HEAD:cmd/"+TemplateName+"/main.go"), "appName = "+fmt.Sprintf("%q", TemplateName)) {
 		return origin, nil
 	}
 	commit := run("rev-parse", "HEAD")
@@ -85,7 +88,7 @@ func (i *Initializer) originChange(ctx context.Context, root, module, name strin
 	if _, err := i.FS.Stat(filepath.Join(root, ".template-version")); os.IsNotExist(err) {
 		return nil, nil
 	}
-	path, err := i.safePath(root, ".template-origin.json")
+	path, err := i.safePath(root, originFile)
 	if err != nil {
 		return nil, err
 	}

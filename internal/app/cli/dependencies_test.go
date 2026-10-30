@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/zhYou/go-cli-starter/internal/app/config"
 	"github.com/zhYou/go-cli-starter/internal/app/greeting"
 	"github.com/zhYou/go-cli-starter/internal/base/logging"
-	"testing"
 )
 
 func TestTwoInvocationsDoNotShareDependencies(t *testing.T) {

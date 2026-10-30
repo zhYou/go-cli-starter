@@ -4,13 +4,14 @@ import (
 	"bufio"
 	"context"
 	"errors"
-	"github.com/spf13/afero"
-	"github.com/stretchr/testify/require"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/require"
 )
 
 type faultFS struct {
@@ -25,6 +26,7 @@ func (f faultFS) Rename(a, b string) error {
 	return f.Fs.Rename(a, b)
 }
 func memoryInitializer(t *testing.T) (*Initializer, string) {
+	t.Helper()
 	fs := afero.NewMemMapFs()
 	root, err := filepath.Abs(filepath.Join(t.TempDir(), "repo"))
 	require.NoError(t, err)
@@ -36,6 +38,7 @@ func memoryInitializer(t *testing.T) (*Initializer, string) {
 	return &Initializer{FS: fs, RunCommand: func(context.Context, string, ...string) ([]byte, error) { return nil, nil }, Lock: func(string) (func() error, error) { return func() error { return nil }, nil }}, root
 }
 func crashedTransaction(t *testing.T) (*Initializer, string) {
+	t.Helper()
 	i, root := memoryInitializer(t)
 	base := i.FS
 	i.FS = faultFS{Fs: base, rename: func(a, b string) error {
@@ -154,6 +157,7 @@ func TestLockHelper(t *testing.T) {
 func TestConcurrentInitializationDoesNotRecoverLiveTransaction(t *testing.T) {
 	root := fixture(t)
 	lock := filepath.Join(root, ".template-init.lock")
+	//nolint:gosec // G204：测试只运行当前测试二进制或固定 Git/Go 命令，参数来自临时 fixture。
 	cmd := exec.Command(os.Args[0], "-test.run=^TestLockHelper$")
 	cmd.Env = append(os.Environ(), "TEMPLATE_LOCK_HELPER=1", "TEMPLATE_LOCK_PATH="+lock)
 	in, err := cmd.StdinPipe()
