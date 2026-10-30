@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/spf13/cobra"
-	"github.com/zhYou/go-cli-starter/internal/apperror"
-	"github.com/zhYou/go-cli-starter/internal/config"
+	"github.com/zhYou/go-cli-starter/internal/app/config"
+	"github.com/zhYou/go-cli-starter/internal/base/fault"
+	"github.com/zhYou/go-cli-starter/internal/base/iostreams"
 	"io"
-	"strings"
 )
 
 // Options 提供进程依赖；每次调用均创建新的命令树。
@@ -31,7 +31,7 @@ func Run(ctx context.Context, args []string, opts Options) int {
 	root.SetArgs(args)
 	_, err := root.ExecuteContextC(ctx)
 	if err == nil && sink.Err() != nil {
-		err = apperror.Wrap(apperror.Runtime, "写入结果失败", sink.Err())
+		err = fault.Wrap(fault.Runtime, "写入结果失败", sink.Err())
 	}
 	err = classifyExecutionError(err)
 	if err == nil {
@@ -65,15 +65,8 @@ func defaults(opts Options) Options {
 	if opts.Date == "" {
 		opts.Date = "unknown"
 	}
-	if opts.In == nil {
-		opts.In = strings.NewReader("")
-	}
-	if opts.Out == nil {
-		opts.Out = io.Discard
-	}
-	if opts.ErrOut == nil {
-		opts.ErrOut = io.Discard
-	}
+	streams := (iostreams.IOStreams{In: opts.In, Out: opts.Out, ErrOut: opts.ErrOut}).WithDefaults()
+	opts.In, opts.Out, opts.ErrOut = streams.In, streams.Out, streams.ErrOut
 	return opts
 }
 
@@ -99,11 +92,11 @@ func newRoot(opts Options) *cobra.Command {
 		}
 		cfg, err := call.deps.LoadConfig(config.Options{AppName: opts.Name, Path: call.configPath, UserConfigDir: opts.ConfigDir, Context: cmd.Context(), Validator: call.deps.Validator, LookupEnv: opts.LookupEnv, LogLevel: override})
 		if err != nil {
-			return apperror.Wrap(apperror.Configuration, "读取配置失败", err)
+			return fault.Wrap(fault.Configuration, "读取配置失败", err)
 		}
 		call.logger, err = call.deps.NewLogger(opts.ErrOut, cfg.LogLevel)
 		if err != nil {
-			return apperror.Wrap(apperror.Configuration, "日志配置无效", err)
+			return fault.Wrap(fault.Configuration, "日志配置无效", err)
 		}
 		return nil
 	}

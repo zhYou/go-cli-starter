@@ -6,7 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/zhYou/go-cli-starter/internal/cli"
+	"github.com/zhYou/go-cli-starter/internal/app/cli"
 )
 
 const appName = "go-cli-starter"

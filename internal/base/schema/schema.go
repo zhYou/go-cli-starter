@@ -1,5 +1,5 @@
-// Package contract 描述并比较 CLI 的机器接口。
-package contract
+// Package schema 从 Go 类型生成运行时结果结构。
+package schema
 
 import (
 	"encoding"

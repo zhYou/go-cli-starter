@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/zhYou/go-cli-starter/internal/scaffold"
+	"github.com/zhYou/go-cli-starter/internal/dev/scaffold"
 	"os"
 	"os/exec"
 	"path/filepath"

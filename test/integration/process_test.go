@@ -4,7 +4,7 @@ import (
 	"errors"
 	"github.com/rogpeppe/go-internal/testscript"
 	"github.com/stretchr/testify/require"
-	"github.com/zhYou/go-cli-starter/internal/scaffold"
+	"github.com/zhYou/go-cli-starter/internal/dev/scaffold"
 	"os"
 	"os/exec"
 	"path/filepath"

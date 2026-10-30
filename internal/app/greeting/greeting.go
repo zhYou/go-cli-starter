@@ -4,7 +4,7 @@ package greeting
 import (
 	"context"
 	"fmt"
-	"github.com/zhYou/go-cli-starter/internal/validation"
+	"github.com/zhYou/go-cli-starter/internal/base/validation"
 )
 
 type Options struct {

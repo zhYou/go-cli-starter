@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-playground/validator/v10"
-	"github.com/zhYou/go-cli-starter/internal/apperror"
+	"github.com/zhYou/go-cli-starter/internal/base/fault"
 	"reflect"
 	"strings"
 )
@@ -55,9 +55,9 @@ func (v *Validator) Struct(ctx context.Context, value any) error {
 				}
 				messages = append(messages, fmt.Sprintf("%s %s", field.Field(), reason))
 			}
-			return apperror.Wrap(apperror.Usage, "", fieldError{strings.Join(messages, "；"), err})
+			return fault.Wrap(fault.Usage, "", fieldError{strings.Join(messages, "；"), err})
 		}
-		return apperror.Wrap(apperror.Runtime, "校验定义无效", err)
+		return fault.Wrap(fault.Runtime, "校验定义无效", err)
 	}
 	return ctx.Err()
 }

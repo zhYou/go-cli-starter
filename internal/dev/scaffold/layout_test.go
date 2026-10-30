@@ -12,7 +12,7 @@ import (
 func TestInitializeMovesCommandDirectory(t *testing.T) {
 	root := projectFixture(t, TemplateModule, TemplateName)
 	source := `package main
-import _ "` + TemplateModule + `/internal/cli"
+import _ "` + TemplateModule + `/internal/app/cli"
 const appName = "` + TemplateName + `"
 func main() {}
 `
@@ -26,7 +26,7 @@ func main() {}
 	require.NoDirExists(t, filepath.Join(root, "cmd", TemplateName))
 	data, err := os.ReadFile(filepath.Join(root, "cmd/my-cli/main.go"))
 	require.NoError(t, err)
-	require.Contains(t, string(data), "example.com/team/repository/internal/cli")
+	require.Contains(t, string(data), "example.com/team/repository/internal/app/cli")
 	changed, err = Initialize(root, "example.com/team/repository", "my-cli")
 	require.NoError(t, err)
 	require.Empty(t, changed)

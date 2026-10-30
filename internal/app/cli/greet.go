@@ -3,7 +3,7 @@ package cli
 import (
 	"fmt"
 	"github.com/spf13/cobra"
-	"github.com/zhYou/go-cli-starter/internal/greeting"
+	"github.com/zhYou/go-cli-starter/internal/app/greeting"
 	"go.uber.org/zap"
 	"io"
 )

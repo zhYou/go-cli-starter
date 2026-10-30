@@ -1,5 +1,5 @@
-// Package apperror 为调用、配置和业务失败保留可识别的错误分类。
-package apperror
+// Package fault 为调用、配置和业务失败保留可识别的错误分类。
+package fault
 
 import "errors"
 

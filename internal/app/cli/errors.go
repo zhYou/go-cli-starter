@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/spf13/cobra"
-	"github.com/zhYou/go-cli-starter/internal/apperror"
+	"github.com/zhYou/go-cli-starter/internal/base/fault"
 )
 
 func exitCode(err error) int {
@@ -15,7 +15,7 @@ func exitCode(err error) int {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return 130
 	}
-	if apperror.KindOf(err) == apperror.Usage {
+	if fault.KindOf(err) == fault.Usage {
 		return 2
 	}
 	return 1
@@ -25,11 +25,11 @@ func classifyExecutionError(err error) error {
 	if err == nil {
 		return nil
 	}
-	var typed *apperror.Error
+	var typed *fault.Error
 	if errors.As(err, &typed) {
 		return err
 	}
-	return apperror.Wrap(apperror.Usage, "", err)
+	return fault.Wrap(fault.Usage, "", err)
 }
 
 func wrapRun(run func(*cobra.Command, []string) error) func(*cobra.Command, []string) error {
@@ -41,11 +41,11 @@ func wrapRun(run func(*cobra.Command, []string) error) func(*cobra.Command, []st
 		if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			return err
 		}
-		var typed *apperror.Error
+		var typed *fault.Error
 		if errors.As(err, &typed) {
 			return err
 		}
-		return apperror.Wrap(apperror.Runtime, "", err)
+		return fault.Wrap(fault.Runtime, "", err)
 	}
 }
 
@@ -54,7 +54,7 @@ func protectCommand(cmd *cobra.Command) {
 	if args := cmd.Args; args != nil {
 		cmd.Args = func(c *cobra.Command, a []string) error {
 			if err := args(c, a); err != nil {
-				return apperror.Wrap(apperror.Usage, "", err)
+				return fault.Wrap(fault.Usage, "", err)
 			}
 			return nil
 		}

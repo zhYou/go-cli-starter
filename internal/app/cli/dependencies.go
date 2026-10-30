@@ -2,10 +2,10 @@ package cli
 
 import (
 	"context"
-	"github.com/zhYou/go-cli-starter/internal/config"
-	"github.com/zhYou/go-cli-starter/internal/greeting"
-	"github.com/zhYou/go-cli-starter/internal/logging"
-	"github.com/zhYou/go-cli-starter/internal/validation"
+	"github.com/zhYou/go-cli-starter/internal/app/config"
+	"github.com/zhYou/go-cli-starter/internal/app/greeting"
+	"github.com/zhYou/go-cli-starter/internal/base/logging"
+	"github.com/zhYou/go-cli-starter/internal/base/validation"
 	"go.uber.org/zap"
 	"io"
 )

@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/zhYou/go-cli-starter/internal/scaffold"
+	"github.com/zhYou/go-cli-starter/internal/dev/scaffold"
 	"io/fs"
 	"os"
 	"os/exec"

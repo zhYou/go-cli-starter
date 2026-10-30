@@ -121,14 +121,14 @@ func TestInitializeDoesNotRewriteNewModuleSubstring(t *testing.T) {
 
 func TestInitializeKeepsRenamedImportsFormatted(t *testing.T) {
 	root := fixture(t)
-	source := "package main\n\nimport (\n\t\"github.com/spf13/cobra\"\n\t\"github.com/zhYou/go-cli-starter/internal/config\"\n)\n\nconst appName = \"go-cli-starter\"\n\nfunc main() {}\n"
+	source := "package main\n\nimport (\n\t\"github.com/spf13/cobra\"\n\t\"github.com/zhYou/go-cli-starter/internal/app/config\"\n)\n\nconst appName = \"go-cli-starter\"\n\nfunc main() {}\n"
 	if err := os.WriteFile(filepath.Join(root, "cmd", TemplateName, "main.go"), []byte(source), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := Initialize(root, "example.com/team/tool", "tool"); err != nil {
 		t.Fatal(err)
 	}
-	wantImports := "import (\n\t\"example.com/team/tool/internal/config\"\n\t\"github.com/spf13/cobra\"\n)"
+	wantImports := "import (\n\t\"example.com/team/tool/internal/app/config\"\n\t\"github.com/spf13/cobra\"\n)"
 	if got := read(t, root, "main.go"); !strings.Contains(got, wantImports) {
 		t.Fatalf("重命名后的导入未格式化：\n%s", got)
 	}

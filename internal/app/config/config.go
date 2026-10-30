@@ -9,7 +9,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/knadh/koanf/providers/confmap"
 	"github.com/knadh/koanf/v2"
-	"github.com/zhYou/go-cli-starter/internal/validation"
+	"github.com/zhYou/go-cli-starter/internal/base/validation"
 	"go.yaml.in/yaml/v3"
 	"io"
 	"os"

@@ -86,7 +86,16 @@ check 不改写源码，但会写 Go 缓存、临时测试文件和 bin 下的�
 
 程序入口位于 `cmd/<name>/`，配置示例位于 `configs/`，集成测试及其脚本位于
 `test/integration/`，共享契约基线位于 `test/testdata/contracts/`。单元测试留在对应包内。
-`tools/` 保留 Go 开发程序，只有需要独立脚本时才增加 `scripts/`。
+`internal/app/cli` 负责命令树和退出码，`internal/app/config` 负责配置，
+`internal/app/greeting` 是可移除的业务示例。`internal/base/` 提供公共基础能力，
+不依赖 `app`、`dev`、`tools` 或 Cobra。`internal/base/schema` 只负责运行时结果
+结构生成；快照归一化、比较和兼容记录检查位于 `internal/dev/contract`。
+`internal/dev/scaffold` 负责模板初始化，根目录 `tools/` 保留 Go 开发程序入口，
+只有需要独立脚本时才增加 `scripts/`。
+
+`iostreams.IOStreams` 显式携带 In、Out 和 ErrOut，`WithDefaults` 返回副本，
+缺省输入返回 EOF，缺省输出写入 io.Discard；不会访问或关闭进程标准流。
+CLI 继续接受 `Options.In`、`Options.Out` 和 `Options.ErrOut`，通过该类型补齐默认值。
 
 开发工具通过 `scaffold.Inspect` 静态识别唯一入口，不根据模块路径末段推测命令名。
 新增文件若包含应用标识，更新初始化受管清单。迁移或删除受管文件后先暂存文件移动，

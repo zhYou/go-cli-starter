@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
-	"github.com/zhYou/go-cli-starter/internal/apperror"
+	"github.com/zhYou/go-cli-starter/internal/base/fault"
 )
 
 func TestExitCodeAndUnwrap(t *testing.T) {
@@ -19,11 +19,11 @@ func TestExitCodeAndUnwrap(t *testing.T) {
 		want int
 	}{
 		{"成功", nil, 0},
-		{"调用", apperror.New(apperror.Usage, "参数无效"), 2},
-		{"配置", apperror.New(apperror.Configuration, "配置无效"), 1},
-		{"运行", apperror.New(apperror.Runtime, "执行失败"), 1},
+		{"调用", fault.New(fault.Usage, "参数无效"), 2},
+		{"配置", fault.New(fault.Configuration, "配置无效"), 1},
+		{"运行", fault.New(fault.Runtime, "执行失败"), 1},
 		{"普通业务错误", errors.New("执行失败"), 1},
-		{"取消", apperror.Wrap(apperror.Runtime, "请求失败", context.Canceled), 130},
+		{"取消", fault.Wrap(fault.Runtime, "请求失败", context.Canceled), 130},
 		{"超时", fmt.Errorf("请求失败：%w", context.DeadlineExceeded), 130},
 	} {
 		t.Run(tc.name, func(t *testing.T) { require.Equal(t, tc.want, exitCode(tc.err)) })

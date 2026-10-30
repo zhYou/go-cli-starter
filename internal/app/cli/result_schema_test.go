@@ -5,8 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/stretchr/testify/require"
-	"github.com/zhYou/go-cli-starter/internal/config"
-	"github.com/zhYou/go-cli-starter/internal/greeting"
+	"github.com/zhYou/go-cli-starter/internal/app/config"
+	"github.com/zhYou/go-cli-starter/internal/app/greeting"
 	"testing"
 )
 

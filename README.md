@@ -144,7 +144,9 @@ RTK 和 superpowers 使用用户目录中的安装。模板不复制全局技能
 
 ```text
 cmd/<name>/                 程序入口与信号测试
-internal/                   CLI、配置、业务与模板初始化
+internal/app/               CLI、配置与业务逻辑
+internal/base/              错误、校验、IO、日志与运行时 schema
+internal/dev/               模板初始化与机器契约比较
 configs/config.example.yaml 配置示例
 test/integration/           真实进程测试与脚本
 test/testdata/contracts/    机器契约基线
@@ -152,7 +154,7 @@ tools/                     初始化与开发任务
 docs/                      使用和维护说明、项目待办
 ```
 
-`cmd/<name>` 入口负责信号和退出；`internal/cli` 组织命令，`internal/config` 加载配置，`internal/greeting` 演示业务逻辑；`internal/scaffold` 和 `tools` 提供初始化与开发任务。
+`cmd/<name>` 入口负责信号和退出；`internal/app/cli` 组织命令，`internal/app/config` 加载配置，`internal/app/greeting` 演示业务逻辑；`internal/base` 提供不依赖应用、开发工具或 Cobra 的公共能力；`internal/base/schema` 负责运行时结果结构，`internal/dev/contract` 负责开发期快照比较。`internal/dev/scaffold` 和根目录 `tools` 提供初始化与开发任务。
 
 初始化后的命令目录随 `--name` 改名；模板版本为 0.2.0，已有项目迁移见[模板升级](docs/template-upgrades.md)。发布包仍在根目录提供 `config.example.yaml`。
 

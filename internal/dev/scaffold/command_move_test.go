@@ -57,7 +57,7 @@ func TestCommandMoveRecoversHardExitTemporaryFile(t *testing.T) {
 	for _, point := range []string{"apply", "rollback", "same-name"} {
 		t.Run(point, func(t *testing.T) {
 			root := projectFixture(t, TemplateModule, TemplateName)
-			source := "package main\nimport _ \"" + TemplateModule + "/internal/cli\"\nconst appName=\"" + TemplateName + "\"\nfunc main(){}\n"
+			source := "package main\nimport _ \"" + TemplateModule + "/internal/app/cli\"\nconst appName=\"" + TemplateName + "\"\nfunc main(){}\n"
 			require.NoError(t, os.WriteFile(filepath.Join(root, "cmd", TemplateName, "main.go"), []byte(source), 0600))
 			cmd := exec.Command(os.Args[0], "-test.run=^TestCommandMoveHardExitHelper$")
 			cmd.Env = append(os.Environ(), "LAYOUT_HARD_EXIT_HELPER=1", "LAYOUT_HARD_EXIT_ROOT="+root, "LAYOUT_HARD_EXIT_POINT="+point)
