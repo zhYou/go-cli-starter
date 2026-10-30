@@ -57,8 +57,8 @@ func TestWindowsHelper(t *testing.T) {
 			_ = child.Process.Release()
 			time.Sleep(10 * time.Millisecond)
 		}
-	case "incompatible-host-job":
-		if err := json.NewEncoder(os.Stdout).Encode(windowsIncompatibleHostJob(args[1], args[2] == "true")); err != nil {
+	case "host-job":
+		if err := json.NewEncoder(os.Stdout).Encode(windowsHostJobScenario(args[1], args[2] == "quota")); err != nil {
 			os.Exit(9)
 		}
 	case "marker-exit":
@@ -431,26 +431,31 @@ func TestWindowsResumeFailureCleansSuspendedProcess(t *testing.T) {
 	}
 }
 
-// 夹具结果明确区分受限宿主建立失败和正式后端拒绝创建，避免未覆盖被当成成功。
+// 夹具结果明确区分宿主建立、挂起时归属与实际执行结果。
 type windowsHostJobResult struct {
-	LimitFlags     uint32              `json:"limit_flags"`
-	UIRestrictions uint32              `json:"ui_restrictions"`
-	HelperInHost   bool                `json:"helper_in_host"`
-	PlainProbe     windowsHostJobProbe `json:"plain_probe"`
-	OwnedProbe     windowsHostJobProbe `json:"owned_probe"`
-	Stage          string              `json:"stage"`
-	SetupError     string              `json:"setup_error"`
-	RunError       string              `json:"run_error"`
-	NativeError    uint32              `json:"native_error"`
-	HasExitState   bool                `json:"has_exit_state"`
-	Canceled       bool                `json:"canceled"`
-	Active         uint32              `json:"active"`
-	QueryError     string              `json:"query_error"`
+	Stage           string `json:"stage"`
+	SetupError      string `json:"setup_error"`
+	LimitFlags      uint32 `json:"limit_flags"`
+	ActiveLimit     uint32 `json:"active_limit"`
+	UIRestrictions  uint32 `json:"ui_restrictions"`
+	HelperInHost    bool   `json:"helper_in_host"`
+	InitialActive   uint32 `json:"initial_active"`
+	Created         bool   `json:"created"`
+	ChildInHost     bool   `json:"child_in_host"`
+	ChildInOwned    bool   `json:"child_in_owned"`
+	OwnedActive     uint32 `json:"owned_active"`
+	BeforeBusiness  bool   `json:"before_business"`
+	ChildQueryError string `json:"child_query_error"`
+	RunError        string `json:"run_error"`
+	NativeError     uint32 `json:"native_error"`
+	HasExitState    bool   `json:"has_exit_state"`
+	Canceled        bool   `json:"canceled"`
+	Active          uint32 `json:"active"`
+	QueryError      string `json:"query_error"`
 }
 
 // 只由独立 helper 调用，主 go test 进程永远不加入此 Job。
-// https://learn.microsoft.com/windows/win32/procthread/nested-jobs
-func windowsIncompatibleHostJob(marker string, breakaway bool) (result windowsHostJobResult) {
+func windowsHostJobScenario(marker string, quota bool) (result windowsHostJobResult) {
 	result.Stage = "create_host_job"
 	host, err := windows.CreateJobObject(nil, nil)
 	if err != nil {
@@ -463,22 +468,25 @@ func windowsIncompatibleHostJob(marker string, breakaway bool) (result windowsHo
 			_ = windows.CloseHandle(host)
 		}
 	}()
-	// 原生诊断分别比较 BREAKAWAY_OK 开关；两种情况均不设置 SILENT_BREAKAWAY。
-	// 拒绝契约暂不变，先记录 JOB_LIST 创建与普通创建的真实归属。
+	// 显式允许 BREAKAWAY，但不设 SILENT_BREAKAWAY；错误后端若主动脱离宿主，会被归属或 marker 检出。
 	limits := windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION{}
-	limits.BasicLimitInformation.LimitFlags = windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-	if breakaway {
-		limits.BasicLimitInformation.LimitFlags |= windows.JOB_OBJECT_LIMIT_BREAKAWAY_OK
+	limits.BasicLimitInformation.LimitFlags = windows.JOB_OBJECT_LIMIT_BREAKAWAY_OK | windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+	if quota {
+		limits.BasicLimitInformation.LimitFlags |= windows.JOB_OBJECT_LIMIT_ACTIVE_PROCESS
+		limits.BasicLimitInformation.ActiveProcessLimit = 1
 	}
-	result.Stage = "set_breakaway_trap"
-	//nolint:gosec // G103：测试调用同步 Win32 API，传入固定原生布局与局部对象的有效地址。
+	result.Stage = "set_host_limits"
+	//nolint:gosec // G103：同步 Win32 API 读取固定原生结构的有效地址。
 	if _, err = windows.SetInformationJobObject(host, windows.JobObjectExtendedLimitInformation, uintptr(unsafe.Pointer(&limits)), uint32(unsafe.Sizeof(limits))); err != nil {
 		result.SetupError = err.Error()
 		return result
 	}
-	restrictions := windows.JOBOBJECT_BASIC_UI_RESTRICTIONS{UIRestrictionsClass: windows.JOB_OBJECT_UILIMIT_HANDLES}
+	restrictions := windows.JOBOBJECT_BASIC_UI_RESTRICTIONS{}
+	if !quota {
+		restrictions.UIRestrictionsClass = windows.JOB_OBJECT_UILIMIT_HANDLES
+	}
 	result.Stage = "set_ui_restrictions"
-	//nolint:gosec // G103：测试调用同步 Win32 API，传入固定原生布局与局部对象的有效地址。
+	//nolint:gosec // G103：同步 Win32 API 读取固定原生结构的有效地址。
 	if _, err = windows.SetInformationJobObject(host, windows.JobObjectBasicUIRestrictions, uintptr(unsafe.Pointer(&restrictions)), uint32(unsafe.Sizeof(restrictions))); err != nil {
 		result.SetupError = err.Error()
 		return result
@@ -488,8 +496,8 @@ func windowsIncompatibleHostJob(marker string, breakaway bool) (result windowsHo
 		result.SetupError = err.Error()
 		return result
 	}
-	// 归属成功后由 helper 进程寿命持有 Job 句柄：先序列化结果，再 os.Exit。
-	// 提前 Close 会终止当前 helper；进程退出或父测试超时终止时，内核关闭句柄并清理遗留后代。
+	// 由 helper 进程寿命持有：先序列化结果再 os.Exit；提前 Close 会终止自身。
+	// helper 正常退出或被外层超时终止时，内核关闭句柄并清理遗留后代。
 	assigned = true
 	result.Stage = "query_host_configuration"
 	//nolint:gosec // G103：同步 Win32 API 读取固定原生结构的有效地址。
@@ -498,6 +506,7 @@ func windowsIncompatibleHostJob(marker string, breakaway bool) (result windowsHo
 		return result
 	}
 	result.LimitFlags = limits.BasicLimitInformation.LimitFlags
+	result.ActiveLimit = limits.BasicLimitInformation.ActiveProcessLimit
 	//nolint:gosec // G103：同步 Win32 API 读取固定原生结构的有效地址。
 	if err = windows.QueryInformationJobObject(host, windows.JobObjectBasicUIRestrictions, uintptr(unsafe.Pointer(&restrictions)), uint32(unsafe.Sizeof(restrictions)), nil); err != nil {
 		result.SetupError = err.Error()
@@ -508,22 +517,52 @@ func windowsIncompatibleHostJob(marker string, breakaway bool) (result windowsHo
 		result.SetupError = err.Error()
 		return result
 	}
+	result.InitialActive, err = jobActiveProcesses(host)
+	if err != nil {
+		result.SetupError = err.Error()
+		return result
+	}
 	executable, err := os.Executable()
 	if err != nil {
 		result.SetupError = err.Error()
 		return result
 	}
-	result.PlainProbe = probeWindowsHostJob(host, executable, marker, false)
-	result.OwnedProbe = probeWindowsHostJob(host, executable, marker, true)
 	result.Stage = "run_backend"
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	err = Run(ctx, Invocation{Program: executable, Args: []string{"-test.run=^TestWindowsHelper$", "--", "marker-exit", marker}}, Execution{Dir: filepath.Dir(marker), Env: os.Environ()})
+	call := Invocation{Program: executable, Args: []string{"-test.run=^TestWindowsHelper$", "--", "marker-exit", marker}}
+	options := Execution{Dir: filepath.Dir(marker), Env: os.Environ()}
+	if quota {
+		// helper 已占满唯一名额。新子进程必须在创建阶段失败，不能降级或逃离宿主。
+		err = Run(ctx, call, options)
+	} else {
+		options.IO = options.IO.WithDefaults()
+		var child *windowsChild
+		child, err = createWindows(ctx, call.Program, call.Args, options)
+		if err == nil {
+			result.Created = true
+			queryErr := probeWindowsProcessInJob(child.info.Process, host, &result.ChildInHost)
+			queryErr = errors.Join(queryErr, probeWindowsProcessInJob(child.info.Process, child.job, &result.ChildInOwned))
+			var activeErr error
+			result.OwnedActive, activeErr = jobActiveProcesses(child.job)
+			queryErr = errors.Join(queryErr, activeErr)
+			if queryErr != nil {
+				result.ChildQueryError = queryErr.Error()
+			}
+			//nolint:gosec // G703：独立测试 helper 仅检查父测试生成并传入的临时 marker 路径。
+			_, markerErr := os.Stat(marker)
+			result.BeforeBusiness = errors.Is(markerErr, os.ErrNotExist)
+			if queryErr != nil || !result.ChildInHost || !result.ChildInOwned || result.OwnedActive != 1 || !result.BeforeBusiness {
+				cancel()
+			}
+			err = child.wait(ctx, DefaultWaitDelay)
+		}
+	}
 	if err != nil {
 		result.RunError = err.Error()
 	}
 	if native, ok := errors.AsType[syscall.Errno](err); ok {
-		//nolint:gosec // G115：Win32 返回 DWORD；uintptr 来自系统 ABI，低 32 位保留文档规定的结果或错误码。
+		//nolint:gosec // G115：Win32 错误码是 DWORD，转换保留系统返回值。
 		result.NativeError = uint32(native)
 	}
 	var exit *exec.ExitError
@@ -537,47 +576,82 @@ func windowsIncompatibleHostJob(marker string, breakaway bool) (result windowsHo
 	return result
 }
 
-func TestWindowsIncompatibleHostJobRejectsBeforeBusiness(t *testing.T) {
-	for _, breakaway := range []bool{true, false} {
-		t.Run("breakaway_"+strconv.FormatBool(breakaway), func(t *testing.T) {
-			testWindowsIncompatibleHostJob(t, breakaway)
-		})
-	}
-}
-
-func testWindowsIncompatibleHostJob(t *testing.T, breakaway bool) {
+func runWindowsHostJobFixture(t *testing.T, quota bool) (windowsHostJobResult, string) {
 	t.Helper()
 	marker := filepath.Join(t.TempDir(), "business-marker")
-	call, options := windowsHelper(t, "incompatible-host-job", marker, strconv.FormatBool(breakaway))
+	mode := "ui"
+	if quota {
+		mode = "quota"
+	}
+	call, options := windowsHelper(t, "host-job", marker, mode)
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	// 使用原生独立 helper 构造宿主；不经过被测后端，不改主测试进程的 Job 归属。
-	//nolint:gosec // G204：辅助进程只执行自身测试二进制；路径来自当前测试生成的临时目录。
+	// 原生独立 helper 构造宿主，不经过被测后端，不改主测试进程的 Job 归属。
+	//nolint:gosec // G204：辅助进程仅执行自身测试二进制，路径来自当前测试。
 	fixture := exec.CommandContext(ctx, call.Program, call.Args...)
 	fixture.Dir, fixture.Env = options.Dir, options.Env
 	fixture.WaitDelay = DefaultWaitDelay
 	output, err := fixture.CombinedOutput()
 	if err != nil {
-		t.Fatalf("受限宿主夹具未完成，未覆盖该场景: %v；%s", err, output)
+		t.Fatalf("宿主夹具未完成，未覆盖该场景: %v；%s", err, output)
 	}
 	var result windowsHostJobResult
 	if err = json.Unmarshal(output, &result); err != nil {
 		t.Fatalf("夹具结果无效，未覆盖该场景: %v；%s", err, output)
 	}
 	t.Logf("宿主 Job 原生证据: %s", output)
-	if result.SetupError != "" {
-		// CI可能已把helper放入外层Job，导致Windows禁止再加入带UI限制的Job。
-		// 这种环境不能证明拒绝路径；明确失败，不Skip，更不能把准备失败当作被测后端成功。
-		t.Fatalf("未覆盖不兼容宿主Job：夹具在 %s 阶段失败，helper可能已继承外层Job限制: %s", result.Stage, result.SetupError)
+	if result.SetupError != "" || result.Stage != "complete" {
+		// 准备失败不能证明后端拒绝；明确失败，不 Skip。
+		t.Fatalf("未覆盖宿主场景，夹具在 %s 阶段失败: %s", result.Stage, result.SetupError)
 	}
-	if result.Stage != "complete" || result.RunError == "" || result.NativeError != uint32(windows.ERROR_ACCESS_DENIED) || result.HasExitState || result.Canceled {
-		t.Fatalf("未在创建时拒绝不兼容宿主Job: %+v", result)
+	wantFlags := uint32(windows.JOB_OBJECT_LIMIT_BREAKAWAY_OK | windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE)
+	wantUI, wantLimit := uint32(windows.JOB_OBJECT_UILIMIT_HANDLES), uint32(0)
+	if quota {
+		wantFlags |= windows.JOB_OBJECT_LIMIT_ACTIVE_PROCESS
+		wantUI, wantLimit = 0, 1
+	}
+	if result.LimitFlags != wantFlags || result.UIRestrictions != wantUI || result.ActiveLimit != wantLimit || !result.HelperInHost || result.InitialActive != 1 {
+		t.Fatalf("宿主原生限制或初始归属不符: %+v", result)
 	}
 	if result.QueryError != "" || result.Active != 1 {
-		t.Fatalf("宿主除helper外仍有活动进程: %+v", result)
+		t.Fatalf("收尾后宿主除 helper 外仍有活动进程: %+v", result)
 	}
-	if _, err = os.Stat(marker); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("不兼容宿主中执行了业务，疑似无Job或breakaway降级: %v", err)
+	return result, marker
+}
+
+func TestWindowsIncompatibleHostJobRejectsBeforeBusiness(t *testing.T) {
+	result, marker := runWindowsHostJobFixture(t, true)
+	// 官方只保证超出活动进程配额时拒绝分配，不保证特定 GetLastError 值。
+	// https://learn.microsoft.com/windows/win32/api/jobapi2/nf-jobapi2-assignprocesstojobobject
+	if result.RunError == "" || result.NativeError == 0 || result.HasExitState || result.Canceled {
+		t.Fatalf("未在创建时拒绝已满宿主 Job: %+v", result)
+	}
+	if _, err := os.Stat(marker); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("已满宿主中执行了业务，疑似 breakaway 降级: %v", err)
+	}
+}
+
+func TestWindowsUIRestrictedHostPreservesJobMembership(t *testing.T) {
+	result, marker := runWindowsHostJobFixture(t, false)
+	if !result.Created {
+		// 兼容旧主机严格拒绝 UI 嵌套的行为；未知创建错误、业务执行或退出状态均不能通过。
+		if result.NativeError != uint32(windows.ERROR_ACCESS_DENIED) || result.RunError == "" || result.HasExitState || result.Canceled {
+			t.Fatalf("UI 宿主创建返回未知失败: %+v", result)
+		}
+		if _, err := os.Stat(marker); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("UI 宿主拒绝创建后仍执行业务: %v", err)
+		}
+		return
+	}
+	// 当前原生 Windows 允许此组合；必须在 Resume 前同时属于宿主与自有 Job。
+	if result.ChildQueryError != "" || !result.ChildInHost || !result.ChildInOwned || result.OwnedActive != 1 || !result.BeforeBusiness {
+		t.Fatalf("创建时未满足 Job 双归属或挂起保障: %+v", result)
+	}
+	if result.RunError != "" || result.NativeError != 0 || result.HasExitState || result.Canceled {
+		t.Fatalf("UI 宿主内正常执行失败: %+v", result)
+	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatalf("Resume 后未执行业务: %v", err)
 	}
 }
 
@@ -668,66 +742,6 @@ func TestWindowsTerminationFailureClosesJobBeforeWaiting(t *testing.T) {
 			}
 		})
 	}
-}
-
-// 仅用于本轮原生取证：所有探针保持挂起并独立清理，绝不恢复业务线程。
-type windowsHostJobProbe struct {
-	CreateError  string `json:"create_error"`
-	QueryError   string `json:"query_error"`
-	InHost       bool   `json:"in_host"`
-	InOwned      bool   `json:"in_owned"`
-	CleanupError string `json:"cleanup_error"`
-}
-
-func probeWindowsHostJob(host windows.Handle, executable, marker string, owned bool) (result windowsHostJobProbe) {
-	var process, job windows.Handle
-	if owned {
-		options := Execution{Dir: filepath.Dir(marker), Env: os.Environ()}
-		options.IO = options.IO.WithDefaults()
-		child, err := createWindows(context.Background(), executable, []string{"-test.run=^TestWindowsHelper$", "--", "marker-exit", marker}, options)
-		if err != nil {
-			result.CreateError = err.Error()
-			return result
-		}
-		process, job = child.info.Process, child.job
-		defer func() {
-			child.streams.close()
-			if err := errors.Join(child.process.Release(), abortWindowsProcess(child.info, child.job)); err != nil {
-				result.CleanupError = err.Error()
-			}
-		}()
-	} else {
-		application, err := windows.UTF16PtrFromString(executable)
-		if err != nil {
-			result.CreateError = err.Error()
-			return result
-		}
-		startup := windows.StartupInfo{Cb: uint32(unsafe.Sizeof(windows.StartupInfo{}))}
-		var info windows.ProcessInformation
-		if err = windows.CreateProcess(application, nil, nil, nil, false, windows.CREATE_SUSPENDED, nil, nil, &startup, &info); err != nil {
-			result.CreateError = err.Error()
-			return result
-		}
-		process = info.Process
-		defer func() {
-			terminationErr := windows.TerminateProcess(info.Process, 1)
-			status, waitErr := windows.WaitForSingleObject(info.Process, 3000)
-			if status != windows.WAIT_OBJECT_0 && waitErr == nil {
-				waitErr = errors.New("普通挂起探针未在期限内终止")
-			}
-			if err := errors.Join(terminationErr, waitErr, windows.CloseHandle(info.Thread), windows.CloseHandle(info.Process)); err != nil {
-				result.CleanupError = err.Error()
-			}
-		}()
-	}
-	err := probeWindowsProcessInJob(process, host, &result.InHost)
-	if job != 0 {
-		err = errors.Join(err, probeWindowsProcessInJob(process, job, &result.InOwned))
-	}
-	if err != nil {
-		result.QueryError = err.Error()
-	}
-	return result
 }
 
 func probeWindowsProcessInJob(process, job windows.Handle, member *bool) error {
