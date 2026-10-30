@@ -173,7 +173,7 @@ func (original *Initializer) Initialize(ctx context.Context, root, module, name 
 		if err != nil {
 			return nil, err
 		}
-		updated := replacer.Replace(string(data))
+		updated := replaceManagedIdentity(relative, string(data), replacer)
 		if updated != string(data) {
 			updatedData := []byte(updated)
 			if filepath.Ext(path) == ".go" {

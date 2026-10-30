@@ -91,6 +91,8 @@ check 不改写源码，但会使用 Go 缓存、临时文件和 bin 产物。
 
 初始化只重写 `internal/dev/scaffold/scaffold.go` 的 managedFiles 白名单。
 新增身份文件须明确登记；保留初始化实现的原模板身份和 fixture，禁止全仓替换。
+历史来源引用仅按 `source_references.go` 中的精确文件和完整 Markdown 引用保留，其余文本仍改名；
+来源登记属于初始化实现自身，不参与应用身份改写。
 移动或新增文件先暂存，再运行使用 Git 索引清单复制项目的 `template:check`。
 它验证改名、幂等、测试、真实构建与 go install 后的绝对路径二进制、version/help/schema/TOML。
 旧项目迁移与事务恢复见[模板升级](template-upgrades.md)，初始化不承担升级。
