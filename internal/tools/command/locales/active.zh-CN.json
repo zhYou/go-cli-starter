@@ -7,5 +7,7 @@
   "command.batch_item_failed": "第 {{.Index}} 项执行失败",
   "command.batch_item_incomplete": "第 {{.Index}} 项执行未完成",
   "command.started": "开始执行外部工具",
-  "command.finished": "外部工具执行结束"
+  "command.finished": "外部工具执行结束",
+  "command.windows_suspend_invalid": "Windows 主线程挂起计数异常",
+  "command.windows_job_not_empty": "Windows Job 终止后仍有活动进程"
 }

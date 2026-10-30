@@ -16,13 +16,15 @@ var catalogs embed.FS
 func Catalog() fs.FS { return catalogs }
 
 var (
-	programRequired     = fault.Definition{Code: "command.program_required", Kind: fault.Runtime}
-	argumentRequired    = fault.Definition{Code: "command.argument_required", Kind: fault.Runtime}
-	waitDelayInvalid    = fault.Definition{Code: "command.wait_delay_invalid", Kind: fault.Runtime}
-	captureLimitInvalid = fault.Definition{Code: "command.capture_limit_invalid", Kind: fault.Runtime}
-	batchOptionsInvalid = fault.Definition{Code: "command.batch_options_invalid", Kind: fault.Runtime}
-	batchItemFailed     = fault.Definition{Code: "command.batch_item_failed", Kind: fault.Runtime}
-	batchItemIncomplete = fault.Definition{Code: "command.batch_item_incomplete", Kind: fault.Runtime}
+	windowsSuspendInvalid = fault.Definition{Code: "command.windows_suspend_invalid", Kind: fault.Runtime}
+	windowsJobNotEmpty    = fault.Definition{Code: "command.windows_job_not_empty", Kind: fault.Runtime}
+	programRequired       = fault.Definition{Code: "command.program_required", Kind: fault.Runtime}
+	argumentRequired      = fault.Definition{Code: "command.argument_required", Kind: fault.Runtime}
+	waitDelayInvalid      = fault.Definition{Code: "command.wait_delay_invalid", Kind: fault.Runtime}
+	captureLimitInvalid   = fault.Definition{Code: "command.capture_limit_invalid", Kind: fault.Runtime}
+	batchOptionsInvalid   = fault.Definition{Code: "command.batch_options_invalid", Kind: fault.Runtime}
+	batchItemFailed       = fault.Definition{Code: "command.batch_item_failed", Kind: fault.Runtime}
+	batchItemIncomplete   = fault.Definition{Code: "command.batch_item_incomplete", Kind: fault.Runtime}
 )
 
 var defaultBundle = sync.OnceValues(func() (*messages.Bundle, error) { return messages.NewBundle(Catalog()) })

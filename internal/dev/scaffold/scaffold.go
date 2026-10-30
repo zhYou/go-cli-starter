@@ -24,6 +24,7 @@ var managedFiles = []string{
 	"internal/tools/command/catalog_test.go",
 	"internal/app/cli/command_embedding_test.go",
 	"internal/tools/command/process.go",
+	"internal/tools/command/io_windows.go",
 	"internal/tools/command/observability.go",
 	"internal/tools/command/observability_test.go",
 	"internal/tools/command/command_test.go",

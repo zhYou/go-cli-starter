@@ -7,5 +7,7 @@
   "command.batch_item_failed": "Batch item {{.Index}} failed",
   "command.batch_item_incomplete": "Batch item {{.Index}} did not complete",
   "command.started": "External tool started",
-  "command.finished": "External tool finished"
+  "command.finished": "External tool finished",
+  "command.windows_suspend_invalid": "Unexpected suspend count on the Windows primary thread",
+  "command.windows_job_not_empty": "Windows Job still has active processes after termination"
 }

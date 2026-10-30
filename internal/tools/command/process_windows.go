@@ -2,15 +2,68 @@ package command
 
 import (
 	"context"
+	"errors"
+	"os"
 	"os/exec"
+	"time"
+
+	"golang.org/x/sys/windows"
 )
 
-// Windows 暂用标准库后端；原生 Job 后端将替换此函数，公共层不依赖 exec.Cmd 内部。
+// Windows 10/Server 2016 起，在创建时绑定独立 Job；失败时不降级到无 Job 的启动。
 func runPlatform(ctx context.Context, program string, args []string, options Execution) error {
-	// #nosec G204 -- 程序及 argv 由显式调用提供，不经 shell。
-	cmd := exec.CommandContext(ctx, program, args...)
-	cmd.Dir, cmd.Env = options.Dir, options.Env
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = options.IO.In, options.IO.Out, options.IO.ErrOut
-	cmd.WaitDelay = options.WaitDelay
-	return cmd.Run()
+	child, err := createWindows(ctx, program, args, options)
+	if err != nil {
+		return err
+	}
+	return child.wait(ctx, options.WaitDelay)
+}
+
+type windowsChild struct {
+	info    windows.ProcessInformation
+	job     windows.Handle
+	process *os.Process
+	streams *windowsIO
+}
+
+// wait 消费一次创建结果。监控先于 Resume 建立，Job 关闭前必须与监控同步。
+func (child *windowsChild) wait(ctx context.Context, delay time.Duration) (result error) {
+	defer func() {
+		result = errors.Join(result, windows.CloseHandle(child.info.Thread), windows.CloseHandle(child.info.Process), windows.CloseHandle(child.job))
+		child.streams.close()
+	}()
+	child.streams.start()
+	rootDone := make(chan struct{})
+	cleaned := make(chan error, 1)
+	go func() {
+		select {
+		case <-ctx.Done():
+		case <-rootDone:
+		}
+		cleaned <- terminateWindowsJob(child.job)
+	}()
+	var resumeErr error
+	if ctx.Err() != nil {
+		resumeErr = contextError(ctx)
+	} else {
+		previous, err := windows.ResumeThread(child.info.Thread)
+		resumeErr = err
+		if err == nil && previous != 1 {
+			resumeErr = windowsSuspendInvalid.New()
+		}
+	}
+	// Resume 失败/取消的挂起进程也必须先终止，再获取真实退出状态。
+	if resumeErr != nil {
+		close(rootDone)
+	}
+	state, waitErr := child.process.Wait()
+	if resumeErr == nil {
+		close(rootDone)
+	}
+	cleanupErr := <-cleaned
+	if waitErr == nil && !state.Success() {
+		waitErr = &exec.ExitError{ProcessState: state}
+	}
+	streamErr := child.streams.wait(delay)
+	return errors.Join(resumeErr, waitErr, cleanupErr, streamErr)
 }

@@ -27,6 +27,8 @@ func TestCommandErrorsHaveOwnedBilingualDefinitions(t *testing.T) {
 		code, zh, en string
 		err          error
 	}{
+		{"command.windows_suspend_invalid", "Windows 主线程挂起计数异常", "Unexpected suspend count on the Windows primary thread", windowsSuspendInvalid.New()},
+		{"command.windows_job_not_empty", "Windows Job 终止后仍有活动进程", "Windows Job still has active processes after termination", windowsJobNotEmpty.New()},
 		{"command.program_required", "必须指定执行程序", "An executable program is required", err},
 		{"command.argument_required", "参数构造函数不能为空", "An argument builder is required", argErr},
 		{"command.program_required", "必须指定执行程序", "An executable program is required", Run(t.Context(), Invocation{}, Execution{})},
