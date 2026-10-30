@@ -108,16 +108,20 @@ func Load(opts Options) (Config, error) {
 		if err := toml.Unmarshal(data, &values); err != nil {
 			return cfg, problem("parse", err, fault.Params{"Path": file})
 		}
-		// 文件结构独立验证，覆盖值不能掩盖未知键或弱类型。
-		fileConfig := koanf.New(".")
-		if err := fileConfig.Load(confmap.Provider(values, "."), nil); err != nil {
-			return cfg, problem("decode", err, nil)
-		}
+		// 先校验 TOML 的原始嵌套结构，禁止字面点号键被解释为路径。
 		var typed Config
-		if err := decode(fileConfig, &typed); err != nil {
+		decoderConfig := strictDecoderConfig()
+		decoderConfig.TagName = "mapstructure"
+		decoderConfig.Result = &typed
+		decoder, err := mapstructure.NewDecoder(decoderConfig)
+		if err != nil {
 			return cfg, problem("decode", err, nil)
 		}
-		if err := layer(values); err != nil {
+		if err := decoder.Decode(values); err != nil {
+			return cfg, problem("decode", err, nil)
+		}
+		// TOML 解析器已经展开合法点号语法；文件数据不再做键展开。
+		if err := k.Load(confmap.Provider(values, ""), nil); err != nil {
 			return cfg, problem("decode", err, nil)
 		}
 	}
@@ -162,9 +166,12 @@ func Load(opts Options) (Config, error) {
 	return cfg, ctx.Err()
 }
 func decode(k *koanf.Koanf, cfg *Config) error {
-	return k.UnmarshalWithConf("", cfg, koanf.UnmarshalConf{Tag: "mapstructure", DecoderConfig: &mapstructure.DecoderConfig{
+	return k.UnmarshalWithConf("", cfg, koanf.UnmarshalConf{Tag: "mapstructure", DecoderConfig: strictDecoderConfig()})
+}
+func strictDecoderConfig() *mapstructure.DecoderConfig {
+	return &mapstructure.DecoderConfig{
 		WeaklyTypedInput: false, ErrorUnused: true, DecodeHook: strictHook, MatchName: func(a, b string) bool { return a == b },
-	}})
+	}
 }
 func strictHook(from, to reflect.Type, value any) (any, error) {
 	if to == reflect.TypeFor[time.Duration]() {

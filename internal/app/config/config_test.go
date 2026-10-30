@@ -150,3 +150,39 @@ func TestAppHomeOverridesDefaultAndRejectsRelativeEvenWithExplicitFile(t *testin
 	_, err = load(file)
 	require.Error(t, err)
 }
+
+func TestTOMLKeyStructureBeforeMerging(t *testing.T) {
+	for _, tc := range []struct {
+		name, text string
+		valid      bool
+	}{
+		{"点号语法", `logging.level = "debug"
+logging.output = "stderr"`, true},
+		{"引用分段语法", `"logging"."level" = "debug"
+"logging"."output" = "stderr"`, true},
+		{"字面点号键", `"logging.level" = "debug"`, false},
+		{"字面键与嵌套字段冲突", `"logging.level" = "noisy"
+[logging]
+level = "debug"
+output = "stderr"`, false},
+		{"字面表名", `["logging.level"]
+value = "debug"`, false},
+		{"嵌套字面键", `[logging]
+"level.part" = "debug"`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			file := filepath.Join(t.TempDir(), "config.toml")
+			require.NoError(t, os.WriteFile(file, []byte(tc.text), 0600))
+			for i := 0; i < 32; i++ {
+				cfg, err := Load(Options{Path: file, LookupEnv: func(string) (string, bool) { return "", false }})
+				if tc.valid {
+					require.NoError(t, err)
+					require.Equal(t, "debug", cfg.Logging.Level)
+					require.Equal(t, "stderr", cfg.Logging.Output)
+				} else {
+					require.Error(t, err, "第 %d 次读取不得接受字面点号键", i)
+				}
+			}
+		})
+	}
+}

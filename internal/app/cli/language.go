@@ -57,9 +57,10 @@ func selectLanguage(root *cobra.Command, args []string, env string) (string, err
 	if selected == "" {
 		selected = "zh-CN"
 	}
-	current := root
+	// 与 Execute 使用相同的命令查找，子命令选项也可能位于命令名之前。
+	// Find 不执行选项 Set；查找错误留给实际执行路径处理。
+	current, scan, _ := root.Find(args)
 	completion := false
-	scan := args
 	findFlag := func(name string, short bool) *pflag.Flag {
 		for cmd := current; cmd != nil; cmd = cmd.Parent() {
 			for _, set := range []*pflag.FlagSet{cmd.Flags(), cmd.PersistentFlags()} {
@@ -111,20 +112,15 @@ func selectLanguage(root *cobra.Command, args []string, env string) (string, err
 					break
 				}
 			}
-		} else {
-			if arg == cobra.ShellCompRequestCmd || arg == cobra.ShellCompNoDescRequestCmd {
-				completion = true
-				if len(scan) > i+1 {
-					scan = scan[:len(scan)-1]
-				}
-				continue
+		} else if current == root && (arg == cobra.ShellCompRequestCmd || arg == cobra.ShellCompNoDescRequestCmd) {
+			completion = true
+			remaining := scan[i+1:]
+			if len(remaining) > 0 {
+				remaining = remaining[:len(remaining)-1]
 			}
-			for _, child := range current.Commands() {
-				if child.Name() == arg || child.HasAlias(arg) {
-					current = child
-					break
-				}
-			}
+			// 隐藏补全尚未由 Cobra 创建；单独查找其真正要补全的命令。
+			current, scan, _ = root.Find(remaining)
+			i = -1
 		}
 	}
 	if lang, ok := canonicalLanguage(selected); ok {

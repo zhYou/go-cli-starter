@@ -145,3 +145,66 @@ func TestNoneLoggingAndEnglishDiagnostics(t *testing.T) {
 	require.Contains(t, stderr, "Invalid configuration")
 	require.NotContains(t, stderr, "日志")
 }
+
+func TestLanguageSelectionWithFlagsBeforeCommand(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+		code int
+	}{
+		{"值为语言", []string{"--name", "--lang=en", "greet"}, "你好，--lang=en！", 0},
+		{"值为未知语言", []string{"--name", "--lang=de", "greet"}, "你好，--lang=de！", 0},
+		{"布尔选项穿插", []string{"--json", "--name", "--lang=de", "greet"}, `{"message":"你好，--lang=de！"}`, 0},
+		{"显式布尔值", []string{"--json=false", "--name", "--lang=en", "greet"}, "你好，--lang=en！", 0},
+		{"实际语言选项优先", []string{"--name", "--lang=de", "--lang", "en", "greet"}, "Hello, --lang=de!", 0},
+		{"实际语言在前", []string{"--lang=en", "--name", "--lang=de", "greet"}, "Hello, --lang=de!", 0},
+		{"分隔符后的语言不生效", []string{"--name", "Ada", "greet", "--", "--lang=en"}, "错误：", 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			code, out, stderr := invoke(t, tc.args...)
+			require.Equal(t, tc.code, code, stderr)
+			require.Contains(t, out+stderr, tc.want)
+			if code == 0 {
+				require.Empty(t, stderr)
+			}
+		})
+	}
+}
+
+func TestLanguageSelectionMatchesTargetFlagMetadata(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		args         []string
+		source, lang string
+		toggle       bool
+		positional   []string
+	}{
+		{"前置长选项", []string{"--source", "--lang=de", "extra"}, "--lang=de", "zh-CN", false, nil},
+		{"前置短选项", []string{"-s", "--lang=de", "extra"}, "--lang=de", "zh-CN", false, nil},
+		{"短选项附值", []string{"-s--lang=de", "extra"}, "--lang=de", "zh-CN", false, nil},
+		{"短选项组合", []string{"-bs", "--lang=de", "extra"}, "--lang=de", "zh-CN", true, nil},
+		{"布尔等号赋值", []string{"--toggle=true", "--source", "--lang=de", "extra"}, "--lang=de", "zh-CN", true, nil},
+		{"前置和后置选项", []string{"-bs", "--lang=de", "extra", "--lang=en"}, "--lang=de", "en", true, nil},
+		{"分隔符", []string{"-s", "value", "extra", "--", "--lang=en"}, "value", "zh-CN", false, []string{"--lang=en"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := NewRoot(Options{Out: &bytes.Buffer{}, ErrOut: &bytes.Buffer{}})
+			var source string
+			var toggle bool
+			var positional []string
+			cmd := &cobra.Command{Use: "extra", Annotations: map[string]string{"skip-config": "true"}, Args: cobra.ArbitraryArgs, RunE: func(_ *cobra.Command, args []string) error { positional = args; return nil }}
+			cmd.Flags().StringVarP(&source, "source", "s", "", "来源")
+			cmd.Flags().BoolVarP(&toggle, "toggle", "b", false, "切换")
+			root.AddCommand(cmd)
+			lang, err := selectLanguage(root, tc.args, "zh-CN")
+			require.NoError(t, err)
+			require.Equal(t, tc.lang, lang)
+			root.SetArgs(tc.args)
+			require.NoError(t, root.Execute())
+			require.Equal(t, tc.source, source)
+			require.Equal(t, tc.toggle, toggle)
+			require.Equal(t, tc.positional, append([]string(nil), positional...))
+		})
+	}
+}
