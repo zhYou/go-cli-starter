@@ -9,6 +9,7 @@ import (
 
 	"github.com/zhYou/go-cli-starter/internal/base/iostreams"
 	"github.com/zhYou/go-cli-starter/internal/base/logging"
+	"github.com/zhYou/go-cli-starter/internal/base/messages"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -17,7 +18,9 @@ const DefaultWaitDelay = 250 * time.Millisecond
 
 // Execution 的流为借用资源，不关闭调用方句柄。Env=nil 继承当前环境，空切片清空环境。
 // WaitDelay=0 使用默认宽限；不为普通命令添加独立 deadline。
+// Localizer 显式选择日志语言；nil 使用本包中文目录。结构化错误由应用入口统一渲染。
 type Execution struct {
+	Localizer *messages.Localizer
 	Logger    *logging.Logger
 	Tracer    trace.Tracer
 	Operation string
@@ -33,10 +36,10 @@ func Run(ctx context.Context, call Invocation, options Execution) (result error)
 		return contextError(ctx)
 	}
 	if call.Program == "" {
-		return errors.New("必须指定执行程序")
+		return programRequired.New()
 	}
 	if options.WaitDelay < 0 {
-		return errors.New("进程收尾宽限不能为负数")
+		return waitDelayInvalid.New()
 	}
 	if options.WaitDelay == 0 {
 		options.WaitDelay = DefaultWaitDelay

@@ -3,10 +3,10 @@ package command
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
+	"github.com/zhYou/go-cli-starter/internal/base/fault"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
@@ -20,10 +20,11 @@ type BatchOptions struct {
 	Capture     CaptureOptions
 }
 
-// RunBatch 按输入顺序返回结果。派生取消留在单项错误，整体仅保留真实失败及父取消。
+// RunBatch 按输入顺序返回结果。派生取消留在单项错误，整体按最先终止批量的原因分类。
+// 已获名额后的自身期限到期记为 Canceled；批量取消导致尚未开跑的项才记为 Skipped。
 func RunBatch(parent context.Context, calls []Invocation, execution Execution, options BatchOptions) ([]Result, error) {
 	if options.Concurrency < 0 || options.ItemTimeout < 0 || options.Capture.Limit < 0 {
-		return nil, errors.New("批量并发数、超时和捕获上限不能为负数")
+		return nil, batchOptionsInvalid.New()
 	}
 	if options.Concurrency == 0 {
 		options.Concurrency = 1
@@ -51,10 +52,14 @@ func RunBatch(parent context.Context, calls []Invocation, execution Execution, o
 			itemCtx := ctx
 			stop := func() {}
 			if options.ItemTimeout > 0 {
-				itemCtx, stop = context.WithTimeout(ctx, options.ItemTimeout)
+				itemCtx, stop = context.WithTimeoutCause(ctx, options.ItemTimeout, itemDeadlineCause{})
 			}
 			defer stop()
 			results[i] = Capture(itemCtx, call, execution, options.Capture)
+			// 独立 cause 标记避免与同时到来的父期限/内部 fail-fast 取消混淆。
+			if results[i].Status == Skipped && context.Cause(itemCtx) == (itemDeadlineCause{}) {
+				results[i].Status = Canceled
+			}
 			if results[i].Err != nil {
 				mu.Lock()
 				if first == nil {
@@ -81,7 +86,8 @@ func RunBatch(parent context.Context, calls []Invocation, execution Execution, o
 	if options.FailFast && first != nil {
 		failures = append(failures, first)
 	}
-	if parent.Err() != nil {
+	// WithCancelCause 原子保留首先触发批量终止的原因；收尾期间的父取消不能覆盖 fail-fast 首因。
+	if parent.Err() != nil && (!options.FailFast || context.Cause(ctx) != first) {
 		failures = append(failures, contextError(parent))
 	}
 	return results, errors.Join(failures...)
@@ -91,9 +97,9 @@ func batchFailure(index int, err error) error {
 	// 标准进程错误保留 errors.As；派生 deadline/cancel 不使 CLI 将普通批量失败映射为 130。
 	cause := withoutCancellation(err)
 	if cause == nil {
-		return fmt.Errorf("第 %d 项执行未完成：%v", index+1, err)
+		return batchItemIncomplete.New(fault.WithParams(fault.Params{"Index": index + 1}))
 	}
-	return fmt.Errorf("第 %d 项执行失败：%w", index+1, cause)
+	return batchItemFailed.Wrap(cause, fault.WithParams(fault.Params{"Index": index + 1}))
 }
 func withoutCancellation(err error) error {
 	if err == nil || err == context.Canceled || err == context.DeadlineExceeded {
@@ -111,3 +117,9 @@ func withoutCancellation(err error) error {
 	}
 	return err
 }
+
+// 保留标准 deadline 错误链，同时识别本项自行到期；不引入可变全局状态。
+type itemDeadlineCause struct{}
+
+func (itemDeadlineCause) Error() string { return context.DeadlineExceeded.Error() }
+func (itemDeadlineCause) Unwrap() error { return context.DeadlineExceeded }

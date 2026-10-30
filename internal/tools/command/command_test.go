@@ -40,6 +40,29 @@ func TestHelperProcess(t *testing.T) {
 		_, _ = os.Stderr.Write(bytes.Repeat([]byte{'b'}, 2<<20))
 	case "exit":
 		os.Exit(7)
+	case "gate-fail":
+		signal.Ignore(syscall.SIGTERM)
+		_ = os.WriteFile(args[1], []byte("ready"), 0600)
+		until := time.Now().Add(5 * time.Second)
+		for time.Now().Before(until) {
+			if _, err := os.Stat(args[2]); err == nil {
+				os.Exit(7)
+			}
+			time.Sleep(time.Millisecond)
+		}
+		os.Exit(8)
+	case "term-marker":
+		received := make(chan os.Signal, 1)
+		signal.Notify(received, syscall.SIGTERM)
+		defer signal.Stop(received)
+		_ = os.WriteFile(args[1], []byte("ready"), 0600)
+		select {
+		case <-received:
+			_ = os.WriteFile(args[2], []byte("term"), 0600)
+		case <-time.After(5 * time.Second):
+			os.Exit(8)
+		}
+		time.Sleep(5 * time.Second)
 	case "interval":
 		start := time.Now().UnixNano()
 		time.Sleep(100 * time.Millisecond)
@@ -100,7 +123,7 @@ func helper(t *testing.T, args ...string) (Invocation, Execution) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return Invocation{Program: executable, Operation: "test.helper", Args: append([]string{"-test.run=^TestHelperProcess$", "--"}, args...)}, Execution{Dir: root, Env: []string{"COMMAND_HELPER=1", "GORACE=atexit_sleep_ms=0", "GO_CLI_STARTER_APP_HOME=" + root, "HOME=" + root, "USERPROFILE=" + root, "SYSTEMROOT=" + os.Getenv("SYSTEMROOT")}}
+	return Invocation{Program: executable, Operation: "test.helper", Args: append([]string{"-test.run=^TestHelperProcess$", "--"}, args...)}, Execution{Dir: root, Env: []string{"COMMAND_HELPER=1", "GORACE=atexit_sleep_ms=0", "GO_CLI_STARTER_HOME=" + root, "HOME=" + root, "USERPROFILE=" + root, "SYSTEMROOT=" + os.Getenv("SYSTEMROOT")}}
 }
 func TestTypedArgumentsAreIndependent(t *testing.T) {
 	source := []string{"literal", ""}

@@ -1,0 +1,11 @@
+{
+  "command.program_required": "必须指定执行程序",
+  "command.argument_required": "参数构造函数不能为空",
+  "command.wait_delay_invalid": "进程收尾宽限不能为负数",
+  "command.capture_limit_invalid": "捕获上限不能为负数",
+  "command.batch_options_invalid": "批量并发数、超时和捕获上限不能为负数",
+  "command.batch_item_failed": "第 {{.Index}} 项执行失败",
+  "command.batch_item_incomplete": "第 {{.Index}} 项执行未完成",
+  "command.started": "开始执行外部工具",
+  "command.finished": "外部工具执行结束"
+}

@@ -13,6 +13,7 @@ import (
 	"github.com/zhYou/go-cli-starter/internal/base/paths"
 	"github.com/zhYou/go-cli-starter/internal/base/telemetry"
 	"github.com/zhYou/go-cli-starter/internal/base/validation"
+	"github.com/zhYou/go-cli-starter/internal/tools/command"
 	"os"
 	"strconv"
 	"strings"
@@ -20,7 +21,7 @@ import (
 )
 
 var loadBundle = sync.OnceValues(func() (*messages.Bundle, error) {
-	return messages.NewBundle(Catalog(), config.Catalog(), session.Catalog(), logging.Catalog(), telemetry.Catalog(), diagnostics.Catalog(), greeting.Catalog(), paths.Catalog(), validation.Catalog())
+	return messages.NewBundle(Catalog(), config.Catalog(), session.Catalog(), logging.Catalog(), telemetry.Catalog(), diagnostics.Catalog(), greeting.Catalog(), paths.Catalog(), validation.Catalog(), command.Catalog())
 })
 
 func newLocalizer(lang string) *messages.Localizer {

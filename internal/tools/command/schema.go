@@ -1,7 +1,5 @@
 package command
 
-import "errors"
-
 // Invocation 保存已构建的程序和独立 argv，不包含执行状态。
 type Invocation struct {
 	Operation string
@@ -23,7 +21,7 @@ type Spec[P any] struct {
 // Build 校验输入并为本次调用构建独立的参数切片。
 func (s Spec[P]) Build(input P) (Invocation, error) {
 	if s.Program == "" {
-		return Invocation{}, errors.New("必须指定执行程序")
+		return Invocation{}, programRequired.New()
 	}
 	if s.Validate != nil {
 		if err := s.Validate(input); err != nil {
@@ -33,7 +31,7 @@ func (s Spec[P]) Build(input P) (Invocation, error) {
 	call := Invocation{Program: s.Program, Operation: s.Operation}
 	for _, arg := range s.Args {
 		if arg == nil {
-			return Invocation{}, errors.New("参数构造函数不能为空")
+			return Invocation{}, argumentRequired.New()
 		}
 		call.Args = append(call.Args, arg(input)...)
 	}

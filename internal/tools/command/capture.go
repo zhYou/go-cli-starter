@@ -35,7 +35,7 @@ func Capture(ctx context.Context, call Invocation, options Execution, capture Ca
 		return Result{ExitCode: -1, Err: contextError(ctx), Status: Skipped}
 	}
 	if capture.Limit < 0 {
-		return Result{ExitCode: -1, Err: errors.New("捕获上限不能为负数"), Status: Failed}
+		return Result{ExitCode: -1, Err: captureLimitInvalid.New(), Status: Failed}
 	}
 	if capture.Limit == 0 {
 		capture.Limit = DefaultCaptureLimit

@@ -1,0 +1,11 @@
+{
+  "command.program_required": "An executable program is required",
+  "command.argument_required": "An argument builder is required",
+  "command.wait_delay_invalid": "Process cleanup grace must not be negative",
+  "command.capture_limit_invalid": "Capture limit must not be negative",
+  "command.batch_options_invalid": "Batch concurrency, timeout and capture limit must not be negative",
+  "command.batch_item_failed": "Batch item {{.Index}} failed",
+  "command.batch_item_incomplete": "Batch item {{.Index}} did not complete",
+  "command.started": "External tool started",
+  "command.finished": "External tool finished"
+}
