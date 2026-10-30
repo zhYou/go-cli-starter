@@ -2,7 +2,7 @@ version: 2
 project_name: go-cli-starter
 builds:
   - id: cli
-    main: .
+    main: ./cmd/go-cli-starter
     binary: go-cli-starter
     env:
       - CGO_ENABLED=0
@@ -17,7 +17,11 @@ archives:
       - goos: windows
         formats: [zip]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    files: [README.md, config.example.yaml]
+    files:
+      - README.md
+      - src: configs/config.example.yaml
+        dst: .
+        strip_parent: true
 sboms:
   - artifacts: archive
     documents: ["{{ .ArtifactName }}.spdx.json"]

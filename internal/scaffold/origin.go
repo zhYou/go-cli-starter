@@ -72,7 +72,7 @@ func (i *Initializer) origin(ctx context.Context, root, module, name string) (Or
 	if remote != "https://github.com/zhYou/go-cli-starter" && remote != "git@github.com:zhYou/go-cli-starter" {
 		return origin, nil
 	}
-	if run("show", "HEAD:.template-version") != version || !strings.Contains(run("show", "HEAD:go.mod"), "module "+TemplateModule) || !strings.Contains(run("show", "HEAD:main.go"), "appName = "+fmt.Sprintf("%q", TemplateName)) {
+	if run("show", "HEAD:.template-version") != version || !strings.Contains(run("show", "HEAD:go.mod"), "module "+TemplateModule) || !strings.Contains(run("show", "HEAD:cmd/"+TemplateName+"/main.go"), "appName = "+fmt.Sprintf("%q", TemplateName)) {
 		return origin, nil
 	}
 	commit := run("rev-parse", "HEAD")

@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/afero"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -19,6 +20,7 @@ import (
 const journalDir = ".template-init"
 
 type transaction struct {
+	Move             *commandMove      `json:"command_move,omitempty"`
 	RollbackComplete bool              `json:"rollback_complete,omitempty"`
 	FormatVersion    int               `json:"format_version"`
 	Module           string            `json:"module"`
@@ -46,8 +48,32 @@ func (i *Initializer) save(root string, tx transaction) error {
 	}
 	return i.atomicWrite(change{filepath.Join(root, journalDir, "journal.json"), data, 0600})
 }
-func (i *Initializer) prepare(root, module, name string, changes []change) (transaction, error) {
-	tx := transaction{FormatVersion: 1, Module: module, Name: name, OriginalModule: TemplateModule, OriginalName: TemplateName, Phase: "prepared"}
+func (i *Initializer) prepare(root, module, name string, changes []change, move *commandMove) (transaction, error) {
+	tx := transaction{Move: move, FormatVersion: 2, Module: module, Name: name, OriginalModule: TemplateModule, OriginalName: TemplateName, Phase: "prepared"}
+	if err := i.preflightCommandMove(root, move); err != nil {
+		return tx, err
+	}
+	var err error
+	changes, err = i.includeCommandFiles(root, changes, move)
+	if err != nil {
+		return tx, err
+	}
+	// 临时路径在持久日志写入前必须不存在，随后仅按日志中的目标路径推导。
+	for _, item := range changes {
+		relative, err := filepath.Rel(root, item.path)
+		if err != nil {
+			return tx, err
+		}
+		temporary, err := i.safePath(root, transactionTemporary(filepath.ToSlash(relative)))
+		if err != nil {
+			return tx, err
+		}
+		if _, err := i.FS.Stat(temporary); err == nil {
+			return tx, fmt.Errorf("事务临时文件已存在，保留现场：%s", temporary)
+		} else if !os.IsNotExist(err) {
+			return tx, err
+		}
+	}
 	if err := i.FS.Mkdir(filepath.Join(root, journalDir), 0700); err != nil {
 		return tx, err
 	}
@@ -72,11 +98,17 @@ func (i *Initializer) prepare(root, module, name string, changes []change) (tran
 	return tx, i.save(root, tx)
 }
 func (i *Initializer) validateTransaction(root string, tx transaction) error {
-	if tx.FormatVersion != 1 || tx.OriginalModule != TemplateModule || tx.OriginalName != TemplateName || len(tx.Files) == 0 || !slices.Contains([]string{"prepared", "applying", "committed"}, tx.Phase) {
+	if tx.FormatVersion == 1 {
+		return errors.New("请使用原版本工具恢复格式 1 的初始化日志，已保留现场")
+	}
+	if tx.FormatVersion != 2 || tx.OriginalModule != TemplateModule || tx.OriginalName != TemplateName || len(tx.Files) == 0 || !slices.Contains([]string{"prepared", "applying", "committed"}, tx.Phase) {
 		return errors.New("恢复记录格式或阶段无效")
 	}
 	if tx.RollbackComplete && tx.Phase != "prepared" {
 		return errors.New("回滚终态与恢复阶段矛盾")
+	}
+	if _, err := i.commandLocation(root, tx); err != nil {
+		return err
 	}
 	terminal := tx.Phase == "committed" || tx.RollbackComplete
 	seen := map[string]bool{}
@@ -92,7 +124,7 @@ func (i *Initializer) validateTransaction(root string, tx transaction) error {
 			return errors.New("恢复记录包含重复路径或无效权限")
 		}
 		seen[file.Path] = true
-		path, err := i.safePath(root, file.Path)
+		path, err := i.transactionPath(root, tx, file.Path)
 		if err != nil {
 			return err
 		}
@@ -122,6 +154,15 @@ func (i *Initializer) validateTransaction(root string, tx transaction) error {
 				return fmt.Errorf("恢复数据摘要不符：%s", relative)
 			}
 		}
+		temporary, err := i.transactionPath(root, tx, transactionTemporary(file.Path))
+		if err != nil {
+			return err
+		}
+		if info, err := i.FS.Stat(temporary); err == nil && !info.Mode().IsRegular() {
+			return fmt.Errorf("事务临时文件不是普通文件：%s", temporary)
+		} else if err != nil && !os.IsNotExist(err) {
+			return err
+		}
 		data, err := afero.ReadFile(i.FS, path)
 		exists := err == nil
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -139,9 +180,20 @@ func (i *Initializer) rollback(root string, tx transaction) error {
 	if err := i.validateTransaction(root, tx); err != nil {
 		return err
 	}
+	if tx.Move != nil {
+		location, err := i.commandLocation(root, tx)
+		if err != nil {
+			return err
+		}
+		if location == tx.Move.To {
+			if err := i.FS.Rename(filepath.Join(root, filepath.FromSlash(tx.Move.To)), filepath.Join(root, filepath.FromSlash(tx.Move.From))); err != nil {
+				return err
+			}
+		}
+	}
 	for index := len(tx.Files) - 1; index >= 0; index-- {
 		file := tx.Files[index]
-		path, err := i.safePath(root, file.Path)
+		path, err := i.transactionPath(root, tx, file.Path)
 		if err != nil {
 			return err
 		}
@@ -157,7 +209,14 @@ func (i *Initializer) rollback(root string, tx transaction) error {
 			if err != nil {
 				return err
 			}
-			if err := i.atomicWrite(change{path, data, file.Mode}); err != nil {
+			temporary, err := i.transactionPath(root, tx, transactionTemporary(file.Path))
+			if err != nil {
+				return err
+			}
+			if err := i.FS.Remove(temporary); err != nil && !os.IsNotExist(err) {
+				return err
+			}
+			if err := i.atomicWriteAt(change{path, data, file.Mode}, temporary); err != nil {
 				return err
 			}
 		} else if err == nil {
@@ -218,8 +277,14 @@ func (i *Initializer) recover(root, module, name string) error {
 	}
 	return i.rollback(root, tx)
 }
-func (i *Initializer) apply(ctx context.Context, root, module, name string, changes []change) ([]string, error) {
-	tx, err := i.prepare(root, module, name, changes)
+func (i *Initializer) apply(ctx context.Context, root, module, name string, changes []change, move *commandMove) ([]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if err := i.preflightCommandMove(root, move); err != nil {
+		return nil, err
+	}
+	tx, err := i.prepare(root, module, name, changes, move)
 	if err != nil {
 		return nil, errors.Join(err, i.FS.RemoveAll(filepath.Join(root, journalDir)))
 	}
@@ -236,10 +301,38 @@ func (i *Initializer) apply(ctx context.Context, root, module, name string, chan
 		if err := i.validateTransaction(root, tx); err != nil {
 			return nil, err
 		}
-		if err := i.atomicWrite(item); err != nil {
+		temporary, err := i.transactionPath(root, tx, transactionTemporary(tx.Files[index].Path))
+		if err != nil {
+			return nil, err
+		}
+		if err := i.atomicWriteAt(item, temporary); err != nil {
 			return fail(fmt.Errorf("初始化 %s 失败：%w", item.path, err))
 		}
 		changed = append(changed, tx.Files[index].Path)
+	}
+	if err := i.validateTransaction(root, tx); err != nil {
+		return nil, err
+	}
+	if move != nil {
+		if err := ctx.Err(); err != nil {
+			return fail(err)
+		}
+		if err := i.FS.Rename(filepath.Join(root, filepath.FromSlash(move.From)), filepath.Join(root, filepath.FromSlash(move.To))); err != nil {
+			return fail(err)
+		}
+		for index, relative := range changed {
+			if strings.HasPrefix(relative, move.From+"/") {
+				relative = move.To + strings.TrimPrefix(relative, move.From)
+			}
+			changed[index] = filepath.Join(root, filepath.FromSlash(relative))
+		}
+		changed = append(changed, filepath.Join(root, filepath.FromSlash(move.To)))
+	}
+	if err := ctx.Err(); err != nil {
+		return fail(err)
+	}
+	if err := i.validateTransaction(root, tx); err != nil {
+		return nil, err
 	}
 	tx.Phase = "committed"
 	if err := i.save(root, tx); err != nil {
@@ -276,6 +369,16 @@ func (file *transactionFile) UnmarshalJSON(data []byte) error {
 }
 
 func (i *Initializer) cleanup(root string, tx transaction) error {
+	for _, file := range tx.Files {
+		temporary, err := i.transactionPath(root, tx, transactionTemporary(file.Path))
+		if err != nil {
+			return err
+		}
+		if err := i.FS.Remove(temporary); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+
 	// 终态日志保留到最后，备份允许已被此前的清理删除。
 	for _, file := range tx.Files {
 		for _, relative := range []string{file.Backup, file.Staged} {
@@ -310,4 +413,9 @@ func (i *Initializer) cleanup(root string, tx transaction) error {
 	}
 	// 此处若中断，只留下空目录；重试可安全移除。
 	return i.FS.Remove(dir)
+}
+
+// transactionTemporary 的路径由持久记录的文件路径唯一确定。
+func transactionTemporary(relative string) string {
+	return path.Join(path.Dir(relative), ".template-init-"+path.Base(relative))
 }

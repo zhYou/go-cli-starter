@@ -1,9 +1,10 @@
-package cli
+package integration
 
 import (
 	"errors"
 	"github.com/rogpeppe/go-internal/testscript"
 	"github.com/stretchr/testify/require"
+	"github.com/zhYou/go-cli-starter/internal/scaffold"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,7 +19,12 @@ func TestProcessExitCodes(t *testing.T) {
 		name += ".exe"
 	}
 	binary := filepath.Join(t.TempDir(), name)
-	cmd := exec.Command("go", "build", "-o", binary, "../..")
+	root, err := filepath.Abs("../..")
+	require.NoError(t, err)
+	project, err := scaffold.Inspect(root)
+	require.NoError(t, err)
+	cmd := exec.Command("go", "build", "-o", binary, "./"+project.CommandPath)
+	cmd.Dir = root
 	data, err := cmd.CombinedOutput()
 	require.NoError(t, err, "%s", data)
 	testscript.Run(t, testscript.Params{Dir: "testdata/process", Setup: func(env *testscript.Env) error {

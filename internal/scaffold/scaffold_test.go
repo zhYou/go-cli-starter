@@ -11,12 +11,15 @@ func fixture(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
 	files := map[string]string{
-		"go.mod":    "module github.com/zhYou/go-cli-starter\n\ngo 1.27.0\n",
-		"main.go":   "package main\nconst appName = \"go-cli-starter\"\nfunc main() {}\n",
-		"README.md": "go-cli-starter github.com/zhYou/go-cli-starter GO_CLI_STARTER_LOG_LEVEL\n",
-		"user.txt":  "go-cli-starter\n",
+		"go.mod":                           "module github.com/zhYou/go-cli-starter\n\ngo 1.27.0\n",
+		"cmd/" + TemplateName + "/main.go": "package main\nconst appName = \"go-cli-starter\"\nfunc main() {}\n",
+		"README.md":                        "go-cli-starter github.com/zhYou/go-cli-starter GO_CLI_STARTER_LOG_LEVEL\n",
+		"user.txt":                         "go-cli-starter\n",
 	}
 	for name, content := range files {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(root, name)), 0755); err != nil {
+			t.Fatal(err)
+		}
 		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -26,6 +29,13 @@ func fixture(t *testing.T) string {
 
 func read(t *testing.T, root, name string) string {
 	t.Helper()
+	if name == "main.go" {
+		matches, err := filepath.Glob(filepath.Join(root, "cmd", "*", "main.go"))
+		if err != nil || len(matches) != 1 {
+			t.Fatalf("查找测试入口失败：%v %v", matches, err)
+		}
+		name, _ = filepath.Rel(root, matches[0])
+	}
 	data, err := os.ReadFile(filepath.Join(root, name))
 	if err != nil {
 		t.Fatal(err)
@@ -35,7 +45,7 @@ func read(t *testing.T, root, name string) string {
 
 func TestInitializeRewritesOnlyTemplateFiles(t *testing.T) {
 	root := fixture(t)
-	before, err := os.Stat(filepath.Join(root, "main.go"))
+	before, err := os.Stat(filepath.Join(root, "cmd", TemplateName, "main.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +53,7 @@ func TestInitializeRewritesOnlyTemplateFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(changed) != 3 {
+	if len(changed) != 4 {
 		t.Fatalf("changed=%v", changed)
 	}
 	if !strings.HasPrefix(read(t, root, "go.mod"), "module github.com/acme/tool\n") {
@@ -58,7 +68,7 @@ func TestInitializeRewritesOnlyTemplateFiles(t *testing.T) {
 	if read(t, root, "user.txt") != "go-cli-starter\n" {
 		t.Fatal("修改了无关文件")
 	}
-	info, err := os.Stat(filepath.Join(root, "main.go"))
+	info, err := os.Stat(filepath.Join(root, "cmd", "my-cli", "main.go"))
 	if err != nil || info.Mode().Perm() != before.Mode().Perm() {
 		t.Fatalf("文件权限发生变化：%v %v", info, err)
 	}
@@ -112,7 +122,7 @@ func TestInitializeDoesNotRewriteNewModuleSubstring(t *testing.T) {
 func TestInitializeKeepsRenamedImportsFormatted(t *testing.T) {
 	root := fixture(t)
 	source := "package main\n\nimport (\n\t\"github.com/spf13/cobra\"\n\t\"github.com/zhYou/go-cli-starter/internal/config\"\n)\n\nconst appName = \"go-cli-starter\"\n\nfunc main() {}\n"
-	if err := os.WriteFile(filepath.Join(root, "main.go"), []byte(source), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "cmd", TemplateName, "main.go"), []byte(source), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := Initialize(root, "example.com/team/tool", "tool"); err != nil {

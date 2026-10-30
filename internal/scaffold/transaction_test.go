@@ -29,7 +29,8 @@ func memoryInitializer(t *testing.T) (*Initializer, string) {
 	root, err := filepath.Abs(filepath.Join(t.TempDir(), "repo"))
 	require.NoError(t, err)
 	require.NoError(t, fs.MkdirAll(root, 0755))
-	for n, s := range map[string]string{"go.mod": "module " + TemplateModule + "\n\ngo 1.27.0\n", "main.go": "package main\nconst appName = \"" + TemplateName + "\"\nfunc main(){}\n", "README.md": TemplateName} {
+	for n, s := range map[string]string{"go.mod": "module " + TemplateModule + "\n\ngo 1.27.0\n", "cmd/" + TemplateName + "/main.go": "package main\nconst appName = \"" + TemplateName + "\"\nfunc main(){}\n", "README.md": TemplateName} {
+		require.NoError(t, fs.MkdirAll(filepath.Dir(filepath.Join(root, n)), 0755))
 		require.NoError(t, afero.WriteFile(fs, filepath.Join(root, n), []byte(s), 0600))
 	}
 	return &Initializer{FS: fs, RunCommand: func(context.Context, string, ...string) ([]byte, error) { return nil, nil }, Lock: func(string) (func() error, error) { return func() error { return nil }, nil }}, root
@@ -55,18 +56,18 @@ func TestRecoverBeforeIdentityCheck(t *testing.T) {
 	i, root := crashedTransaction(t)
 	module, _ := afero.ReadFile(i.FS, filepath.Join(root, "go.mod"))
 	require.Contains(t, string(module), "example.com/tool")
-	main, _ := afero.ReadFile(i.FS, filepath.Join(root, "main.go"))
+	main, _ := afero.ReadFile(i.FS, filepath.Join(root, "cmd", TemplateName, "main.go"))
 	require.Contains(t, string(main), TemplateName)
 	_, err := i.Initialize(context.Background(), root, "example.com/tool", "tool")
 	require.NoError(t, err)
-	main, _ = afero.ReadFile(i.FS, filepath.Join(root, "main.go"))
+	main, _ = afero.ReadFile(i.FS, filepath.Join(root, "cmd", "tool", "main.go"))
 	require.Contains(t, string(main), `"tool"`)
 }
 func TestRecoveryRejectsEditedOrEscapingPaths(t *testing.T) {
 	for _, mode := range []string{"edited", "escape", "conflict", "corrupt"} {
 		t.Run(mode, func(t *testing.T) {
 			i, root := crashedTransaction(t)
-			path := filepath.Join(root, "main.go")
+			path := filepath.Join(root, "cmd", TemplateName, "main.go")
 			journal := filepath.Join(root, ".template-init", "journal.json")
 			switch mode {
 			case "edited":
@@ -96,7 +97,7 @@ func TestRollbackFailureKeepsRecoveryData(t *testing.T) {
 	base := i.FS
 	targets := 0
 	i.FS = faultFS{Fs: base, rename: func(a, b string) error {
-		if filepath.Dir(b) == root && !strings.HasPrefix(filepath.Base(b), ".") {
+		if b == filepath.Join(root, "go.mod") || b == filepath.Join(root, "README.md") || b == filepath.Join(root, "cmd", TemplateName, "main.go") {
 			targets++
 			if targets >= 2 {
 				return errors.New("写入和回滚失败")
@@ -117,12 +118,12 @@ func TestWriteFailureRestoresOriginalBytes(t *testing.T) {
 		i, root := memoryInitializer(t)
 		base := i.FS
 		before := map[string][]byte{}
-		for _, n := range []string{"go.mod", "main.go", "README.md"} {
+		for _, n := range []string{"go.mod", "cmd/" + TemplateName + "/main.go", "README.md"} {
 			before[n], _ = afero.ReadFile(base, filepath.Join(root, n))
 		}
 		count := 0
 		i.FS = faultFS{Fs: base, rename: func(a, b string) error {
-			if filepath.Dir(b) == root && !strings.HasPrefix(filepath.Base(b), ".") {
+			if b == filepath.Join(root, "go.mod") || b == filepath.Join(root, "README.md") || b == filepath.Join(root, "cmd", TemplateName, "main.go") {
 				count++
 				if count == failAt {
 					return errors.New("指定写入失败")

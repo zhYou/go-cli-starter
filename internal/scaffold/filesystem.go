@@ -95,6 +95,19 @@ func (i *Initializer) atomicWrite(item change) error {
 	if err != nil {
 		return err
 	}
+	return i.finishAtomicWrite(file, item)
+}
+
+// atomicWriteAt 仅使用已经由事务日志确认所有权的临时路径。
+func (i *Initializer) atomicWriteAt(item change, temporary string) error {
+	file, err := i.FS.OpenFile(temporary, os.O_WRONLY|os.O_CREATE|os.O_EXCL, item.mode)
+	if err != nil {
+		return err
+	}
+	return i.finishAtomicWrite(file, item)
+}
+
+func (i *Initializer) finishAtomicWrite(file afero.File, item change) error {
 	tempName := file.Name()
 	defer func() { _ = i.FS.Remove(tempName) }()
 	if err := i.FS.Chmod(tempName, item.mode); err != nil {

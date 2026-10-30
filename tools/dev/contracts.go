@@ -10,10 +10,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 )
 
-const contractFile = "testdata/contracts/v1.json"
+const contractFile = "test/testdata/contracts/v1.json"
 
 func captureContract(ctx context.Context) ([]byte, error) {
 	dir, err := os.MkdirTemp("", "cli-contract-*")
@@ -120,22 +119,12 @@ func checkContract(ctx context.Context, against string) error {
 	base := snapshot
 	initial := false
 	if against != "" {
-		if strings.HasPrefix(against, "-") {
-			return fmt.Errorf("无效的 Git 基准引用")
-		}
-		data, err := exec.CommandContext(ctx, "git", "show", against+":"+contractFile).Output()
+		base, initial, err = readContractBase(ctx, against)
 		if err != nil {
-			if _, refErr := exec.CommandContext(ctx, "git", "rev-parse", "--verify", against+"^{commit}").Output(); refErr != nil {
-				return fmt.Errorf("无法解析 Git 基准：%w", refErr)
-			}
-			initial = true
-			data, err = os.ReadFile("testdata/contracts/initial.json")
-			if err != nil {
-				return err
-			}
+			return err
 		}
-		base = data
 	}
+
 	records, err := readRecords(against)
 	if err != nil {
 		return err

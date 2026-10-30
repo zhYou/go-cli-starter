@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/zhYou/go-cli-starter/internal/scaffold"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -81,6 +82,10 @@ func command(dir, name string, args ...string) error {
 }
 
 func build() error {
+	project, err := scaffold.Inspect(".")
+	if err != nil {
+		return err
+	}
 	if err := os.MkdirAll("bin", 0o755); err != nil {
 		return err
 	}
@@ -96,7 +101,7 @@ func build() error {
 		commit = strings.TrimSpace(string(data))
 	}
 	flags := fmt.Sprintf("-s -w -X main.version=%s -X main.commit=%s -X main.date=%s", version, commit, time.Now().UTC().Format(time.RFC3339))
-	return command("", "go", "build", "-trimpath", "-ldflags", flags, "-o", filepath.Join("bin", name), ".")
+	return command("", "go", "build", "-trimpath", "-ldflags", flags, "-o", filepath.Join("bin", name), "./"+project.CommandPath)
 }
 
 func format(write bool) error {

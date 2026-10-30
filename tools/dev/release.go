@@ -97,6 +97,13 @@ func checkReleaseSnapshot(dist string) error {
 		if match[2] == "windows" && match[4] != "zip" || match[2] != "windows" && match[4] != "tar.gz" {
 			return fmt.Errorf("归档格式与平台不符：%s", name)
 		}
+		binary := appName
+		if match[2] == "windows" {
+			binary += ".exe"
+		}
+		if err := validateArchive(filepath.Join(dist, name), binary); err != nil {
+			return fmt.Errorf("发布归档 %s 无效：%w", name, err)
+		}
 		sbom := name + ".spdx.json"
 		if _, ok := checksums[sbom]; !ok {
 			return fmt.Errorf("归档缺少已校验 SBOM：%s", name)

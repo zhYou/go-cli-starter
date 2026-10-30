@@ -12,7 +12,9 @@ import (
 	"testing"
 )
 
-func releaseFixture(t *testing.T) string {
+func releaseFixture(t *testing.T) string { return releaseFixtureMode(t, "", "") }
+
+func releaseFixtureMode(t *testing.T, selected, mode string) string {
 	dir := t.TempDir()
 	var sums strings.Builder
 	for _, target := range []string{"linux_amd64", "linux_arm64", "darwin_amd64", "darwin_arm64", "windows_amd64", "windows_arm64"} {
@@ -24,7 +26,17 @@ func releaseFixture(t *testing.T) string {
 		doc := map[string]any{"spdxVersion": "SPDX-2.3", "SPDXID": "SPDXRef-DOCUMENT", "name": name, "documentNamespace": "https://example.com/" + name, "creationInfo": map[string]any{"creators": []string{"Tool: syft"}, "created": "2026-10-29T00:00:00Z"}, "packages": []any{map[string]any{"SPDXID": "SPDXRef-root", "name": name}}}
 		sbom, err := json.Marshal(doc)
 		require.NoError(t, err)
-		for file, data := range map[string][]byte{name: []byte("测试归档：" + target), name + ".spdx.json": sbom} {
+		binary := appName
+		windows := strings.HasPrefix(target, "windows")
+		if windows {
+			binary += ".exe"
+		}
+		archiveMode := "valid"
+		if target == selected {
+			archiveMode = mode
+		}
+		archive := releaseArchiveBytes(t, windows, binary, archiveMode)
+		for file, data := range map[string][]byte{name: archive, name + ".spdx.json": sbom} {
 			require.NoError(t, os.WriteFile(filepath.Join(dir, file), data, 0600))
 			sum := sha256.Sum256(data)
 			fmt.Fprintf(&sums, "%s  %s\n", hex.EncodeToString(sum[:]), file)

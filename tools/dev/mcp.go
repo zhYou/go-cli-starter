@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/zhYou/go-cli-starter/internal/scaffold"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -82,7 +83,11 @@ func checkMCP() error {
 	if !found {
 		return errors.New("gopls 未提供 go_diagnostics 工具")
 	}
-	path, err := filepath.Abs("main.go")
+	project, err := scaffold.Inspect(".")
+	if err != nil {
+		return err
+	}
+	path, err := filepath.Abs(filepath.Join(project.CommandPath, "main.go"))
 	if err != nil {
 		return err
 	}

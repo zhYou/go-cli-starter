@@ -6,14 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/spf13/afero"
-	"go/ast"
 	"go/format"
-	"go/parser"
-	"go/token"
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 )
 
@@ -23,13 +19,14 @@ const TemplateName = "go-cli-starter"
 // 模板只管理这些文件中的应用标识。
 // 初始化项目时保留本实现及其测试夹具，避免改动初始化基准。
 var managedFiles = []string{
-	"go.mod", "main.go", "internal/cli/cli.go",
+	"go.mod", "cmd/" + TemplateName + "/main.go", "cmd/" + TemplateName + "/main_test.go", "internal/cli/cli.go",
 	"internal/cli/errors.go",
-	"main_test.go",
-	"internal/cli/process_test.go",
+	"test/integration/process_test.go",
 	"tools/dev/contracts_test.go",
 	"tools/dev/contracts.go",
 	"tools/dev/template_test.go",
+	"tools/dev/mcp.go",
+	"docs/superpowers/plans/2026-10-29-project-layout-plan.md",
 	"internal/cli/result_schema_test.go",
 	"internal/cli/results.go",
 	"internal/cli/dependencies.go",
@@ -44,7 +41,7 @@ var managedFiles = []string{
 	"internal/cli/errors_test.go",
 	"internal/apperror/error_test.go", "tools/init/main.go",
 	"tools/dev/main.go", "tools/dev/template.go", "mise.toml", ".goreleaser.yaml", "README.md", "AGENTS.md",
-	"config.example.yaml", "docs/development.md",
+	"configs/config.example.yaml", "docs/development.md", "docs/template-upgrades.md",
 }
 
 var validName = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
@@ -66,8 +63,8 @@ func (original *Initializer) Initialize(ctx context.Context, root, module, name 
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if !validName.MatchString(name) {
-		return nil, errors.New("名称必须以小写字母开头，且只能包含小写字母、数字或连字符")
+	if err := validateCommandName(name); err != nil {
+		return nil, err
 	}
 	if !validModule.MatchString(module) || strings.HasSuffix(module, "/") {
 		return nil, errors.New("无效的 Go 模块路径")
@@ -157,7 +154,11 @@ func (original *Initializer) Initialize(ctx context.Context, root, module, name 
 	if len(changes) == 0 {
 		return []string{}, nil
 	}
-	return i.apply(ctx, root, module, name, changes)
+	var move *commandMove
+	if name != TemplateName {
+		move = &commandMove{From: "cmd/" + TemplateName, To: "cmd/" + name}
+	}
+	return i.apply(ctx, root, module, name, changes, move)
 }
 
 // Identity 读取模块路径和可执行文件名，不执行项目代码。
@@ -165,44 +166,6 @@ func Identity(root string) (string, string, error) {
 	return (&Initializer{FS: afero.NewOsFs()}).identity(root)
 }
 func (i *Initializer) identity(root string) (string, string, error) {
-	data, err := afero.ReadFile(i.FS, filepath.Join(root, "go.mod"))
-	if err != nil {
-		return "", "", err
-	}
-	var module string
-	for _, line := range strings.Split(string(data), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) == 2 && fields[0] == "module" {
-			module = strings.Trim(fields[1], `"`)
-			break
-		}
-	}
-	source, err := afero.ReadFile(i.FS, filepath.Join(root, "main.go"))
-	if err != nil {
-		return "", "", err
-	}
-	file, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root, "main.go"), source, 0)
-	if err != nil {
-		return "", "", err
-	}
-	var name string
-	ast.Inspect(file, func(node ast.Node) bool {
-		value, ok := node.(*ast.ValueSpec)
-		if !ok {
-			return true
-		}
-		for i, ident := range value.Names {
-			if ident.Name != "appName" || i >= len(value.Values) {
-				continue
-			}
-			if literal, ok := value.Values[i].(*ast.BasicLit); ok && literal.Kind == token.STRING {
-				name, _ = strconv.Unquote(literal.Value)
-			}
-		}
-		return true
-	})
-	if module == "" || name == "" {
-		return "", "", errors.New("无法从模板中找到模块路径或 appName")
-	}
-	return module, name, nil
+	project, err := i.inspect(root)
+	return project.Module, project.Name, err
 }

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/spf13/afero"
@@ -50,6 +51,10 @@ func verifyTemplate() error {
 	if changed, err := scaffold.Initialize(dir, module, name); err != nil || len(changed) != 0 {
 		return fmt.Errorf("初始化不满足幂等性：%v", err)
 	}
+	project, err := scaffold.Inspect(dir)
+	if err != nil {
+		return err
+	}
 	if err := validateTemplateMetadata(dir); err != nil {
 		return err
 	}
@@ -62,10 +67,10 @@ func verifyTemplate() error {
 	if err := command(dir, "go", "test", "./..."); err != nil {
 		return err
 	}
-	if err := command(dir, "go", "build", "-o", filepath.Join(dir, "app-check"), "."); err != nil {
+	if err := command(dir, "go", "build", "-o", filepath.Join(dir, "app-check"), "./"+project.CommandPath); err != nil {
 		return err
 	}
-	check := exec.Command("go", "list", "-deps", "-f", "{{.ImportPath}}", ".")
+	check := exec.Command("go", "list", "-deps", "-f", "{{.ImportPath}}", "./"+project.CommandPath)
 	check.Dir = dir
 	imports, err := check.Output()
 	if err != nil {
@@ -74,7 +79,10 @@ func verifyTemplate() error {
 	if module != scaffold.TemplateModule && strings.Contains(string(imports), scaffold.TemplateModule) {
 		return fmt.Errorf("生成的项目仍在导入原模板模块")
 	}
-	if err := command(dir, "go", "run", ".", "schema", "greet"); err != nil {
+	if err := command(dir, "go", "run", "./"+project.CommandPath, "schema", "greet"); err != nil {
+		return err
+	}
+	if err := verifyCommandInstall(dir, project); err != nil {
 		return err
 	}
 	if err := command(dir, "goreleaser", "check"); err != nil {
@@ -142,4 +150,23 @@ func validateTemplateMetadata(dir string) error {
 		}
 	}
 	return nil
+}
+
+func verifyCommandInstall(root string, project scaffold.Project) error {
+	installDir, err := os.MkdirTemp("", "cli-install-check-*")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.RemoveAll(installDir) }()
+	cmd := exec.Command("go", "install", "./"+project.CommandPath)
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), "GOBIN="+installDir)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("安装命令失败：%w：%s", err, out)
+	}
+	name := project.Name
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	return command(root, filepath.Join(installDir, name), "schema", "greet")
 }
