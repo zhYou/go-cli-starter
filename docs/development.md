@@ -10,6 +10,10 @@
 正式文档记录当前能力；superpowers 设计和计划保留在本地忽略目录 `docs/superpowers/`，不提交。
 后续需求只记带 `backlog` 标签的 GitHub Issues；待办不是实施授权，Issue 编号是唯一 ID。
 
+仓库文本文件统一使用 LF。`.editorconfig` 约束编辑器保存，`.gitattributes` 通过
+`text=auto eol=lf` 约束 Git 提交和检出，包括 Windows；二进制文件由 Git 自动识别。
+调整换行规则时，确认工作区只有本次修改，再执行 `git add --renormalize .`，审查差异后提交。
+
 首次使用及锁变更后显式运行 `mise run setup`，然后运行 `mise run doctor`。
 setup 只安装项目声明的锁定工具、下载模块，不更新锁。普通任务与 exec 的自动安装均关闭，
 `GOTOOLCHAIN=local` 禁止 Go 隐式下载工具链。缺工具应报错，检查不能兼任安装、升级或修复。
