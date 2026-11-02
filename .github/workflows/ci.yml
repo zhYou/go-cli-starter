@@ -41,9 +41,13 @@ jobs:
       - run: mise run release:verify
   agent-mcp:
     runs-on: ubuntu-latest
-    env:
-      GO_CLI_STARTER_HOME: ${{ runner.temp }}/agent-mcp-home
     steps:
+      - name: 隔离应用状态目录
+        shell: bash
+        env:
+          GO_CLI_STARTER_HOME: ${{ runner.temp }}/agent-mcp-home
+        run: |
+          printf 'GO_CLI_STARTER_HOME=%s\n' "$GO_CLI_STARTER_HOME" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
