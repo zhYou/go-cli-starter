@@ -20,4 +20,7 @@ env GO_CLI_STARTER_LANG=
 cli 0 greet --name --lang=en
 stdout 'Hello, --lang=en!'
 cli 0 __complete greet --lang ''
-stdout ':0'
+stdout 'en'
+stdout 'zh-CN'
+stdout ':4'
+! stderr .
