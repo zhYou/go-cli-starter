@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -81,7 +82,7 @@ func (call *invocation) localizeTree(root *cobra.Command, language string) error
 		}
 		flags[i] = text
 	}
-	template, err := localizer.Format("cli.version_template", messages.FormatOptions{Params: map[string]any{paramName: "{{.Name}}", "Version": "{{.Version}}"}})
+	version, err := localizer.Format("cli.version_template", messages.FormatOptions{Params: map[string]any{paramName: root.Name(), "Version": root.Version}})
 	if err != nil {
 		return err
 	}
@@ -102,7 +103,8 @@ func (call *invocation) localizeTree(root *cobra.Command, language string) error
 	for i, binding := range call.flagTexts {
 		binding.flag.Usage = flags[i]
 	}
-	root.SetVersionTemplate(template + "\n")
+	// Cobra 解析固定字符串字面量；渲染结果中的分隔符不会被再次解释。
+	root.SetVersionTemplate("{{" + strconv.Quote(version+"\n") + "}}")
 	call.localizer = localizer
 	return nil
 }

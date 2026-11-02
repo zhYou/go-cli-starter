@@ -1,6 +1,8 @@
 package i18ncheck
 
 import (
+	"strconv"
+	"strings"
 	"testing"
 	"testing/fstest"
 
@@ -149,4 +151,58 @@ func TestCheckRejectsUnanalyzableTemplateCalls(t *testing.T) {
 			require.Error(t, Check(pair(content, content)))
 		})
 	}
+}
+
+// 不同语言需要的根参数必须被提取，不能因表达式形态被漏掉。
+func TestCheckFindsParametersInAliasesAndPipelines(t *testing.T) {
+	cases := map[string]string{
+		"literal variable index": `{{$key := "Name"}}{{index . $key}}`,
+		"parenthesized field":    `{{(.).Name}}`,
+		"parenthesized alias":    `{{$root := (.)}}{{$root.Name}}`,
+		"or root alias":          `{{$root := or . .}}{{$root.Name}}`,
+		"pipeline index":         `{{"Name" | index .}}`,
+		"direct reassignment":    `{{$root := .User}}{{$root = .}}{{$root.Name}}`,
+	}
+	for name, en := range cases {
+		t.Run(name, func(t *testing.T) {
+			content := func(text string) string { return "[\"sample\"]\nother = " + strconv.Quote(text) + "\n" }
+			// 正例用独立写法表达同一组参数，防止双边同时漏检而假通过。
+			reference := `{{.Name}}`
+			if name == "direct reassignment" {
+				reference = `{{.User}}{{.Name}}`
+			}
+			require.NoError(t, Check(pair(content(en), content(reference))))
+			zh := strings.ReplaceAll(en, "Name", "Title")
+			require.Error(t, Check(pair(content(en), content(zh))))
+		})
+	}
+}
+
+// 无法证明根键或分支赋值后的别名时，即使两边写法相同也必须拒绝。
+func TestCheckRejectsUncertainRootDependencies(t *testing.T) {
+	cases := map[string]string{
+		"dynamic index key":           `{{$key := .Key}}{{index . $key}}`,
+		"dynamic pipeline key":        `{{.Key | index .}}`,
+		"unknown alias field":         `{{$root := or . .User}}{{$root.Name}}`,
+		"branch assignment":           `{{$root := .User}}{{if .Active}}{{$root = $}}{{end}}{{$root.Name}}`,
+		"branch condition assignment": `{{$root := .User}}{{if $root = .}}{{end}}{{$root.Name}}`,
+		"range assignment":            `{{$root := .User}}{{range .Items}}{{$root.Name}}{{$root = $}}{{end}}`,
+	}
+	for name, text := range cases {
+		t.Run(name, func(t *testing.T) {
+			content := "[\"sample\"]\nother = " + strconv.Quote(text) + "\n"
+			require.Error(t, Check(pair(content, content)))
+		})
+	}
+}
+
+// range 的 else 分支在零次迭代时保留管道原值，而不是循环元素。
+func TestCheckTracksRangeVariablesInElse(t *testing.T) {
+	en := `["sample"]
+other = '{{range $value := .}}{{else}}{{$value.Name}}{{end}}'
+`
+	zh := `["sample"]
+other = '{{range $value := .}}{{else}}{{$value.Title}}{{end}}'
+`
+	require.Error(t, Check(pair(en, zh)))
 }

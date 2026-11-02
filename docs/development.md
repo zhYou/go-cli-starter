@@ -87,7 +87,11 @@ Get、Raw、All 等绕过结构体的入口。zap 只在 base/logging，OTel SDK
 `mise run i18n:check` 检查 `internal/locales/active.en.toml` 与 `active.zh-CN.toml`：
 目录非空，消息 ID 不重复，字段与消息内容有效，模板语法正确；两种语言的 ID 和模板参数集合一致，
 复数形式的参数按并集比较。每条消息必须有 other，允许 description 和 zero、one、two、few、many。
-新增或修改消息时同时维护两种语言，稳定 ID 不随语言改变。
+检查器支持直接字段、根别名、括号、`if`/`with`/`range`、被调用的非递归命名模板，以及根对象上
+字符串字面量或可静态确定的字面量变量 `index`；管道中的字面量键也可识别。`and`/`or` 只有在各个值
+都可确定为根对象时才被视为根别名。根对象的动态 `index` 键、无法确定的字段/链/模板上下文，
+以及控制结构或其分支内的变量赋值会报错；请改为直接字段或在分支外确定的变量。子对象上的动态键
+不会引入额外的根参数。新增或修改消息时同时维护两种语言，稳定 ID 不随语言改变。
 
 `mise run config:check` 递归检查 `configs/` 应用配置、`internal/locales/` 语言资源，以及根目录
 明确登记的 `config.toml`、`config.example.toml` 和同名 JSON/YAML 变体。`configs/config.example.toml`

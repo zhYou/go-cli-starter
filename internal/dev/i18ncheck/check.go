@@ -98,7 +98,7 @@ func parameters(entry map[string]string) ([]string, error) {
 			return nil, err
 		}
 		a := templateAnalyzer{template: t, params: set, active: make(map[string]bool)}
-		a.collect(t.Root, true, map[string]bool{"$": true})
+		a.collect(t.Root, true, map[string]templateValue{"$": {known: true, root: true}})
 		if a.err != nil {
 			return nil, a.err
 		}
@@ -111,14 +111,22 @@ func parameters(entry map[string]string) ([]string, error) {
 	return result, nil
 }
 
+// templateValue 跟踪根对象与可证明的字符串字面量；未知值不能用于判断根参数。
+type templateValue struct {
+	known, root bool
+	literal     string
+	isLiteral   bool
+}
+
 type templateAnalyzer struct {
 	template *template.Template
 	params   map[string]bool
 	active   map[string]bool
+	depth    int
 	err      error
 }
 
-func (a *templateAnalyzer) collect(node parse.Node, rootDot bool, aliases map[string]bool) {
+func (a *templateAnalyzer) collect(node parse.Node, rootDot bool, aliases map[string]templateValue) {
 	if a.err != nil {
 		return
 	}
@@ -131,66 +139,71 @@ func (a *templateAnalyzer) collect(node parse.Node, rootDot bool, aliases map[st
 		}
 	case *parse.ActionNode:
 		a.collect(n.Pipe, rootDot, aliases)
-		bindAliases(n.Pipe, rootDot, aliases)
+		a.bindAliases(n.Pipe, rootDot, aliases, false)
 	case *parse.PipeNode:
 		if n != nil {
+			var previous *templateValue
 			for _, command := range n.Cmds {
-				a.collect(command, rootDot, aliases)
+				a.collectCommand(command, rootDot, aliases, previous)
+				value := commandValue(command, rootDot, aliases, previous)
+				previous = &value
 			}
-		}
-	case *parse.CommandNode:
-		if len(n.Args) >= 3 {
-			if ident, ok := n.Args[0].(*parse.IdentifierNode); ok && ident.Ident == "index" {
-				switch root := n.Args[1].(type) {
-				case *parse.DotNode:
-					if key, ok := n.Args[2].(*parse.StringNode); ok && rootDot {
-						a.params[key.Text] = true
-					}
-				case *parse.VariableNode:
-					if len(root.Ident) == 1 && aliases[root.Ident[0]] {
-						if key, ok := n.Args[2].(*parse.StringNode); ok {
-							a.params[key.Text] = true
-						}
-					}
-				}
-			}
-		}
-		for _, arg := range n.Args {
-			a.collect(arg, rootDot, aliases)
 		}
 	case *parse.FieldNode:
 		if rootDot && len(n.Ident) > 0 {
 			a.params[n.Ident[0]] = true
 		}
 	case *parse.VariableNode:
-		if len(n.Ident) > 1 && aliases[n.Ident[0]] {
-			a.params[n.Ident[1]] = true
+		if len(n.Ident) > 1 {
+			value := aliases[n.Ident[0]]
+			if !value.known {
+				a.err = fmt.Errorf("无法静态确定模板变量 %q", n.Ident[0])
+			} else if value.root {
+				a.params[n.Ident[1]] = true
+			}
 		}
 	case *parse.ChainNode:
 		a.collect(n.Node, rootDot, aliases)
+		value := nodeValue(n.Node, rootDot, aliases)
+		if !value.known {
+			a.err = fmt.Errorf("无法静态确定模板链的上下文")
+		} else if value.root && len(n.Field) > 0 {
+			a.params[n.Field[0]] = true
+		}
 	case *parse.IfNode:
 		aliases = maps.Clone(aliases)
 		a.collect(n.Pipe, rootDot, aliases)
-		bindAliases(n.Pipe, rootDot, aliases)
-		a.collect(n.List, rootDot, maps.Clone(aliases))
-		a.collect(n.ElseList, rootDot, maps.Clone(aliases))
+		a.bindAliases(n.Pipe, rootDot, aliases, true)
+		a.collectBranches(n.List, n.ElseList, rootDot, rootDot, aliases)
 	case *parse.RangeNode:
 		aliases = maps.Clone(aliases)
 		a.collect(n.Pipe, rootDot, aliases)
-		bindAliases(n.Pipe, rootDot, aliases)
-		a.collect(n.List, false, maps.Clone(aliases))
-		a.collect(n.ElseList, rootDot, maps.Clone(aliases))
+		if n.Pipe != nil && n.Pipe.IsAssign {
+			a.err = fmt.Errorf("不支持控制结构中的模板变量赋值")
+			return
+		}
+		bodyAliases, elseAliases := maps.Clone(aliases), maps.Clone(aliases)
+		if n.Pipe != nil {
+			initial := pipeValue(n.Pipe, rootDot, aliases)
+			for _, variable := range n.Pipe.Decl {
+				bodyAliases[variable.Ident[0]] = templateValue{known: true}
+				elseAliases[variable.Ident[0]] = initial
+			}
+		}
+		a.depth++
+		a.collect(n.List, false, bodyAliases)
+		a.collect(n.ElseList, rootDot, elseAliases)
+		a.depth--
 	case *parse.WithNode:
 		aliases = maps.Clone(aliases)
 		a.collect(n.Pipe, rootDot, aliases)
-		bindAliases(n.Pipe, rootDot, aliases)
 		bodyRoot, err := templateContext(n.Pipe, rootDot, aliases)
 		if err != nil {
 			a.err = err
 			return
 		}
-		a.collect(n.List, bodyRoot, maps.Clone(aliases))
-		a.collect(n.ElseList, rootDot, maps.Clone(aliases))
+		a.bindAliases(n.Pipe, rootDot, aliases, true)
+		a.collectBranches(n.List, n.ElseList, bodyRoot, rootDot, aliases)
 	case *parse.TemplateNode:
 		a.collect(n.Pipe, rootDot, aliases)
 		bodyRoot, err := templateContext(n.Pipe, rootDot, aliases)
@@ -208,59 +221,147 @@ func (a *templateAnalyzer) collect(node parse.Node, rootDot bool, aliases map[st
 			return
 		}
 		a.active[n.Name] = true
-		a.collect(called.Root, bodyRoot, map[string]bool{"$": bodyRoot})
+		a.collect(called.Root, bodyRoot, map[string]templateValue{"$": {known: true, root: bodyRoot}})
 		delete(a.active, n.Name)
 	}
 }
 
-// templateContext 识别未经计算的根对象或子值；无法判断的上下文直接拒绝。
-func templateContext(pipe *parse.PipeNode, rootDot bool, aliases map[string]bool) (bool, error) {
-	if pipe == nil {
-		return false, nil
+func (a *templateAnalyzer) collectBranches(body, alternative *parse.ListNode, bodyRoot, elseRoot bool, aliases map[string]templateValue) {
+	a.depth++
+	a.collect(body, bodyRoot, maps.Clone(aliases))
+	a.collect(alternative, elseRoot, maps.Clone(aliases))
+	a.depth--
+}
+
+func (a *templateAnalyzer) collectCommand(command *parse.CommandNode, rootDot bool, aliases map[string]templateValue, previous *templateValue) {
+	for _, arg := range command.Args {
+		a.collect(arg, rootDot, aliases)
 	}
-	if len(pipe.Cmds) != 1 || len(pipe.Cmds[0].Args) != 1 {
-		return false, fmt.Errorf("无法静态确定模板上下文")
+	if a.err != nil || len(command.Args) == 0 {
+		return
 	}
-	switch value := pipe.Cmds[0].Args[0].(type) {
+	ident, ok := command.Args[0].(*parse.IdentifierNode)
+	if !ok || ident.Ident != "index" {
+		return
+	}
+	if len(command.Args) < 2 {
+		a.err = fmt.Errorf("无法静态确定 index 对象")
+		return
+	}
+	object := nodeValue(command.Args[1], rootDot, aliases)
+	if !object.known {
+		a.err = fmt.Errorf("无法静态确定 index 对象")
+		return
+	}
+	if !object.root {
+		return
+	}
+	var key templateValue
+	if len(command.Args) > 2 {
+		key = nodeValue(command.Args[2], rootDot, aliases)
+	} else if previous != nil {
+		key = *previous
+	}
+	if !key.isLiteral {
+		a.err = fmt.Errorf("根对象的 index 键必须是可静态确定的字符串")
+		return
+	}
+	a.params[key.literal] = true
+}
+
+// nodeValue 只对可证明的根引用及字符串值作肯定判断。
+func nodeValue(node parse.Node, rootDot bool, aliases map[string]templateValue) templateValue {
+	switch n := node.(type) {
 	case *parse.DotNode:
-		return rootDot, nil
+		return templateValue{known: true, root: rootDot}
 	case *parse.VariableNode:
-		isRoot, known := aliases[value.Ident[0]]
-		if !known {
-			return false, fmt.Errorf("无法静态确定模板变量 %q", value.Ident[0])
+		value := aliases[n.Ident[0]]
+		if len(n.Ident) > 1 && value.known {
+			return templateValue{known: true}
 		}
-		return len(value.Ident) == 1 && isRoot, nil
-	case *parse.FieldNode, *parse.ChainNode, *parse.StringNode, *parse.NumberNode, *parse.BoolNode, *parse.NilNode:
-		return false, nil
+		return value
+	case *parse.StringNode:
+		return templateValue{known: true, literal: n.Text, isLiteral: true}
+	case *parse.FieldNode, *parse.ChainNode, *parse.NumberNode, *parse.BoolNode, *parse.NilNode:
+		return templateValue{known: true}
 	case *parse.PipeNode:
-		return templateContext(value, rootDot, aliases)
+		return pipeValue(n, rootDot, aliases)
 	default:
-		return false, fmt.Errorf("无法静态确定模板上下文")
+		return templateValue{}
 	}
 }
 
-// bindAliases 跟踪直接引用根数据的模板变量，分支中使用独立作用域。
-func bindAliases(pipe *parse.PipeNode, rootDot bool, aliases map[string]bool) {
-	if pipe == nil || len(pipe.Decl) != 1 {
-		return
+func pipeValue(pipe *parse.PipeNode, rootDot bool, aliases map[string]templateValue) templateValue {
+	if pipe == nil {
+		return templateValue{known: true}
 	}
-	name := pipe.Decl[0].Ident[0]
-	if len(pipe.Cmds) != 1 || len(pipe.Cmds[0].Args) != 1 {
-		delete(aliases, name)
-		return
+	var previous *templateValue
+	for _, command := range pipe.Cmds {
+		value := commandValue(command, rootDot, aliases, previous)
+		previous = &value
 	}
-	isRoot := false
-	switch value := pipe.Cmds[0].Args[0].(type) {
-	case *parse.DotNode:
-		isRoot = rootDot
-	case *parse.VariableNode:
-		var known bool
-		isRoot, known = aliases[value.Ident[0]]
-		if !known {
-			delete(aliases, name)
-			return
+	if previous == nil {
+		return templateValue{}
+	}
+	return *previous
+}
+
+func commandValue(command *parse.CommandNode, rootDot bool, aliases map[string]templateValue, previous *templateValue) templateValue {
+	if len(command.Args) == 1 && previous == nil {
+		return nodeValue(command.Args[0], rootDot, aliases)
+	}
+	if len(command.Args) == 0 {
+		return templateValue{}
+	}
+	ident, ok := command.Args[0].(*parse.IdentifierNode)
+	if !ok {
+		return templateValue{}
+	}
+	if ident.Ident == "index" && len(command.Args) >= 2 {
+		if nodeValue(command.Args[1], rootDot, aliases).known {
+			return templateValue{known: true}
 		}
-		isRoot = len(value.Ident) == 1 && isRoot
 	}
-	aliases[name] = isRoot
+	if ident.Ident == "or" || ident.Ident == "and" {
+		values := command.Args[1:]
+		if len(values) == 0 && previous == nil {
+			return templateValue{}
+		}
+		for _, arg := range values {
+			value := nodeValue(arg, rootDot, aliases)
+			if !value.known || !value.root {
+				return templateValue{}
+			}
+		}
+		if previous != nil && (!previous.known || !previous.root) {
+			return templateValue{}
+		}
+		return templateValue{known: true, root: true}
+	}
+	return templateValue{}
+}
+
+// templateContext 识别可证明的根对象或子值；未知上下文直接拒绝。
+func templateContext(pipe *parse.PipeNode, rootDot bool, aliases map[string]templateValue) (bool, error) {
+	value := pipeValue(pipe, rootDot, aliases)
+	if !value.known {
+		return false, fmt.Errorf("无法静态确定模板上下文")
+	}
+	return value.root, nil
+}
+
+// bindAliases 跟踪根别名和字面量；禁止跨分支修改外层变量。
+func (a *templateAnalyzer) bindAliases(pipe *parse.PipeNode, rootDot bool, aliases map[string]templateValue, control bool) {
+	if pipe == nil || len(pipe.Decl) == 0 {
+		return
+	}
+	if pipe.IsAssign && (control || a.depth > 0) {
+		a.err = fmt.Errorf("不支持控制结构中的模板变量赋值")
+		return
+	}
+	if len(pipe.Decl) != 1 {
+		a.err = fmt.Errorf("不支持多个模板变量声明")
+		return
+	}
+	aliases[pipe.Decl[0].Ident[0]] = pipeValue(pipe, rootDot, aliases)
 }

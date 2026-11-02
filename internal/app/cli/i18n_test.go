@@ -375,3 +375,34 @@ func TestGreetExampleUsesInvocationName(t *testing.T) {
 		require.Contains(t, out, "testcli greet --name Codex --json")
 	}
 }
+
+// 翻译中的合法字面模板分隔符及元数据必须只渲染一次。
+func TestVersionFlagRendersLiteralTextOnce(t *testing.T) {
+	for _, tc := range []struct{ name, template, nameValue, version, want string }{
+		{"opening delimiter", `prefix {{"{{"}}`, "app", "v1", "prefix {{\n"},
+		{"literal field", `prefix {{"{{.Missing}}"}}`, "app", "v1", "prefix {{.Missing}}\n"},
+		{"actual metadata", `{{.Name}} {{.Version}}`, "app{{.Name}}", "v{{.Missing}}", "app{{.Name}} v{{.Missing}}\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			replacement := "other = " + strconv.Quote(tc.template) + "\n"
+			bundle := catalogFixture(t, "en", "cli.version_template", replacement)
+			var out, stderr bytes.Buffer
+			var code int
+			require.NotPanics(t, func() {
+				code = run(context.Background(), []string{"--version"}, Options{Name: tc.nameValue, Version: tc.version, Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv}, func() (*messages.Bundle, error) { return bundle, nil })
+			})
+			require.Zero(t, code, stderr.String())
+			require.Equal(t, tc.want, out.String())
+			require.Empty(t, stderr.String())
+		})
+	}
+}
+
+func TestVersionFlagRenderingFailureLeavesStdoutEmpty(t *testing.T) {
+	bundle := catalogFixture(t, "en", "cli.version_template", "other = \"prefix {{.Missing}}\"\n")
+	var out, stderr bytes.Buffer
+	code := run(context.Background(), []string{"--version"}, Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv}, func() (*messages.Bundle, error) { return bundle, nil })
+	require.Equal(t, 1, code, stderr.String())
+	require.Empty(t, out.String())
+	require.Contains(t, stderr.String(), "cli.version_template")
+}
