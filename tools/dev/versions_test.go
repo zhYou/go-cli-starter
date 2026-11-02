@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -58,5 +59,51 @@ func TestHistoricalVersionTextIsNotCurrentDeclaration(t *testing.T) {
 func TestVersionRejectsPrereleaseOrBuildSuffix(t *testing.T) {
 	for _, version := range []string{"1.27.30", "1.27.3-rc.1", "1.27.3+patched"} {
 		require.Error(t, matchToolVersion("go", "go version go"+version+" linux/amd64", "1.27.3"))
+	}
+}
+
+func TestVersionsGoToolchain(t *testing.T) {
+	tests := []struct {
+		name      string
+		minimum   string
+		toolchain string
+		wantError bool
+	}{
+		{name: "implicit-matching", minimum: "1.27.3"},
+		{name: "explicit-matching", minimum: "1.27.3", toolchain: "go1.27.3"},
+		{name: "explicit-newer-than-minimum", minimum: "1.27.0", toolchain: "go1.27.3"},
+		{name: "implicit-mismatching", minimum: "1.27.0", wantError: true},
+		{name: "explicit-mismatching", minimum: "1.27.3", toolchain: "go1.27.4", wantError: true},
+		{name: "minimum-too-new", minimum: "1.27.4", toolchain: "go1.27.3", wantError: true},
+		{name: "minimum-different-series", minimum: "1.26.0", toolchain: "go1.27.3", wantError: true},
+		{name: "missing-minimum", toolchain: "go1.27.3", wantError: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := versionFixture(t)
+			module := "module example.com/versions\n"
+			if tt.minimum != "" {
+				module += "\ngo " + tt.minimum + "\n"
+			}
+			if tt.toolchain != "" {
+				module += "\ntoolchain " + tt.toolchain + "\n"
+			}
+			require.NoError(t, os.WriteFile(filepath.Join(root, "go.mod"), []byte(module), 0600))
+			readme := filepath.Join(root, "README.md")
+			//nolint:gosec // G304：测试路径只来自当前临时 fixture，不读取用户文件。
+			data, err := os.ReadFile(readme)
+			require.NoError(t, err)
+			table := regexp.MustCompile(`(?m)^\| Go 模块最低版本 \| [^|]+ \|$`)
+			data = table.ReplaceAll(data, []byte("| Go 模块最低版本 | "+tt.minimum+" |"))
+			//nolint:gosec // G703：版本表仅写入当前测试的临时 fixture。
+			require.NoError(t, os.WriteFile(readme, data, 0600))
+
+			err = checkVersions(root)
+			if tt.wantError {
+				require.ErrorContains(t, err, "模块最低 Go 版本、工具链与 mise 不一致")
+			} else {
+				require.NoError(t, err)
+			}
+		})
 	}
 }
