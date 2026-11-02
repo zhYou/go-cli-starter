@@ -219,6 +219,8 @@ func TestFinishWaitsForRegisteredWorkBeforeEndingSpanAndClosingFiles(t *testing.
 	cfg.Telemetry.Exporter = telemetry.File
 	ctx, s := Begin(t.Context(), cfg, logging.RunInfo{Component: "test", Command: "work"}, Options{Directories: &paths.Directories{State: t.TempDir()}}, func(err error) { t.Error(err) })
 	started, release, finished := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	workerDone := make(chan struct{})
+	registered := false
 	var releaseOnce, finishOnce sync.Once
 	releaseWork := func() { releaseOnce.Do(func() { close(release) }) }
 	finish := func() {
@@ -227,19 +229,28 @@ func TestFinishWaitsForRegisteredWorkBeforeEndingSpanAndClosingFiles(t *testing.
 	t.Cleanup(func() {
 		releaseWork()
 		finish()
+		if registered {
+			select {
+			case <-workerDone:
+			case <-time.After(3 * time.Second):
+				t.Error("已登记 worker 未完成收尾")
+			}
+		}
 		select {
 		case <-finished:
 		case <-time.After(3 * time.Second):
 			t.Error("已登记工作或 Session 未完成收尾")
 		}
 	})
-	require.True(t, s.Go(func(ctx context.Context) {
+	registered = s.Go(func(ctx context.Context) {
+		defer close(workerDone)
 		_, span := s.Tracer.Start(ctx, "worker")
 		defer span.End()
 		close(started)
 		<-release
 		s.Logger.WithContext(ctx).Infow("worker_completed")
-	}))
+	})
+	require.True(t, registered)
 	select {
 	case <-started:
 	case <-time.After(time.Second):
