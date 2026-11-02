@@ -46,6 +46,8 @@ func localizedFlagError(_ *cobra.Command, err error) error {
 }
 
 func configureHelp(cmd *cobra.Command, call *invocation) {
+	// Cobra 创建默认选项前会合并自身和祖先的持久选项。
+	cmd.InheritedFlags()
 	if cmd.Flags().Lookup(flagHelp) == nil {
 		cmd.InitDefaultHelpFlag()
 		call.bindFlag(cmd.Flags().Lookup(flagHelp), message("cli.help_flag"))

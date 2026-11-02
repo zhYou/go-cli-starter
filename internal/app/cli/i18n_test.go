@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"io/fs"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/zhYou/go-cli-starter/internal/base/messages"
 	"github.com/zhYou/go-cli-starter/internal/locales"
 
@@ -260,27 +262,86 @@ other = "乙名称"
 }
 
 func TestTranslatedUsageCannotChangeCommandName(t *testing.T) {
-	bundle := catalogFixture(t, "en", "cli.greet_use", "other = \"salute --name NAME\"\n")
-	loader := func() (*messages.Bundle, error) { return bundle, nil }
-	var out, stderr bytes.Buffer
-	code := run(context.Background(), []string{"greet", "--help"}, Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv}, loader)
-	require.Equal(t, 1, code, stderr.String())
-	require.Empty(t, out.String())
-	require.Contains(t, stderr.String(), "cli.greet_use")
+	for _, tc := range []struct{ name, use string }{
+		{"different name", "salute --name NAME"},
+		{"leading space", " greet --name NAME"},
+		{"tab in name", "greet\t--name NAME"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			bundle := catalogFixture(t, "en", "cli.greet_use", "other = "+strconv.Quote(tc.use)+"\n")
+			loader := func() (*messages.Bundle, error) { return bundle, nil }
+			t.Run("construct", func(t *testing.T) {
+				root, _, err := buildRoot(defaults(Options{LookupEnv: noFixtureEnv}), loader)
+				require.ErrorContains(t, err, "cli.greet_use")
+				require.Equal(t, "供用户和自动化工具使用的 CLI 模板", root.Short)
+				greet, _, findErr := root.Find([]string{"greet"})
+				require.NoError(t, findErr)
+				require.Equal(t, "greet --name 姓名", greet.Use)
+			})
+			t.Run("run", func(t *testing.T) {
+				var out, stderr bytes.Buffer
+				code := run(context.Background(), []string{"greet", "--help"}, Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv}, loader)
+				require.Equal(t, 1, code, stderr.String())
+				require.Empty(t, out.String())
+				require.Contains(t, stderr.String(), "cli.greet_use")
+			})
+		})
+	}
 }
 
-func TestExistingHelpFlagKeepsItsOwnDescription(t *testing.T) {
-	var out bytes.Buffer
-	root, call, err := buildRoot(defaults(Options{Out: &out, LookupEnv: noFixtureEnv}), locales.LoadBundle)
-	require.NoError(t, err)
-	cmd := &cobra.Command{Use: "extra", RunE: func(*cobra.Command, []string) error { return nil }}
-	cmd.Flags().BoolP("help", "h", false, "custom help description")
-	root.AddCommand(cmd)
-	configureHelp(cmd, call)
-	require.NoError(t, call.localizeTree(root, "en"))
-	root.SetArgs([]string{"extra", "--help"})
-	require.NoError(t, root.Execute())
-	require.Contains(t, out.String(), "custom help description")
+func TestExistingHelpAndVersionFlagsKeepTheirDescriptions(t *testing.T) {
+	for _, flag := range []string{"help", "version"} {
+		for _, scope := range []string{"local", "persistent", "inherited"} {
+			t.Run(flag+"/"+scope, func(t *testing.T) {
+				var out bytes.Buffer
+				root, call, err := buildRoot(defaults(Options{Out: &out, LookupEnv: noFixtureEnv}), locales.LoadBundle)
+				require.NoError(t, err)
+				cmd := &cobra.Command{Use: "extra", RunE: func(*cobra.Command, []string) error { return nil }}
+				if flag == "version" {
+					cmd.Version = "dev"
+					cmd.Flags().Bool("help", false, "custom help description")
+				}
+				description := "custom " + flag + " description"
+				var registered *pflag.Flag
+				args := []string{"extra", "--help"}
+				switch scope {
+				case "local":
+					cmd.Flags().Bool(flag, false, description)
+					registered = cmd.Flags().Lookup(flag)
+					root.AddCommand(cmd)
+				case "persistent":
+					cmd.PersistentFlags().Bool(flag, false, description)
+					registered = cmd.PersistentFlags().Lookup(flag)
+					root.AddCommand(cmd)
+				case "inherited":
+					parent := &cobra.Command{Use: "parent"}
+					parent.PersistentFlags().Bool(flag, false, description)
+					registered = parent.PersistentFlags().Lookup(flag)
+					parent.AddCommand(cmd)
+					root.AddCommand(parent)
+					args = []string{"parent", "extra", "--help"}
+				}
+				configureHelp(cmd, call)
+				require.NoError(t, call.localizeTree(root, "en"))
+				root.SetArgs(args)
+				require.NoError(t, root.Execute())
+				require.Contains(t, out.String(), description)
+				require.Equal(t, description, registered.Usage)
+			})
+		}
+	}
+}
+
+func TestDefaultHelpAndVersionFlagsAreLocalized(t *testing.T) {
+	for _, tc := range []struct{ lang, help, version string }{
+		{"en", "Show help", "Show version information"},
+		{"zh", "显示帮助", "显示版本信息"},
+	} {
+		code, out, stderr := invoke(t, "--lang", tc.lang, "--help")
+		require.Zero(t, code, stderr)
+		require.Contains(t, out, tc.help)
+		require.Contains(t, out, tc.version)
+	}
 }
 
 func TestLongDescriptionRenderingFailureIsReturned(t *testing.T) {

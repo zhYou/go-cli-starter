@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -68,8 +67,8 @@ func (call *invocation) localizeTree(root *cobra.Command, language string) error
 			*field.dest = text
 		}
 		if binding.texts.use.id != "" {
-			parts := strings.Fields(commands[i].use)
-			if len(parts) == 0 || parts[0] != binding.name {
+			candidate := &cobra.Command{Use: commands[i].use}
+			if name := candidate.Name(); name == "" || name != binding.name {
 				return fmt.Errorf("message %q changes command name %q", binding.texts.use.id, binding.name)
 			}
 		}
