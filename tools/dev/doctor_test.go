@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -22,8 +24,15 @@ func TestDoctorHelper(t *testing.T) {
 		_, _ = os.Stdout.WriteString(strings.Repeat("x", 4096))
 		_, _ = os.Stderr.WriteString(strings.Repeat("y", 4096))
 	case "interval":
+
 		start := time.Now().UnixNano()
-		time.Sleep(400 * time.Millisecond)
+		ready, gate := os.Args[len(os.Args)-3], os.Args[len(os.Args)-2]
+		//nolint:gosec // G703：同步路径只由当前测试的临时目录生成。
+		if err := os.WriteFile(ready, []byte("ready"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		//nolint:gosec // G703：释放路径只由父测试的临时 fixture 传入。
+		require.Eventually(t, func() bool { _, err := os.Stat(gate); return err == nil }, 2*time.Second, time.Millisecond, "未收到探测释放信号")
 		data, _ := json.Marshal([2]int64{start, time.Now().UnixNano()})
 		_, _ = os.Stdout.Write(data)
 	case "sleep":
@@ -81,14 +90,39 @@ func TestDoctorReportsTimeoutAndTruncationTogether(t *testing.T) {
 
 func TestDoctorConcurrencyLimit(t *testing.T) {
 	t.Setenv("DOCTOR_HELPER", "1")
-	t.Setenv("GO_CLI_STARTER_HOME", t.TempDir())
+	root := t.TempDir()
+	t.Setenv("GO_CLI_STARTER_HOME", root)
 	exe, err := os.Executable()
 	require.NoError(t, err)
 	calls := make([]cmdexec.Invocation, 8)
 	for i := range calls {
-		calls[i] = cmdexec.Invocation{Program: exe, Args: []string{"-test.run=^TestDoctorHelper$", "--", "interval"}}
+		calls[i] = cmdexec.Invocation{Program: exe, Args: []string{"-test.run=^TestDoctorHelper$", "--", filepath.Join(root, fmt.Sprintf("ready-%d", i)), filepath.Join(root, fmt.Sprintf("gate-%d", i/4)), "interval"}}
 	}
-	results := runDoctorProbes(t.Context(), calls)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	done := make(chan []cmdexec.Result, 1)
+	finished := make(chan struct{})
+	go func() { defer close(finished); done <- runDoctorProbes(ctx, calls) }()
+	t.Cleanup(func() {
+		cancel()
+		select {
+		case <-finished:
+		case <-time.After(4 * time.Second):
+			t.Error("探测 helper 未完成收尾")
+		}
+	})
+	for wave := 0; wave < 2; wave++ {
+		for slot := 0; slot < 4; slot++ {
+			ready := filepath.Join(root, fmt.Sprintf("ready-%d", wave*4+slot))
+			require.Eventually(t, func() bool { _, err := os.Stat(ready); return err == nil }, 2*time.Second, time.Millisecond, "未出现探测就绪标记 %s", ready)
+		}
+		require.NoError(t, os.WriteFile(filepath.Join(root, fmt.Sprintf("gate-%d", wave)), nil, 0600))
+	}
+	var results []cmdexec.Result
+	select {
+	case results = <-done:
+	case <-time.After(4 * time.Second):
+		t.Fatal("探测结果超时")
+	}
 	intervals := make([][2]int64, len(results))
 	for i, result := range results {
 		require.NoError(t, result.Err)

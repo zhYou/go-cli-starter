@@ -89,13 +89,13 @@ var managedFiles = []string{
 	"internal/base/logging/logger_test.go",
 	"internal/base/logging/logging_test.go",
 	"internal/base/telemetry/session_test.go",
-	"cmd/go-cli-starter/main_test.go",
 	"internal/app/greeting/greeting_catalog_test.go",
 	"internal/app/session/session_catalog_test.go",
 	"internal/tools/command/errors_catalog_test.go",
 	"internal/tools/command/errors_test.go",
 	"internal/tools/command/helpers_test.go",
 	"test/integration/catalog_test.go",
+	"test/integration/helpers_test.go",
 }
 
 var validName = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)

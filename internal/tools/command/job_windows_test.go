@@ -16,20 +16,28 @@ import (
 )
 
 func TestWindowsConcurrentJobIsolation(t *testing.T) {
-	sibling, opts := helper(t, "sleep", "250ms", "survived")
-	canceled, cancelOpts := helper(t, "sleep", "5s", "never")
+	sibling, opts := helper(t, "gate-output")
+	siblingReady, gate := filepath.Join(opts.Dir, "ready"), filepath.Join(opts.Dir, "gate")
+	sibling.Args = append(sibling.Args, siblingReady, gate, "survived")
+	canceled, cancelOpts := helper(t, "ready-sleep")
+	canceledReady := filepath.Join(cancelOpts.Dir, "ready")
+	canceled.Args = append(canceled.Args, canceledReady, "5s", "never")
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	done := make(chan Result, 1)
-	go func() { done <- Capture(t.Context(), sibling, opts, CaptureOptions{}) }()
-	timer := time.AfterFunc(50*time.Millisecond, cancel)
-	defer timer.Stop()
-	r := Capture(ctx, canceled, cancelOpts, CaptureOptions{})
-	if !errors.Is(r.Err, context.Canceled) {
-		t.Fatal(r.Err)
+	survivorDone := startCapture(t, t.Context(), sibling, opts)
+	canceledDone := startCapture(t, ctx, canceled, cancelOpts)
+	waitMarker(t, siblingReady)
+	waitMarker(t, canceledReady)
+	cancel()
+	r := awaitCapture(t, canceledDone)
+	if !errors.Is(r.Err, context.Canceled) || r.Status != Canceled {
+		t.Fatalf("取消结果: %+v", r)
 	}
-	survivor := <-done
-	if survivor.Err != nil || string(survivor.Stdout) != "survived" {
+	if err := os.WriteFile(gate, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	survivor := awaitCapture(t, survivorDone)
+	if survivor.Err != nil || survivor.Status != Succeeded || string(survivor.Stdout) != "survived" {
 		t.Fatalf("取消误伤并发 Job: %+v", survivor)
 	}
 }

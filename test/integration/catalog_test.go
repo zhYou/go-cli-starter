@@ -1,11 +1,13 @@
 package integration
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -21,10 +23,14 @@ func TestCorruptCatalogEndToEnd(t *testing.T) {
 	require.NoError(t, err)
 	overlayFile := filepath.Join(dir, "overlay.json")
 	require.NoError(t, os.WriteFile(overlayFile, overlay, 0600))
+
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
 	//nolint:gosec // G204：执行固定 Go 测试命令，overlay 路径来自当前测试的临时目录。
-	cmd := exec.CommandContext(t.Context(), "go", "test", "-count=1", "-overlay", overlayFile, "-run", "^TestCorruptCatalogProcess$", "./internal/app/greeting", "./internal/app/session", "./internal/tools/command")
+	cmd := exec.CommandContext(ctx, "go", "test", "-count=1", "-overlay", overlayFile, "-run", "^TestCorruptCatalogProcess$", "./internal/app/greeting", "./internal/app/session", "./internal/tools/command")
 	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "TEST_CORRUPT_I18N_CATALOG=1", "GO_CLI_STARTER_HOME="+filepath.Join(dir, "app-home"), "GOPROXY=off", "GOTOOLCHAIN=local")
+	cmd.Env = append(isolatedAppEnvironment(t, "go-cli-starter"), "TEST_CORRUPT_I18N_CATALOG=1", "GOPROXY=off", "GOTOOLCHAIN=local")
+	cmd.WaitDelay = time.Second
 	output, err := cmd.CombinedOutput()
 	require.NoError(t, err, "%s", output)
 }

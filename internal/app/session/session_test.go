@@ -219,6 +219,20 @@ func TestFinishWaitsForRegisteredWorkBeforeEndingSpanAndClosingFiles(t *testing.
 	cfg.Telemetry.Exporter = telemetry.File
 	ctx, s := Begin(t.Context(), cfg, logging.RunInfo{Component: "test", Command: "work"}, Options{Directories: &paths.Directories{State: t.TempDir()}}, func(err error) { t.Error(err) })
 	started, release, finished := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	var releaseOnce, finishOnce sync.Once
+	releaseWork := func() { releaseOnce.Do(func() { close(release) }) }
+	finish := func() {
+		finishOnce.Do(func() { go func() { s.Finish(ctx, logging.CommandResult{}); close(finished) }() })
+	}
+	t.Cleanup(func() {
+		releaseWork()
+		finish()
+		select {
+		case <-finished:
+		case <-time.After(3 * time.Second):
+			t.Error("已登记工作或 Session 未完成收尾")
+		}
+	})
 	require.True(t, s.Go(func(ctx context.Context) {
 		_, span := s.Tracer.Start(ctx, "worker")
 		defer span.End()
@@ -226,8 +240,12 @@ func TestFinishWaitsForRegisteredWorkBeforeEndingSpanAndClosingFiles(t *testing.
 		<-release
 		s.Logger.WithContext(ctx).Infow("worker_completed")
 	}))
-	<-started
-	go func() { s.Finish(ctx, logging.CommandResult{}); close(finished) }()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("登记的工作未启动")
+	}
+	finish()
 	require.Eventually(t, func() bool { s.mu.Lock(); defer s.mu.Unlock(); return s.finishing }, time.Second, time.Millisecond)
 	require.False(t, s.Go(func(context.Context) { t.Error("关闭后不应接受新工作") }))
 	select {
@@ -236,7 +254,7 @@ func TestFinishWaitsForRegisteredWorkBeforeEndingSpanAndClosingFiles(t *testing.
 	default:
 	}
 	require.True(t, trace.SpanFromContext(ctx).IsRecording())
-	close(release)
+	releaseWork()
 	select {
 	case <-finished:
 	case <-time.After(time.Second):
@@ -245,7 +263,11 @@ func TestFinishWaitsForRegisteredWorkBeforeEndingSpanAndClosingFiles(t *testing.
 	require.False(t, trace.SpanFromContext(ctx).IsRecording())
 	data, err := os.ReadFile(filepath.Join(s.files.Path, diagnostics.EventsFile))
 	require.NoError(t, err)
-	require.Less(t, bytes.Index(data, []byte("worker_completed")), bytes.Index(data, []byte("command_finished")))
+	workerIndex := bytes.Index(data, []byte("worker_completed"))
+	finishedIndex := bytes.Index(data, []byte("command_finished"))
+	require.NotEqual(t, -1, workerIndex, "缺少工作完成事件")
+	require.NotEqual(t, -1, finishedIndex, "缺少命令完成事件")
+	require.Less(t, workerIndex, finishedIndex)
 	spans, err := os.ReadFile(filepath.Join(s.files.Path, diagnostics.TraceFile))
 	require.NoError(t, err)
 	require.Contains(t, string(spans), "worker")

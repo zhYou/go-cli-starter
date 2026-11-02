@@ -9,7 +9,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
@@ -252,15 +254,22 @@ func TestLockHelper(t *testing.T) {
 func TestConcurrentInitializationDoesNotRecoverLiveTransaction(t *testing.T) {
 	root := fixture(t)
 	lock := filepath.Join(root, ".template-init.lock")
-	//nolint:gosec // G204：测试只运行当前测试二进制或固定 Git/Go 命令，参数来自临时 fixture。
-	cmd := exec.Command(os.Args[0], "-test.run=^TestLockHelper$")
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	//nolint:gosec // G204：锁 helper 只执行当前测试二进制。
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestLockHelper$")
+	cmd.WaitDelay = time.Second
 	cmd.Env = append(os.Environ(), "TEMPLATE_LOCK_HELPER=1", "TEMPLATE_LOCK_PATH="+lock)
 	in, err := cmd.StdinPipe()
 	require.NoError(t, err)
 	out, err := cmd.StdoutPipe()
 	require.NoError(t, err)
 	require.NoError(t, cmd.Start())
-	t.Cleanup(func() { _ = in.Close(); _ = cmd.Process.Kill() })
+
+	var waitOnce sync.Once
+	var waitErr error
+	waitChild := func() error { waitOnce.Do(func() { waitErr = cmd.Wait() }); return waitErr }
+	t.Cleanup(func() { cancel(); _ = in.Close(); _ = cmd.Process.Kill(); _ = waitChild() })
 	line, err := bufio.NewReader(out).ReadString('\n')
 	require.NoError(t, err)
 	require.Equal(t, "就绪\n", line)
@@ -268,7 +277,7 @@ func TestConcurrentInitializationDoesNotRecoverLiveTransaction(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, read(t, root, "go.mod"), TemplateModule)
 	require.NoError(t, cmd.Process.Kill())
-	require.Error(t, cmd.Wait())
+	require.Error(t, waitChild())
 	_, err = Initialize(root, "example.com/tool", "tool")
 	require.NoError(t, err)
 }

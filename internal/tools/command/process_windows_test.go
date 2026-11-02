@@ -1,7 +1,6 @@
 package command
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -40,34 +39,16 @@ func TestWindowsCancelAfterResumeAndDuringSpawn(t *testing.T) {
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
-			done := make(chan error, 1)
-			go func() { done <- Run(ctx, call, options) }()
-			deadline := time.Now().Add(3 * time.Second)
-			for time.Now().Before(deadline) {
-				if _, err := os.Stat(marker); err == nil {
-					break
-				}
-				time.Sleep(5 * time.Millisecond)
-			}
-			if _, err := os.Stat(marker); err != nil {
-				cancel()
-				waitErr := <-done
-				t.Fatalf("未观察到 helper 就绪: %v；执行结果: %v", err, waitErr)
-			}
+			done := startCapture(t, ctx, call, options)
+			waitMarker(t, marker)
 			cancel()
-			err := <-done
+			result := awaitCapture(t, done)
+			err := result.Err
 			var exit *exec.ExitError
 			if !errors.Is(err, context.Canceled) || !errors.As(err, &exit) {
 				t.Fatalf("取消退出错误: %v", err)
 			}
-			//nolint:gosec // G304：辅助进程只执行自身测试二进制；路径来自当前测试生成的临时目录。
-			before, _ := os.ReadFile(marker)
-			time.Sleep(80 * time.Millisecond)
-			//nolint:gosec // G304：辅助进程只执行自身测试二进制；路径来自当前测试生成的临时目录。
-			after, _ := os.ReadFile(marker)
-			if !bytes.Equal(before, after) {
-				t.Fatal("取消后后代继续写入")
-			}
+			assertHeartbeatStopped(t, marker, 80*time.Millisecond)
 		})
 	}
 }
