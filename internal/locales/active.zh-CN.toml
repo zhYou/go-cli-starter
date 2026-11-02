@@ -19,6 +19,9 @@ other = "错误：{{.Message}}"
 ["cli.greet"]
 other = "输出问候语（可移除的示例）"
 
+["cli.greet_example"]
+other = "  {{.Name}} greet --name Codex\n  {{.Name}} greet --name Codex --json"
+
 ["cli.greet_log"]
 other = "已生成问候语"
 
