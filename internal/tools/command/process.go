@@ -18,7 +18,7 @@ const DefaultWaitDelay = 250 * time.Millisecond
 
 // Execution 的流为借用资源，不关闭调用方句柄。Env=nil 继承当前环境，空切片清空环境。
 // WaitDelay=0 使用默认宽限；不为普通命令添加独立 deadline。
-// Localizer 显式选择日志语言；nil 使用本包中文目录。结构化错误由应用入口统一渲染。
+// Localizer 显式选择日志语言；nil 使用集中目录的英文消息。结构化错误由应用入口统一渲染。
 type Execution struct {
 	Localizer *messages.Localizer
 	Logger    *logging.Logger

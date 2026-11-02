@@ -31,7 +31,7 @@ func observe(ctx context.Context, call Invocation, options Execution) (context.C
 	logger := options.Logger
 	if logger != nil {
 		logger = logger.WithContext(ctx)
-		logger.Debugw(localizer.Text("command.started", nil), "operation", operation, "tool", tool)
+		logger.Debugw(diagnosticText(localizer, "command.started"), "operation", operation, "tool", tool)
 	}
 	return ctx, func(err error) {
 		outcome := "success"
@@ -58,7 +58,7 @@ func observe(ctx context.Context, call Invocation, options Execution) (context.C
 			span.End()
 		}
 		if logger != nil {
-			logger.Record(logging.ToolCall{Message: localizer.Text("command.finished", nil), Operation: operation, Tool: tool, Outcome: outcome, ExitCode: exit, Duration: time.Since(start), Err: err})
+			logger.Record(logging.ToolCall{Message: diagnosticText(localizer, "command.finished"), Operation: operation, Tool: tool, Outcome: outcome, ExitCode: exit, Duration: time.Since(start), Err: err})
 		}
 	}
 }

@@ -17,5 +17,5 @@ func TestGreetingDirectCallRejectsWhitespace(t *testing.T) {
 	}
 	result, err := New(validation.New()).Run(context.Background(), Options{Name: " Codex "})
 	require.NoError(t, err)
-	require.Equal(t, "你好， Codex ！", result.Message)
+	require.Equal(t, "Hello,  Codex !", result.Message)
 }

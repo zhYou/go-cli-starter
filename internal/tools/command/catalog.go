@@ -3,10 +3,10 @@ package command
 import (
 	"embed"
 	"io/fs"
-	"sync"
 
 	"github.com/zhYou/go-cli-starter/internal/base/fault"
 	"github.com/zhYou/go-cli-starter/internal/base/messages"
+	"github.com/zhYou/go-cli-starter/internal/locales"
 )
 
 //go:embed locales/*.json
@@ -27,15 +27,20 @@ var (
 	batchItemIncomplete   = fault.Definition{Code: "command.batch_item_incomplete", Kind: fault.Runtime}
 )
 
-var defaultBundle = sync.OnceValues(func() (*messages.Bundle, error) { return messages.NewBundle(Catalog()) })
-
 func commandLocalizer(provided *messages.Localizer) *messages.Localizer {
 	if provided != nil {
 		return provided
 	}
-	bundle, err := defaultBundle()
+	bundle, err := locales.LoadBundle()
 	if err != nil {
 		return nil
 	}
-	return bundle.Localizer("zh-CN")
+	return bundle.Localizer("en")
+}
+
+func diagnosticText(localizer *messages.Localizer, id string) string {
+	if localizer == nil || localizer.Language() == "" {
+		return "Operation failed [" + id + "]"
+	}
+	return localizer.Text(id, nil)
 }
