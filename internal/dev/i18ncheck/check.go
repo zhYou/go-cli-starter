@@ -67,8 +67,14 @@ func Check(source fs.FS) error {
 		if !ok {
 			return fmt.Errorf("zh-CN 缺少消息 %q", id)
 		}
-		enParams := parameters(en[id])
-		zhParams := parameters(other)
+		enParams, err := parameters(en[id])
+		if err != nil {
+			return fmt.Errorf("消息 %q 的 en 模板：%w", id, err)
+		}
+		zhParams, err := parameters(other)
+		if err != nil {
+			return fmt.Errorf("消息 %q 的 zh-CN 模板：%w", id, err)
+		}
 		if !slices.Equal(enParams, zhParams) {
 			return fmt.Errorf("消息 %q 的参数不一致：en=%v，zh-CN=%v", id, enParams, zhParams)
 		}
@@ -81,39 +87,55 @@ func Check(source fs.FS) error {
 	return nil
 }
 
-func parameters(entry map[string]string) []string {
+func parameters(entry map[string]string) ([]string, error) {
 	set := make(map[string]bool)
 	for form, text := range entry {
 		if form == "description" {
 			continue
 		}
-		// Parse 已验证模板语法，使用相同的内置函数集再次解析以提取参数。
-		t, _ := template.New("").Parse(text)
-		collect(t.Root, set, true, map[string]bool{"$": true})
+		t, err := template.New("").Parse(text)
+		if err != nil {
+			return nil, err
+		}
+		a := templateAnalyzer{template: t, params: set, active: make(map[string]bool)}
+		a.collect(t.Root, true, map[string]bool{"$": true})
+		if a.err != nil {
+			return nil, a.err
+		}
 	}
 	result := make([]string, 0, len(set))
 	for key := range set {
 		result = append(result, key)
 	}
 	slices.Sort(result)
-	return result
+	return result, nil
 }
 
-func collect(node parse.Node, set map[string]bool, rootDot bool, aliases map[string]bool) {
+type templateAnalyzer struct {
+	template *template.Template
+	params   map[string]bool
+	active   map[string]bool
+	err      error
+}
+
+func (a *templateAnalyzer) collect(node parse.Node, rootDot bool, aliases map[string]bool) {
+	if a.err != nil {
+		return
+	}
 	switch n := node.(type) {
 	case *parse.ListNode:
 		if n != nil {
 			for _, child := range n.Nodes {
-				collect(child, set, rootDot, aliases)
+				a.collect(child, rootDot, aliases)
 			}
 		}
 	case *parse.ActionNode:
-		collect(n.Pipe, set, rootDot, aliases)
+		a.collect(n.Pipe, rootDot, aliases)
 		bindAliases(n.Pipe, rootDot, aliases)
 	case *parse.PipeNode:
 		if n != nil {
 			for _, command := range n.Cmds {
-				collect(command, set, rootDot, aliases)
+				a.collect(command, rootDot, aliases)
 			}
 		}
 	case *parse.CommandNode:
@@ -122,56 +144,109 @@ func collect(node parse.Node, set map[string]bool, rootDot bool, aliases map[str
 				switch root := n.Args[1].(type) {
 				case *parse.DotNode:
 					if key, ok := n.Args[2].(*parse.StringNode); ok && rootDot {
-						set[key.Text] = true
+						a.params[key.Text] = true
 					}
 				case *parse.VariableNode:
 					if len(root.Ident) == 1 && aliases[root.Ident[0]] {
 						if key, ok := n.Args[2].(*parse.StringNode); ok {
-							set[key.Text] = true
+							a.params[key.Text] = true
 						}
 					}
 				}
 			}
 		}
 		for _, arg := range n.Args {
-			collect(arg, set, rootDot, aliases)
+			a.collect(arg, rootDot, aliases)
 		}
 	case *parse.FieldNode:
 		if rootDot && len(n.Ident) > 0 {
-			set[n.Ident[0]] = true
+			a.params[n.Ident[0]] = true
 		}
 	case *parse.VariableNode:
 		if len(n.Ident) > 1 && aliases[n.Ident[0]] {
-			set[n.Ident[1]] = true
+			a.params[n.Ident[1]] = true
 		}
 	case *parse.ChainNode:
-		collect(n.Node, set, rootDot, aliases)
+		a.collect(n.Node, rootDot, aliases)
 	case *parse.IfNode:
 		aliases = maps.Clone(aliases)
-		collect(n.Pipe, set, rootDot, aliases)
+		a.collect(n.Pipe, rootDot, aliases)
 		bindAliases(n.Pipe, rootDot, aliases)
-		collect(n.List, set, rootDot, aliases)
-		collect(n.ElseList, set, rootDot, aliases)
+		a.collect(n.List, rootDot, maps.Clone(aliases))
+		a.collect(n.ElseList, rootDot, maps.Clone(aliases))
 	case *parse.RangeNode:
 		aliases = maps.Clone(aliases)
-		collect(n.Pipe, set, rootDot, aliases)
+		a.collect(n.Pipe, rootDot, aliases)
 		bindAliases(n.Pipe, rootDot, aliases)
-		collect(n.List, set, false, aliases)
-		collect(n.ElseList, set, rootDot, aliases)
+		a.collect(n.List, false, maps.Clone(aliases))
+		a.collect(n.ElseList, rootDot, maps.Clone(aliases))
 	case *parse.WithNode:
 		aliases = maps.Clone(aliases)
-		collect(n.Pipe, set, rootDot, aliases)
+		a.collect(n.Pipe, rootDot, aliases)
 		bindAliases(n.Pipe, rootDot, aliases)
-		collect(n.List, set, false, aliases)
-		collect(n.ElseList, set, rootDot, aliases)
+		bodyRoot, err := templateContext(n.Pipe, rootDot, aliases)
+		if err != nil {
+			a.err = err
+			return
+		}
+		a.collect(n.List, bodyRoot, maps.Clone(aliases))
+		a.collect(n.ElseList, rootDot, maps.Clone(aliases))
 	case *parse.TemplateNode:
-		collect(n.Pipe, set, rootDot, aliases)
+		a.collect(n.Pipe, rootDot, aliases)
+		bodyRoot, err := templateContext(n.Pipe, rootDot, aliases)
+		if err != nil {
+			a.err = err
+			return
+		}
+		called := a.template.Lookup(n.Name)
+		if called == nil || called.Tree == nil {
+			a.err = fmt.Errorf("未定义模板 %q", n.Name)
+			return
+		}
+		if a.active[n.Name] {
+			a.err = fmt.Errorf("不支持递归模板 %q", n.Name)
+			return
+		}
+		a.active[n.Name] = true
+		a.collect(called.Root, bodyRoot, map[string]bool{"$": bodyRoot})
+		delete(a.active, n.Name)
+	}
+}
+
+// templateContext 识别未经计算的根对象或子值；无法判断的上下文直接拒绝。
+func templateContext(pipe *parse.PipeNode, rootDot bool, aliases map[string]bool) (bool, error) {
+	if pipe == nil {
+		return false, nil
+	}
+	if len(pipe.Cmds) != 1 || len(pipe.Cmds[0].Args) != 1 {
+		return false, fmt.Errorf("无法静态确定模板上下文")
+	}
+	switch value := pipe.Cmds[0].Args[0].(type) {
+	case *parse.DotNode:
+		return rootDot, nil
+	case *parse.VariableNode:
+		isRoot, known := aliases[value.Ident[0]]
+		if !known {
+			return false, fmt.Errorf("无法静态确定模板变量 %q", value.Ident[0])
+		}
+		return len(value.Ident) == 1 && isRoot, nil
+	case *parse.FieldNode, *parse.ChainNode, *parse.StringNode, *parse.NumberNode, *parse.BoolNode, *parse.NilNode:
+		return false, nil
+	case *parse.PipeNode:
+		return templateContext(value, rootDot, aliases)
+	default:
+		return false, fmt.Errorf("无法静态确定模板上下文")
 	}
 }
 
 // bindAliases 跟踪直接引用根数据的模板变量，分支中使用独立作用域。
 func bindAliases(pipe *parse.PipeNode, rootDot bool, aliases map[string]bool) {
-	if pipe == nil || len(pipe.Decl) != 1 || len(pipe.Cmds) != 1 || len(pipe.Cmds[0].Args) != 1 {
+	if pipe == nil || len(pipe.Decl) != 1 {
+		return
+	}
+	name := pipe.Decl[0].Ident[0]
+	if len(pipe.Cmds) != 1 || len(pipe.Cmds[0].Args) != 1 {
+		delete(aliases, name)
 		return
 	}
 	isRoot := false
@@ -179,7 +254,13 @@ func bindAliases(pipe *parse.PipeNode, rootDot bool, aliases map[string]bool) {
 	case *parse.DotNode:
 		isRoot = rootDot
 	case *parse.VariableNode:
-		isRoot = len(value.Ident) == 1 && aliases[value.Ident[0]]
+		var known bool
+		isRoot, known = aliases[value.Ident[0]]
+		if !known {
+			delete(aliases, name)
+			return
+		}
+		isRoot = len(value.Ident) == 1 && isRoot
 	}
-	aliases[pipe.Decl[0].Ident[0]] = isRoot
+	aliases[name] = isRoot
 }

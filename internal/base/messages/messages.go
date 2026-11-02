@@ -12,7 +12,6 @@ import (
 
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"github.com/nicksnyder/go-i18n/v2/i18n/template"
-	"github.com/pelletier/go-toml/v2"
 	"github.com/zhYou/go-cli-starter/internal/base/fault"
 	"github.com/zhYou/go-cli-starter/internal/base/messages/catalog"
 	"golang.org/x/text/language"
@@ -39,7 +38,7 @@ type Localizer struct {
 // NewBundle 加载并冻结消息目录；零参数保留为旧调用的诊断兜底。
 func NewBundle(catalogs ...fs.FS) (*Bundle, error) {
 	b := i18n.NewBundle(language.English)
-	unmarshal := map[string]i18n.UnmarshalFunc{"json": json.Unmarshal, "toml": toml.Unmarshal}
+	unmarshal := map[string]i18n.UnmarshalFunc{"json": json.Unmarshal}
 	seen := make(map[string]map[string]bool)
 	for _, source := range catalogs {
 		names, err := catalog.Files(source)
@@ -51,14 +50,29 @@ func NewBundle(catalogs ...fs.FS) (*Bundle, error) {
 			if err != nil {
 				return nil, fmt.Errorf("读取 %s：%w", name, err)
 			}
+			var file *i18n.MessageFile
 			if path.Ext(name) == ".toml" {
-				if _, err := catalog.Parse(data); err != nil {
+				entries, err := catalog.Parse(data)
+				if err != nil {
 					return nil, fmt.Errorf("%s：%w", name, err)
 				}
-			}
-			file, err := i18n.ParseMessageFileBytes(data, name, unmarshal)
-			if err != nil {
-				return nil, fmt.Errorf("加载 %s：%w", name, err)
+				// 仅借用上游文件名的语言解析，消息 ID 和字段以严格解析结果为准。
+				file, err = i18n.ParseMessageFileBytes(nil, name, nil)
+				if err != nil {
+					return nil, fmt.Errorf("加载 %s：%w", name, err)
+				}
+				for id, fields := range entries {
+					file.Messages = append(file.Messages, &i18n.Message{
+						ID: id, Description: fields["description"],
+						Zero: fields["zero"], One: fields["one"], Two: fields["two"],
+						Few: fields["few"], Many: fields["many"], Other: fields["other"],
+					})
+				}
+			} else {
+				file, err = i18n.ParseMessageFileBytes(data, name, unmarshal)
+				if err != nil {
+					return nil, fmt.Errorf("加载 %s：%w", name, err)
+				}
 			}
 			if len(file.Messages) == 0 {
 				return nil, fmt.Errorf("消息文件 %s 为空", name)

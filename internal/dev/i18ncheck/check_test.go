@@ -98,3 +98,55 @@ other = '{{$root := .}}{{$root.Title}}'
 `)
 	require.Error(t, Check(catalog))
 }
+
+func TestCheckComparesParametersWithinRootPreservingWith(t *testing.T) {
+	catalog := pair(`["sample"]
+other = '{{with .}}{{.Name}}{{end}}'
+`, `["sample"]
+other = '{{with .}}{{.Title}}{{end}}'
+`)
+	require.Error(t, Check(catalog))
+}
+
+func TestCheckComparesParametersInCalledTemplate(t *testing.T) {
+	catalog := pair(`["sample"]
+other = '{{define "part"}}{{.Name}}{{end}}{{template "part" .}}'
+`, `["sample"]
+other = '{{define "part"}}{{.Title}}{{end}}{{template "part" .}}'
+`)
+	require.Error(t, Check(catalog))
+}
+
+func TestCheckUnderstandsCalledTemplateContext(t *testing.T) {
+	catalog := pair(`["sample"]
+other = '{{define "part"}}{{.Name}}{{end}}{{template "part" .User}}'
+`, `["sample"]
+other = '{{.User.Name}}'
+`)
+	require.NoError(t, Check(catalog))
+}
+
+func TestCheckAcceptsCalledTemplateWithMatchingRootParameters(t *testing.T) {
+	catalog := pair(`["sample"]
+other = '{{define "part"}}{{.Name}}{{end}}{{template "part" .}}'
+`, `["sample"]
+other = '{{with .}}{{.Name}}{{end}}'
+`)
+	require.NoError(t, Check(catalog))
+}
+
+func TestCheckRejectsUnanalyzableTemplateCalls(t *testing.T) {
+	tests := map[string]string{
+		"undefined":        `{{template "missing" .}}`,
+		"recursive":        `{{define "part"}}{{if .Next}}{{template "part" .Next}}{{end}}{{end}}{{template "part" .}}`,
+		"computed context": `{{with printf "%s" .}}{{.Name}}{{end}}`,
+		"computed alias":   `{{$value := printf "%s" .}}{{with $value}}{{.Name}}{{end}}`,
+		"reassigned alias": `{{$value := .}}{{$value = printf "%s" .}}{{with $value}}{{.Name}}{{end}}`,
+	}
+	for name, text := range tests {
+		t.Run(name, func(t *testing.T) {
+			content := "[\"sample\"]\nother = '" + text + "'\n"
+			require.Error(t, Check(pair(content, content)))
+		})
+	}
+}

@@ -180,3 +180,20 @@ func TestFormatRejectsUnavailableLanguage(t *testing.T) {
 	require.Error(t, err)
 	require.Empty(t, text)
 }
+
+func TestBundlePreservesReservedTOMLMessageIDs(t *testing.T) {
+	for _, id := range []string{"translation", "other", "id"} {
+		t.Run(id, func(t *testing.T) {
+			catalog := fstest.MapFS{"active.en.toml": {Data: []byte("[\"" + id + "\"]\none = \"One\"\nother = \"Many\"\n")}}
+			bundle, err := NewBundle(catalog)
+			require.NoError(t, err)
+			localizer := bundle.Localizer("en")
+			text, err := localizer.Format(id, FormatOptions{PluralCount: 1})
+			require.NoError(t, err)
+			require.Equal(t, "One", text)
+			text, err = localizer.Format("", FormatOptions{})
+			require.Error(t, err)
+			require.Empty(t, text)
+		})
+	}
+}
