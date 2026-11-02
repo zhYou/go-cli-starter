@@ -11,8 +11,12 @@ import (
 
 func TestBundleIsolationFallbackAndErrorCauses(t *testing.T) {
 	fs := fstest.MapFS{
-		"locales/active.en.json":    {Data: []byte(`{"sample":{"other":"Hello, {{.Name}}!"}}`)},
-		"locales/active.zh-CN.json": {Data: []byte(`{"sample":{"other":"你好，{{.Name}}！"}}`)},
+		"active.en.toml": {Data: []byte(`["sample"]
+other = "Hello, {{.Name}}!"
+`)},
+		"active.zh-CN.toml": {Data: []byte(`["sample"]
+other = "你好，{{.Name}}！"
+`)},
 	}
 	b, err := NewBundle(fs)
 	require.NoError(t, err)
@@ -31,7 +35,7 @@ func TestBundleIsolationFallbackAndErrorCauses(t *testing.T) {
 func TestBundleLoadsTOMLAndRejectsEmptyOrCorruptCatalog(t *testing.T) {
 	t.Run("TOML message", func(t *testing.T) {
 		catalog := fstest.MapFS{
-			"locales/active.en.toml": {Data: []byte(`["sample.message"]
+			"active.en.toml": {Data: []byte(`["sample.message"]
 other = "Hello, {{.Name}}!"
 `)},
 		}
@@ -41,12 +45,12 @@ other = "Hello, {{.Name}}!"
 	})
 	tests := map[string]fstest.MapFS{
 		"empty directory": {},
-		"empty file":      {"locales/active.en.toml": {Data: nil}},
-		"unknown field": {"locales/active.en.toml": {Data: []byte(`["sample"]
+		"empty file":      {"active.en.toml": {Data: nil}},
+		"unknown field": {"active.en.toml": {Data: []byte(`["sample"]
 other = "text"
 typo = "ignored"
 `)}},
-		"missing other": {"locales/active.en.toml": {Data: []byte(`["sample"]
+		"missing other": {"active.en.toml": {Data: []byte(`["sample"]
 one = "text"
 `)}},
 	}
@@ -60,13 +64,13 @@ one = "text"
 
 func TestFormatRequiresCompleteRenderingAndSupportsPluralCount(t *testing.T) {
 	catalog := fstest.MapFS{
-		"locales/active.en.toml": {Data: []byte(`["files.count"]
+		"active.en.toml": {Data: []byte(`["files.count"]
 one = "{{.Count}} file for {{.Name}}"
 other = "{{.Count}} files for {{.Name}}"
 ["files.default_count"]
 other = "{{.PluralCount}} files"
 `)},
-		"locales/active.zh-CN.toml": {Data: []byte(`["files.count"]
+		"active.zh-CN.toml": {Data: []byte(`["files.count"]
 other = "{{.Name}} 的 {{.Count}} 个文件"
 `)},
 	}
@@ -100,7 +104,7 @@ other = "{{.Name}} 的 {{.Count}} 个文件"
 
 func TestRenderSelectsPluralFromFaultCount(t *testing.T) {
 	catalog := fstest.MapFS{
-		"locales/active.en.toml": {Data: []byte(`["files.count"]
+		"active.en.toml": {Data: []byte(`["files.count"]
 one = "{{.Count}} argument"
 other = "{{.Count}} arguments"
 ["legacy.count"]
@@ -196,4 +200,11 @@ func TestBundlePreservesReservedTOMLMessageIDs(t *testing.T) {
 			require.Empty(t, text)
 		})
 	}
+}
+
+// 旧 JSON 目录不能再被当作消息源加载。
+func TestBundleRejectsLegacyJSONCatalog(t *testing.T) {
+	catalog := fstest.MapFS{"active.en.json": {Data: []byte(`{"legacy":{"other":"obsolete"}}`)}}
+	_, err := NewBundle(catalog)
+	require.Error(t, err)
 }

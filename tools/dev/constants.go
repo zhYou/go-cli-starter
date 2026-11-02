@@ -12,6 +12,7 @@ const (
 	devDirectory           = "dev"
 	configExample          = "configs/config.example.toml"
 	chineseGreeting        = "你好，Ada！"
+	englishGreeting        = "Hello, Ada!"
 	greetCommand           = "greet"
 	gitProgram             = "git"
 	govulncheckTool        = "go:golang.org/x/vuln/cmd/govulncheck"

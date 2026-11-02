@@ -8,11 +8,15 @@ cli 0 --lang en schema greet
 stdout '"description":"Greeting'
 cli 0 --lang en greet --help
 stdout 'Usage:'
-env GO_CLI_STARTER_LANG=en
+env GO_CLI_STARTER_LANG=zh-CN
 cli 0 greet --name Ada
+stdout '你好，Ada！'
+cli 0 --lang en greet --name Ada
 stdout 'Hello, Ada!'
 cli 0 --lang zh greet --name Ada
 stdout '你好，Ada！'
+env GO_CLI_STARTER_LANG=
+
 cli 0 greet --name --lang=en
 stdout 'Hello, --lang=en!'
 cli 0 __complete greet --lang ''

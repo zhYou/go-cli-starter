@@ -44,7 +44,16 @@ run = "go test ./..."
 description = "运行竞态检测（需要 C 编译器）"
 run = "go test -race ./..."
 
+[tasks."i18n:check"]
+description = "检查集中双语消息目录"
+run = "go run ./tools/dev i18n-check"
+
+[tasks."config:check"]
+description = "检查受管应用配置"
+run = "go run ./tools/dev config-check"
+
 [tasks.lint]
+depends = ["i18n:check", "config:check"]
 description = "运行锁定版本的静态检查工具"
 run = "golangci-lint run --allow-serial-runners"
 

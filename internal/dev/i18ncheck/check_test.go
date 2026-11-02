@@ -9,8 +9,8 @@ import (
 
 func pair(en, zh string) fstest.MapFS {
 	return fstest.MapFS{
-		"locales/active.en.toml":    {Data: []byte(en)},
-		"locales/active.zh-CN.toml": {Data: []byte(zh)},
+		"active.en.toml":    {Data: []byte(en)},
+		"active.zh-CN.toml": {Data: []byte(zh)},
 	}
 }
 
@@ -40,7 +40,7 @@ other = "Hello {{.Name}}"
 `
 	tests := map[string]fstest.MapFS{
 		"empty directory":      {},
-		"missing language":     {"locales/active.en.toml": {Data: []byte(valid)}},
+		"missing language":     {"active.en.toml": {Data: []byte(valid)}},
 		"empty catalog":        pair("", valid),
 		"duplicate id":         pair(valid+valid, valid),
 		"unknown field":        pair(valid+"typo = \"x\"\n", valid),
@@ -52,9 +52,9 @@ other = "Hello {{.Name}}"
 		"different ids":        pair(valid, "[\"other.message\"]\nother = \"Hello {{.Name}}\"\n"),
 		"different parameters": pair(valid, "[\"sample.message\"]\nother = \"Hello {{.Other}}\"\n"),
 		"extra language file": {
-			"locales/active.en.toml":    {Data: []byte(valid)},
-			"locales/active.zh-CN.toml": {Data: []byte(valid)},
-			"locales/active.fr.toml":    {Data: []byte(valid)},
+			"active.en.toml":    {Data: []byte(valid)},
+			"active.zh-CN.toml": {Data: []byte(valid)},
+			"active.fr.toml":    {Data: []byte(valid)},
 		},
 	}
 	for name, catalog := range tests {

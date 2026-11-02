@@ -11,7 +11,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zhYou/go-cli-starter/internal/dev/configpolicy"
+	"github.com/zhYou/go-cli-starter/internal/dev/i18ncheck"
 	"github.com/zhYou/go-cli-starter/internal/dev/scaffold"
+	"github.com/zhYou/go-cli-starter/internal/locales"
 )
 
 const appName = "go-cli-starter"
@@ -49,6 +52,10 @@ func runArgs(args []string) error {
 		return verifyRelease("dist")
 	case "vuln":
 		return checkVulnerabilities(context.Background(), nil)
+	case "i18n-check":
+		return i18ncheck.Check(locales.Catalog())
+	case "config-check":
+		return configpolicy.Check(".")
 	case "rules-check":
 		return checkRules(context.Background())
 	case "versions-check":

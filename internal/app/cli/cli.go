@@ -163,7 +163,7 @@ func buildRoot(opts Options, loadBundle func() (*messages.Bundle, error), args .
 	root.AddCommand(greet, version, schema, completion)
 	call.bindCommand(root, commandTexts{short: message("cli.root")})
 	call.bindCommand(help, commandTexts{short: message("cli.help"), use: message("cli.help_use")})
-	call.bindCommand(greet, commandTexts{short: message("cli.greet"), use: message("cli.greet_use"), example: textMessage{id: "cli.greet_example", params: map[string]any{"Name": opts.Name}}})
+	call.bindCommand(greet, commandTexts{short: message("cli.greet"), use: message("cli.greet_use"), example: textMessage{id: "cli.greet_example", params: map[string]any{paramName: opts.Name}}})
 	call.bindCommand(version, commandTexts{short: message("cli.version")})
 	call.bindCommand(schema, commandTexts{short: message("cli.schema"), use: message("cli.schema_use")})
 	call.bindCommand(completion, commandTexts{short: message("cli.completion")})

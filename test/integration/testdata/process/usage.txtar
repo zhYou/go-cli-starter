@@ -1,3 +1,4 @@
+env GO_CLI_STARTER_LANG=zh-CN
 cli 2 greet
 ! stdout .
 stderr '错误：.*--name'

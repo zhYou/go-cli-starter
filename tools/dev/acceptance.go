@@ -99,7 +99,7 @@ func verifyExecutable(executable, dir, name, example, version, commit string) er
 	}
 	// 使用发布包或模板副本自带的 TOML，先核验它能直接加载。
 	stdout, stderr, err = run(nil, "--config", example, greetCommand, nameFlag, acceptanceName, jsonFlag)
-	if err := acceptGreeting(stdout, stderr, err, chineseGreeting); err != nil {
+	if err := acceptGreeting(stdout, stderr, err, englishGreeting); err != nil {
 		return err
 	}
 	// 默认配置路径同样通过应用 HOME 隔离；用 stderr 日志观察真实覆盖结果。
@@ -112,19 +112,19 @@ func verifyExecutable(executable, dir, name, example, version, commit string) er
 	if err != nil || !bytes.Contains(stderr, []byte("greeting_finished")) {
 		return errors.Join(fmt.Errorf("默认 TOML 配置未生效：%s", stderr), err)
 	}
-	if err := acceptGreeting(stdout, nil, nil, chineseGreeting); err != nil {
+	if err := acceptGreeting(stdout, nil, nil, englishGreeting); err != nil {
 		return err
 	}
-	override := []string{prefix + "_LOGGING_LEVEL=error", prefix + "_LANG=en"}
+	override := []string{prefix + "_LOGGING_LEVEL=error", prefix + "_LANG=zh-CN"}
 	stdout, stderr, err = run(override, greetCommand, nameFlag, acceptanceName, jsonFlag)
-	if err := acceptGreeting(stdout, stderr, err, "Hello, Ada!"); err != nil {
+	if err := acceptGreeting(stdout, stderr, err, chineseGreeting); err != nil {
 		return err
 	}
-	stdout, stderr, err = run(override, languageFlag, "zh-CN", "--log-level", "debug", greetCommand, nameFlag, acceptanceName, jsonFlag)
+	stdout, stderr, err = run(override, languageFlag, "en", "--log-level", "debug", greetCommand, nameFlag, acceptanceName, jsonFlag)
 	if err != nil || !bytes.Contains(stderr, []byte("greeting_finished")) {
 		return errors.Join(fmt.Errorf("显式日志选项未覆盖环境变量：%s", stderr), err)
 	}
-	if err := acceptGreeting(stdout, nil, nil, chineseGreeting); err != nil {
+	if err := acceptGreeting(stdout, nil, nil, englishGreeting); err != nil {
 		return err
 	}
 	stdout, stderr, err = run([]string{prefix + "_LOG_LEVEL=invalid"}, greetCommand, nameFlag, acceptanceName, jsonFlag)

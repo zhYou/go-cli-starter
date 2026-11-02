@@ -2,7 +2,6 @@
 package catalog
 
 import (
-	"errors"
 	"fmt"
 	"io/fs"
 	"path"
@@ -59,25 +58,19 @@ func Parse(data []byte) (map[string]map[string]string, error) {
 	return result, nil
 }
 
-// Files 查找目录根或兼容旧模块的 locales 子目录中的消息文件。
+// Files 查找消息目录根中的 TOML 文件。
 func Files(source fs.FS) ([]string, error) {
 	if source == nil {
 		return nil, fmt.Errorf("消息目录为 nil")
 	}
+	entries, err := fs.ReadDir(source, ".")
+	if err != nil {
+		return nil, fmt.Errorf("读取消息目录：%w", err)
+	}
 	var names []string
-	for _, dir := range []string{".", "locales"} {
-		entries, err := fs.ReadDir(source, dir)
-		if err != nil {
-			if dir == "locales" && errors.Is(err, fs.ErrNotExist) {
-				continue
-			}
-			return nil, fmt.Errorf("读取消息目录 %s：%w", dir, err)
-		}
-		for _, entry := range entries {
-			ext := path.Ext(entry.Name())
-			if !entry.IsDir() && (ext == ".json" || ext == ".toml") {
-				names = append(names, path.Join(dir, entry.Name()))
-			}
+	for _, entry := range entries {
+		if !entry.IsDir() && path.Ext(entry.Name()) == ".toml" {
+			names = append(names, entry.Name())
 		}
 	}
 	if len(names) == 0 {

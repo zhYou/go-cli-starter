@@ -81,7 +81,7 @@ func (call *invocation) localizeTree(root *cobra.Command, language string) error
 		}
 		flags[i] = text
 	}
-	template, err := localizer.Format("cli.version_template", messages.FormatOptions{Params: map[string]any{"Name": "{{.Name}}", "Version": "{{.Version}}"}})
+	template, err := localizer.Format("cli.version_template", messages.FormatOptions{Params: map[string]any{paramName: "{{.Name}}", "Version": "{{.Version}}"}})
 	if err != nil {
 		return err
 	}

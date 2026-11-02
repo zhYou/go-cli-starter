@@ -1,5 +1,0 @@
-{
-  "paths.absolute": {
-    "other": "{{.Field}} 必须提供绝对路径"
-  }
-}

@@ -104,7 +104,9 @@ func BenchmarkBuildRoot(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		buildRoot(opts, locales.LoadBundle)
+		if _, _, err := buildRoot(opts, locales.LoadBundle); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 func BenchmarkRunGreet(b *testing.B) {

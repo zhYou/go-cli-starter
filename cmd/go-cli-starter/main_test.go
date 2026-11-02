@@ -42,7 +42,7 @@ func TestMainSignalCancellation(t *testing.T) {
 	defer cancel()
 	//nolint:gosec // G204：测试只运行当前测试二进制或固定 Git/Go 命令，参数来自临时 fixture。
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestSignalHelper$")
-	cmd.Env = append(os.Environ(), "CLI_SIGNAL_HELPER=1", paths.EnvPrefix(appName)+"_HOME="+t.TempDir())
+	cmd.Env = append(os.Environ(), "CLI_SIGNAL_HELPER=1", paths.EnvPrefix(appName)+"_HOME="+t.TempDir(), paths.EnvPrefix(appName)+"_LANG=")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	stderr, err := cmd.StderrPipe()
@@ -72,5 +72,5 @@ func TestMainSignalCancellation(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, 130, cmd.ProcessState.ExitCode())
 	require.Empty(t, out.String())
-	require.Contains(t, string(rest), "操作已取消")
+	require.Contains(t, string(rest), "Operation cancelled")
 }
