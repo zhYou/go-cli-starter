@@ -12,8 +12,39 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 	"github.com/zhYou/go-cli-starter/internal/app/config"
+	"github.com/zhYou/go-cli-starter/internal/base/messages"
 	"github.com/zhYou/go-cli-starter/internal/base/paths"
 )
+
+func TestDefaultLanguageIsEnglishAndIgnoresSystemLocale(t *testing.T) {
+	t.Setenv("LANG", "zh_CN.UTF-8")
+	t.Setenv("LC_ALL", "zh_CN.UTF-8")
+	code, out, stderr := invoke(t, "greet", "--name", "Ada")
+	require.Zero(t, code, stderr)
+	require.Equal(t, "Hello, Ada!\n", out)
+	require.Empty(t, stderr)
+}
+
+func TestLanguageOverrideDoesNotRenderUnselectedMetadata(t *testing.T) {
+	for _, tc := range []struct {
+		missing, selected, want string
+	}{
+		{"en", "zh", "用法："},
+		{"zh-CN", "en", "Usage:"},
+	} {
+		t.Run(tc.selected, func(t *testing.T) {
+			bundle := catalogFixture(t, tc.missing, "cli.greet", "")
+			loader := func() (*messages.Bundle, error) { return bundle, nil }
+			var out, stderr bytes.Buffer
+			code := run(context.Background(), []string{"--lang", tc.missing, "--lang", tc.selected, "greet", "--help"}, Options{
+				Out: &out, ErrOut: &stderr, Language: tc.missing, LookupEnv: noFixtureEnv,
+			}, loader)
+			require.Zero(t, code, stderr.String())
+			require.Contains(t, out.String(), tc.want)
+			require.Empty(t, stderr.String())
+		})
+	}
+}
 
 func TestEnglishInvocation(t *testing.T) {
 	for _, tc := range []struct {
@@ -38,6 +69,7 @@ func TestEnglishInvocation(t *testing.T) {
 		}
 	}
 }
+
 func TestLanguageScanRespectsFlagValuesAndSeparator(t *testing.T) {
 	for _, tc := range []struct {
 		args []string
@@ -55,6 +87,7 @@ func TestLanguageScanRespectsFlagValuesAndSeparator(t *testing.T) {
 		require.Contains(t, out+errOut, tc.want)
 	}
 }
+
 func TestRequiredAndGroupsBeforeConfiguration(t *testing.T) {
 	for _, group := range []bool{false, true} {
 		count := 0
@@ -103,6 +136,7 @@ func TestLanguagePrecedenceAndIsolation(t *testing.T) {
 	require.Empty(t, out)
 	require.Contains(t, errOut, "de")
 }
+
 func TestMetadataLanguageScanForNewFlags(t *testing.T) {
 	root := metadataRoot(Options{})
 	cmd := &cobra.Command{Use: "extra"}
@@ -123,6 +157,7 @@ func TestMetadataLanguageScanForNewFlags(t *testing.T) {
 		require.Equal(t, want, lang, "%v", args)
 	}
 }
+
 func TestInvalidExplicitValuesNeverLoadConfig(t *testing.T) {
 	count := 0
 	deps := Dependencies{LoadConfig: func(config.Options) (config.Config, error) { count++; return config.Defaults(), nil }}
@@ -132,6 +167,7 @@ func TestInvalidExplicitValuesNeverLoadConfig(t *testing.T) {
 	require.Zero(t, count)
 	require.Empty(t, out.String())
 }
+
 func TestNoneLoggingAndEnglishDiagnostics(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.toml")

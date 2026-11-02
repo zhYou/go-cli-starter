@@ -80,6 +80,7 @@ func TestExplicitDefaultOverridesEnvironment(t *testing.T) {
 		require.Equal(t, want, cfg.Logging.Level)
 	}
 }
+
 func TestStrictTOML(t *testing.T) {
 	for _, tc := range []struct {
 		text  string
@@ -137,6 +138,7 @@ func TestModuleDefaultsAndEnvironmentTypes(t *testing.T) {
 		require.Error(t, err)
 	}
 }
+
 func TestAppHomeOverridesDefaultAndRejectsRelativeEvenWithExplicitFile(t *testing.T) {
 	home := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(home, "config.toml"), []byte("[logging]\nlevel = \"debug\"\n"), 0600))

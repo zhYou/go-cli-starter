@@ -9,10 +9,20 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zhYou/go-cli-starter/internal/app/greeting"
-
 	"github.com/stretchr/testify/require"
+	"github.com/zhYou/go-cli-starter/internal/app/greeting"
 )
+
+func TestDebugLogsDoNotPolluteJSON(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("[logging]\noutput = \"stderr\"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	code, out, errOut := invoke(t, "greet", "--name", "Codex", "--json", "--log-level", "debug", "--config", path)
+	if code != 0 || !json.Valid([]byte(out)) || !strings.Contains(errOut, `"level":"debug"`) {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+}
 
 func TestBusinessCreatesPersistentEvents(t *testing.T) {
 	home := t.TempDir()

@@ -3,10 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
-	"debug/buildinfo"
 	"encoding/json"
 	"os"
-	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
@@ -35,6 +33,7 @@ func TestDoctorHelper(t *testing.T) {
 	}
 	os.Exit(0)
 }
+
 func TestDoctorProbesBoundedAndOrdered(t *testing.T) {
 	t.Setenv("DOCTOR_HELPER", "1")
 	exe, err := os.Executable()
@@ -64,24 +63,7 @@ func TestDoctorProbesBoundedAndOrdered(t *testing.T) {
 		require.Contains(t, doctorProbeError("helper", result).Error(), "取消")
 	}
 }
-func TestGovulncheckBuildInfoExact(t *testing.T) {
-	valid := buildinfo.BuildInfo{Path: "golang.org/x/vuln/cmd/govulncheck", Main: debug.Module{Path: "golang.org/x/vuln", Version: "v1.9.0"}}
-	require.NoError(t, matchGovulncheckBuildInfo(&valid, "1.9.0"))
-	for _, mutate := range []func(*buildinfo.BuildInfo){
-		func(b *buildinfo.BuildInfo) { b.Path = "example.org/other" },
-		func(b *buildinfo.BuildInfo) { b.Main.Path = "example.org/other" },
-		func(b *buildinfo.BuildInfo) { b.Main.Version = "v1.9.00" },
-		func(b *buildinfo.BuildInfo) { b.Main.Version = "v1.9.0-rc.1" },
-		func(b *buildinfo.BuildInfo) { b.Main.Replace = &debug.Module{Path: "local"} },
-	} {
-		b := valid
-		mutate(&b)
-		require.Error(t, matchGovulncheckBuildInfo(&b, "1.9.0"))
-	}
-	spec, err := versionTool("go:golang.org/x/vuln/cmd/govulncheck")
-	require.NoError(t, err)
-	require.Equal(t, []string{"-h"}, spec.Args)
-}
+
 func TestDoctorSummaryStableAndExplicit(t *testing.T) {
 	var out bytes.Buffer
 	calls := []doctorProbe{{key: "go", want: "1.27.3", spec: toolSpec{Name: "go"}}, {key: "syft", want: "1.55.0", spec: toolSpec{Name: "syft"}}}

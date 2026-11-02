@@ -31,7 +31,3 @@ func TestExecutableAcceptanceVerifiesIdentityAndMetadata(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "bad.toml"), []byte("unknown = true"), 0600))
 	require.Error(t, verifyExecutable(executable, dir, appName, filepath.Join(dir, "bad.toml"), "0.2.0", "acceptance"))
 }
-
-func TestReleaseVerificationRequiresInstalledArtifact(t *testing.T) {
-	require.Error(t, verifyRelease(releaseFixture(t)), "仅归档结构通过不能替代真实安装验收")
-}

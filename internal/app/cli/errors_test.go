@@ -5,12 +5,42 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 	"github.com/zhYou/go-cli-starter/internal/base/fault"
 )
+
+func TestChineseErrorsPreserveUserValues(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"unknown"}, "unknown"},
+		{[]string{"greet"}, "--name"},
+		{[]string{"greet", "--name", "x", "extra"}, "extra"},
+		{[]string{"greet", "--unknown"}, "unknown"},
+		{[]string{"greet", "-x"}, "x"},
+		{[]string{"greet", "--name"}, "name"},
+		{[]string{"--json=invalid"}, "invalid"},
+		{[]string{"completion", "bogus"}, "bogus"},
+		{[]string{"help", "bogus"}, "bogus"},
+		{[]string{"schema", "bogus"}, "bogus"},
+	} {
+		code, out, errOut := invoke(t, append([]string{"--lang", "zh"}, tc.args...)...)
+		if code != 2 || out != "" || !strings.HasPrefix(errOut, "错误：") || !strings.Contains(errOut, tc.want) {
+			t.Errorf("参数=%v 退出码=%d 标准输出=%q 标准错误=%q", tc.args, code, out, errOut)
+		}
+		for _, english := range []string{"unknown", "required", "unsupported", "invalid", "accepts", "Error:"} {
+			// 用户输入保留原文，错误模板必须使用中文。
+			if strings.Contains(strings.ReplaceAll(errOut, tc.want, ""), english) {
+				t.Errorf("参数=%v 错误仍包含英文模板：%s", tc.args, errOut)
+			}
+		}
+	}
+}
 
 func TestExitCodeAndUnwrap(t *testing.T) {
 	for _, tc := range []struct {

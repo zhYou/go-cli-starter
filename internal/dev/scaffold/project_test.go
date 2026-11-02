@@ -8,15 +8,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func projectFixture(t *testing.T, module, name string) string {
-	t.Helper()
-	root := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(root, "go.mod"), []byte("module "+module+"\n\ngo 1.27.0\n"), 0600))
-	dir := filepath.Join(root, "cmd", name)
-	//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
-	require.NoError(t, os.MkdirAll(dir, 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\nconst appName = \""+name+"\"\nfunc main() {}\n"), 0600))
-	return root
+func TestInspectRejectsGoVersionNames(t *testing.T) {
+	for _, name := range []string{"v2", "v10"} {
+		t.Run(name, func(t *testing.T) {
+			root := projectFixture(t, "example.com/tool", name)
+			_, err := Inspect(root)
+			require.Error(t, err)
+		})
+	}
+	for _, name := range []string{"v0", "v1", "v02"} {
+		t.Run(name, func(t *testing.T) {
+			root := projectFixture(t, "example.com/tool", name)
+			project, err := Inspect(root)
+			require.NoError(t, err)
+			require.Equal(t, name, project.Name)
+		})
+	}
 }
 
 func TestInspectCommandProject(t *testing.T) {
