@@ -6,8 +6,8 @@
 ## 先确定边界，再增加目录
 
 一个命令需要 CLI、业务函数和运行资源时，项目选择由 `cmd/<name>` 处理信号与退出，
-`internal/app/cli` 处理参数和呈现，应用模块定义自己的选项、结果、错误码和消息目录，
-`internal/app/session` 组合运行资源。这样业务可直接调用并校验输入，无需导入 Cobra。
+`internal/app/cli` 处理参数和呈现，应用模块定义自己的选项、结果和错误码，消息集中维护在
+`internal/locales/`；`internal/app/session` 组合运行资源。这样业务可直接调用并校验输入，无需导入 Cobra。
 公共机制在 `internal/base`，不得反向依赖 app、tools、dev 或 Cobra；外部进程在
 `internal/tools/command`，模板、快照及工具探测在 `internal/dev` 和根 `tools`。
 
@@ -100,6 +100,9 @@ mapstructure 使用 `ErrorUnused=true`、`WeaklyTypedInput=false`、精确名称
 `GO_CLI_STARTER_TELEMETRY_BATCH_INTERVAL=1s` 是显式的 duration 文本转换；
 兼容 `GO_CLI_STARTER_LOG_LEVEL` 在新 `GO_CLI_STARTER_LOGGING_LEVEL` 之后应用，flag 最后应用。
 空环境变量视为未设置。非法显式文件立即报错，默认文件缺失可继续；不自动迁移 YAML。
+自行维护的应用配置使用 TOML，新增配置放在 `configs/` 并经统一入口加载。其他应用配置路径
+须先登记到 `internal/dev/configpolicy`；工具配置以及 JSON 业务、测试和契约数据可保持原格式。
+检查范围和例外见[开发说明](development.md#静态规则与开发探测)。
 
 validator 实例可复用；项目在使用前完成自定义规则注册，之后只校验。
 不要在并发调用期间变更规则。库依据：
@@ -120,22 +123,40 @@ err := problem.Wrap(readErr, fault.WithParams(fault.Params{"Path": file}))
 // errors.Is(err, os.ErrNotExist) 与 errors.As(err, &exitError) 仍能遍历原始原因。
 ```
 
-新模块同时提供 `locales/active.zh-CN.json`、`locales/active.en.json` 与只读 Catalog。
-入口把模块 Catalog 组合成 Bundle，冻结后为每次调用建立 Localizer：
+各模块的消息集中写入 `internal/locales/active.en.toml` 和 `active.zh-CN.toml`，每种语言包含
+完整消息 ID；新增或修改时双语同次维护。使用带引号的完整 ID 作为 TOML 表名，other 必需，
+可按语言添加 zero、one、two、few、many 复数形式及 description。例如：
+
+```toml
+# active.en.toml
+["greeting.message"]
+other = "Hello, {{.Name}}!"
+```
+
+入口通过 `locales.LoadBundle()` 取得缓存的只读 Bundle 或加载错误，每次调用建立独立 Localizer。
+成功结果与帮助使用严格 Format，并检查错误；需要复数时在 `FormatOptions.PluralCount` 传入计数，
+模板可用 `{{.PluralCount}}` 访问该值：
 
 ```go
-bundle, err := messages.NewBundle(greeting.Catalog(), command.Catalog())
+bundle, err := locales.LoadBundle()
 if err != nil {
     return err
 }
 localizer := bundle.Localizer("en")
-text := localizer.Text("greeting.message", map[string]any{"Name": "Codex"})
+text, err := localizer.Format("greeting.message", messages.FormatOptions{
+    Params: map[string]any{"Name": "Codex"},
+})
+if err != nil {
+    return err
+}
 ```
 
-缺译返回可诊断的默认文案；项目不用 MustLocalize 处理运行错误。CLI 按 `--lang` >
-`<PREFIX>_LANG` > zh-CN 选语言，zh 是别名，en 是英语，不从 OS 区域推断。
-稳定命令、选项、JSON 字段、错误码和状态枚举不翻译；第三方错误叶子保留原文。
-Help、version、completion、schema 在坏配置下仍可运行，不创建诊断目录。
+加载失败、缺译、模板错误或缺少参数会返回错误；Format 失败时返回空字符串，不使用部分渲染文本。
+Text/Render 仅用于安全诊断兜底，不能凭非空字符串判断渲染成功；诊断故障不吞掉原始业务错误。
+`mise run i18n:check` 检查双语目录、模板和参数，细则见[开发说明](development.md#静态规则与开发探测)。
+项目暂不支持运行时翻译覆盖或 `[i18n]` 配置。CLI 按 `--lang` > `<PREFIX>_LANG` > en 选语言，
+zh-CN 是中文、zh 是别名，不从 OS 区域推断。稳定命令、选项、JSON 字段、错误码和状态枚举不翻译；
+第三方错误叶子保留原文。Help、version、completion、schema 在坏配置下仍可运行，不创建诊断目录。
 
 退出码为成功 0、运行/配置 1、调用无效 2、调用者取消 130。stdout 只提交成功结果；
 `--json` 为一个文档，序列化失败保持空输出，底层写失败可能留下部分字节。消费方先检查退出码。

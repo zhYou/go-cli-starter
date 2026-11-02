@@ -4,7 +4,7 @@
 
 默认输出文本，通过 `--json` 输出结构化结果。包含命令发现、配置、日志、测试、本地环境、项目改名和跨平台发布。
 
-项目交流和文档使用中文。CLI 默认 zh-CN，可显式选择 en，不随系统区域改变；命令名、选项名、机器字段和退出码保持稳定。设计取舍与扩展示例见[设计指南](docs/design-guidelines.md)。
+项目交流和文档使用中文。CLI 默认 en，可显式选择 zh-CN 或 zh，不随系统区域改变；命令名、选项名、机器字段和退出码保持稳定。设计取舍与扩展示例见[设计指南](docs/design-guidelines.md)。
 
 ## 创建新项目
 
@@ -69,7 +69,7 @@ GO_CLI_STARTER_HOME="$(mktemp -d)" ./bin/go-cli-starter greet --name Codex --jso
 示例结果：
 
 ```json
-{"message":"你好，Codex！"}
+{"message":"Hello, Codex!"}
 ```
 
 - 默认文本；`--json` 不随终端环境改变，也不由配置或环境变量隐式开启。
@@ -106,9 +106,12 @@ exporter = "none" # none、file
 `GO_CLI_STARTER_TELEMETRY_EXPORTER`；兼容入口 `GO_CLI_STARTER_LOG_LEVEL` 优先于新的级别变量，
 `--log-level` 优先于两者。没有给出的 flag 不覆盖文件或环境值。
 
-语言独立于配置：`--lang en` > `GO_CLI_STARTER_LANG=en` > zh-CN；zh 是中文别名。
+语言独立于配置：`--lang` > `GO_CLI_STARTER_LANG` > en；中文使用 zh-CN，zh 是别名。
 帮助、schema 描述、结果正文、错误和日志消息使用所选语言，第三方诊断可保留原文。
+帮助与成功结果在完整渲染成功后才提交；这些消息加载或渲染失败会报告错误。诊断本身发生故障时
+使用安全兜底，避免输出部分渲染文本，日志和 Trace 故障仍告警并继续业务。
 帮助、version、completion 和 schema 不读取配置、不创建诊断目录，损坏配置下仍可发现命令。
+消息集中维护在 `internal/locales/` 的双语 TOML 中，暂不支持运行时翻译覆盖或 `[i18n]` 配置。
 
 | 平台 | 配置目录 | 数据 / 状态 / 缓存 |
 | --- | --- | --- |
@@ -131,7 +134,7 @@ exporter = "none" # none、file
 ```sh
 example_home=$(mktemp -d)
 cp configs/config.example.toml "$example_home/config.toml"
-GO_CLI_STARTER_HOME="$example_home" ./bin/go-cli-starter greet --name Codex --lang en --json
+GO_CLI_STARTER_HOME="$example_home" ./bin/go-cli-starter greet --name Codex --lang zh-CN --json
 ```
 
 ## Codex 开发
@@ -169,6 +172,7 @@ RTK 和 superpowers 使用用户目录中的安装。模板不复制全局技能
 | `mise run test` | 单元与命令测试 |
 | `mise run test:race` | 竞态检测，需要 C 编译器 |
 | `mise run lint` / `rules:check` | 18 项静态检查及真实类型边界 fixture |
+| `mise run i18n:check` / `config:check` | 校验双语消息目录 / 受管应用配置；均纳入 lint 和 check |
 | `mise run test:fuzz` / `test:bench` | 有界 argv 模糊测试 / 开销测量，无性能门槛 |
 | `mise run build` | 构建到 bin，注入版本信息 |
 | `mise run check` | 与 CI 相同的完整源码检查 |
@@ -182,6 +186,7 @@ RTK 和 superpowers 使用用户目录中的安装。模板不复制全局技能
 cmd/<name>/                 程序入口与信号测试
 internal/app/               CLI、配置与业务逻辑
 internal/base/              错误、消息、路径、校验、IO、日志、Trace、诊断、schema
+internal/locales/           集中维护的双语 TOML 消息目录
 internal/tools/command/     外部命令与有界并行
 internal/dev/               模板初始化与机器契约比较
 configs/config.example.toml 配置示例

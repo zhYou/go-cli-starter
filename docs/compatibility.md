@@ -20,6 +20,11 @@ initial.json 来自设计确认的代码 54d9dcd，在临时副本捕获；派�
 应用 v0.1.0→v0.2.0 的破坏变更决策：根及各子命令新增 lang，log-level 默认由 warn 改为 info，
 共 12 项快照路径。schema_version 仍为 1，结果字段和退出码保持；该记录不表示已创建标签或发布。
 
+[2026-11-02-i18n-config.json](compatibility/changes/2026-11-02-i18n-config.json) 记录后续默认语言
+由 zh-CN 改为 en 的破坏变更，包含 schema 中 `lang.default` 的变化；需要中文的调用应显式选择
+`--lang zh-CN` 或 `<PREFIX>_LANG=zh-CN`。消息目录集中和应用配置规则的迁移步骤见[模板升级](template-upgrades.md#迁移到集中消息目录和英文默认值)。
+该记录不表示已创建应用版本标签或发布；模板版本仍为 0.3.0，需按来源提交识别本次变更。
+
 配置从 YAML 迁到唯一严格 TOML、默认日志改为 info/file、私有目录及显式语言选择也影响使用，
 即使没有进入机器快照仍需人工迁移，步骤见[模板升级](template-upgrades.md)。
 旧 LOG_LEVEL 兼容入口保留；Trace 默认 none，file 为本地诊断 JSON，不声明 OTLP 或重放兼容。

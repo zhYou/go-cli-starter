@@ -28,9 +28,27 @@
 版本段名称，防止 go install 产物名偏离目录；v0、v1、v02 可用。新增源码若含身份，显式登记白名单。
 历史快照缺失时可读取旧 Git 路径，损坏文件和 Git 错误不能当作“没有基线”。
 
+## 迁移到集中消息目录和英文默认值
+
+本次变更后模板版本仍为 0.3.0，按模板提交识别是否包含此升级；它不自动修改派生项目。
+
+1. 未显式选择语言的调用从 zh-CN 改为 en。需要保留中文时显式传 `--lang zh-CN`，或设置
+   `<PREFIX>_LANG=zh-CN`；flag 优先于非空环境变量。`zh` 仍是中文别名，不读取系统区域。
+   检查依赖帮助、问候正文或 schema 中 `lang.default` 的脚本；机器字段及退出码保持不变。
+2. 将模块分散的双语 JSON 消息迁入 `internal/locales/active.en.toml` 和 `active.zh-CN.toml`，
+   使用完整消息 ID、同时维护两种语言，删除旧 Catalog 接线。通过 `locales.LoadBundle()` 加载共享
+   Bundle，每次调用创建 Localizer。帮助与成功结果改用严格 Format 并传播错误；Text/Render 只用于
+   安全诊断兜底，不输出部分渲染结果，也不吞原业务错误。
+3. 自行维护的应用配置使用受管 TOML 并经统一入口加载；工具配置、JSON 数据及协议/契约保留原格式。
+   新配置登记方式和检查边界见[开发说明](development.md#静态规则与开发探测)。暂不添加运行时
+   翻译覆盖或 `[i18n]` 配置。
+4. 运行 `mise run i18n:check`、`mise run config:check` 及常规交付检查；检查显式中文和默认英文。
+   参阅[兼容记录](compatibility/changes/2026-11-02-i18n-config.json)，按需更新调用方及部署环境。
+
 ## 迁移到 0.3.0
 
-1. 在干净隔离分支备份业务及来源记录，按上节完成旧事务，再选择已审查的模板提交人工合并。
+1. 在干净隔离分支备份业务及来源记录，按[升级前完成旧事务](#升级前完成旧事务)完成恢复，
+   再选择已审查的模板提交人工合并。
    迁移到 app/base/tools/dev 分层：业务和 CLI 在 app，共用机制在 base，进程在 tools/command，
    初始化与契约检查在 dev。更新导入、受管清单、测试和工具；不要只搬目录而遗漏资源生命周期。
 2. 将旧 `config.yaml` 的 `log_level` 改为唯一 `config.toml` 的 `[logging] level`，
@@ -50,8 +68,8 @@
 4. 核对私有目录及权限。Linux 使用 XDG，macOS 使用 Application Support/Caches，Windows 使用
    APPDATA/LOCALAPPDATA。`GO_CLI_STARTER_HOME` 为绝对应用根，改名 mycli 后为 `MYCLI_HOME`；
    配置在根下 config.toml，data/state/cache 分开，与安装位置无关。为测试父子进程隔离此变量。
-5. 新增 `--lang` 与 `<PREFIX>_LANG`，按 flag > 环境 > zh-CN，zh 是别名、en 是英语。
-   合并模块双语 JSON 目录与冻结 Bundle；不读取系统区域，不翻译机器标识、字段及退出码。
+5. 0.3.0 当时新增 `--lang` 与 `<PREFIX>_LANG`，默认 zh-CN，提供模块双语 JSON 目录及冻结 Bundle。
+   后续默认语言和目录的变化见上节；不读取系统区域，不翻译机器标识、字段及退出码。
 6. 审查[本次兼容记录](compatibility/changes/2026-10-30-cli-foundations.json)：
    schema_version 仍为 1，12 项机器快照差异为各命令 lang 与 info 默认值；
    TOML、日志落盘和路径另有手工迁移。应用 v0.1.0→v0.2.0 是兼容决策，本次不创建发布标签。
