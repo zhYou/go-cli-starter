@@ -15,6 +15,7 @@ import (
 	"github.com/zhYou/go-cli-starter/internal/base/messages"
 	"github.com/zhYou/go-cli-starter/internal/base/paths"
 	"github.com/zhYou/go-cli-starter/internal/base/telemetry"
+	"github.com/zhYou/go-cli-starter/internal/locales"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -68,8 +69,12 @@ func Begin(ctx context.Context, config appconfig.Config, info logging.RunInfo, o
 	filesWarn := reporter(diagnosticsFailed, serializedWarn)
 	s := &Session{ownsLogger: opts.ExternalLogger == nil, warnLogging: loggingWarn, localizer: opts.Localizer}
 	if s.localizer == nil {
-		bundle, _ := messages.NewBundle(Catalog(), logging.Catalog(), telemetry.Catalog(), diagnostics.Catalog())
-		s.localizer = bundle.Localizer("zh-CN")
+		bundle, err := locales.LoadBundle()
+		if err != nil {
+			serializedWarn(loggingFailed.Wrap(err))
+		} else {
+			s.localizer = bundle.Localizer("en")
+		}
 	}
 	id := diagnostics.NewID()
 	if s.ownsLogger && config.Logging.Output == "file" || config.Telemetry.Exporter == telemetry.File {
@@ -117,7 +122,7 @@ func Begin(ctx context.Context, config appconfig.Config, info logging.RunInfo, o
 	ctx, s.span = s.Tracer.Start(ctx, info.Component+"."+info.Command)
 	s.ctx = ctx
 	s.Logger = s.Logger.WithContext(ctx)
-	s.Logger.Infow(s.localizer.Text("session.started", nil), "event", "command_started")
+	s.Logger.Infow(diagnosticText(s.localizer, "session.started"), "event", "command_started")
 	return ctx, s
 }
 
@@ -153,10 +158,10 @@ func (s *Session) Finish(ctx context.Context, result logging.CommandResult) {
 		s.finishing = true
 		s.mu.Unlock()
 		s.work.Wait()
-		result.Message = s.localizer.Text("session.finished", nil)
+		result.Message = diagnosticText(s.localizer, "session.finished")
 		s.Logger.Record(result)
 		if result.ExitCode != 0 || result.Err != nil {
-			s.span.SetStatus(codes.Error, s.localizer.Text("session.failed", nil))
+			s.span.SetStatus(codes.Error, diagnosticText(s.localizer, "session.failed"))
 			if result.Err != nil {
 				s.span.RecordError(result.Err)
 			}
@@ -179,4 +184,11 @@ func reporter(def fault.Definition, warn func(error)) func(error) {
 			once.Do(func() { warn(def.Wrap(err)) })
 		}
 	}
+}
+
+func diagnosticText(localizer *messages.Localizer, id string) string {
+	if localizer == nil || localizer.Language() == "" {
+		return "Operation failed [" + id + "]"
+	}
+	return localizer.Text(id, nil)
 }

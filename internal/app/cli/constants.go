@@ -3,9 +3,11 @@ package cli
 // 本包协议、状态与命令标识保持稳定，避免局部拼写漂移。
 const (
 	paramMessage         = "Message"
+	paramName            = "Name"
 	paramValue           = "Value"
 	paramFlag            = "Flag"
 	languageChinese      = "zh-CN"
+	languageEnglish      = "en"
 	flagJSON             = "json"
 	outputJSON           = "json"
 	flagHelp             = "help"
@@ -19,9 +21,6 @@ const (
 	flagName             = "name"
 	commandHelp          = "help"
 	commandVersion       = "version"
-	commandRoot          = "root"
 
-	flagLogLevel      = "log-level"
-	commandGreet      = "greet"
-	commandSchemaName = "schema"
+	flagLogLevel = "log-level"
 )

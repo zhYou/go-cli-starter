@@ -20,7 +20,11 @@ type Dependencies struct {
 	Logger     *logging.Logger
 }
 type invocation struct {
+	bundle               *messages.Bundle
 	localizer            *messages.Localizer
+	commandTexts         []commandTextBinding
+	flagTexts            []flagTextBinding
+	helpErr              error
 	results              resultRegistry
 	asJSON               bool
 	configPath, logLevel string

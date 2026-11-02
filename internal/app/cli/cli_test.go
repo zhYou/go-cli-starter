@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/zhYou/go-cli-starter/internal/base/paths"
+	"github.com/zhYou/go-cli-starter/internal/locales"
 
 	"github.com/spf13/cobra"
 )
@@ -37,9 +38,9 @@ func TestGreetOutput(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"text", []string{"greet", "--name", "Codex"}, "你好，Codex！\n"},
-		{"json", []string{"greet", "--name", "Codex", "--json"}, "{\"message\":\"你好，Codex！\"}\n"},
-		{"unicode", []string{"--json", "greet", "--name", "周游"}, "{\"message\":\"你好，周游！\"}\n"},
+		{"text", []string{"greet", "--name", "Codex"}, "Hello, Codex!\n"},
+		{"json", []string{"greet", "--name", "Codex", "--json"}, "{\"message\":\"Hello, Codex!\"}\n"},
+		{"unicode", []string{"--json", "greet", "--name", "周游"}, "{\"message\":\"Hello, 周游!\"}\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			code, out, errOut := invoke(t, tc.args...)
@@ -58,7 +59,7 @@ func TestInvalidArgumentsFailWithoutOutputOrPrompt(t *testing.T) {
 		{"help", "unknown"}, {"help", "greet", "unknown"},
 	} {
 		code, out, errOut := invoke(t, args...)
-		if code != 2 || out != "" || strings.Count(errOut, "错误：") != 1 {
+		if code != 2 || out != "" || strings.Count(errOut, "Error:") != 1 {
 			t.Errorf("args=%v code=%d stdout=%q stderr=%q", args, code, out, errOut)
 		}
 	}
@@ -68,7 +69,7 @@ func TestChineseHelpRegardlessOfLocale(t *testing.T) {
 	t.Setenv("LANG", "en_US.UTF-8")
 	t.Setenv("LC_ALL", "en_US.UTF-8")
 	for _, args := range [][]string{{}, {"--help"}, {"greet", "--help"}, {"help", "greet"}, {"version", "--help"}, {"schema", "--help"}, {"completion", "--help"}, {"help", "--help"}} {
-		code, out, errOut := invoke(t, args...)
+		code, out, errOut := invoke(t, append([]string{"--lang", "zh"}, args...)...)
 		if code != 0 || errOut != "" || !strings.Contains(out, "用法：") || !strings.Contains(out, "显示帮助") || !strings.Contains(out, "日志级别") || !strings.Contains(out, "默认值") {
 			t.Errorf("参数=%v 退出码=%d 标准输出=%q 标准错误=%q", args, code, out, errOut)
 		}
@@ -96,7 +97,7 @@ func TestChineseErrorsPreserveUserValues(t *testing.T) {
 		{[]string{"help", "bogus"}, "bogus"},
 		{[]string{"schema", "bogus"}, "bogus"},
 	} {
-		code, out, errOut := invoke(t, tc.args...)
+		code, out, errOut := invoke(t, append([]string{"--lang", "zh"}, tc.args...)...)
 		if code != 2 || out != "" || !strings.HasPrefix(errOut, "错误：") || !strings.Contains(errOut, tc.want) {
 			t.Errorf("参数=%v 退出码=%d 标准输出=%q 标准错误=%q", tc.args, code, out, errOut)
 		}
@@ -111,12 +112,12 @@ func TestChineseErrorsPreserveUserValues(t *testing.T) {
 
 func TestChineseVersionAndSchema(t *testing.T) {
 	for _, args := range [][]string{{"version"}, {"--version"}} {
-		code, out, errOut := invoke(t, args...)
+		code, out, errOut := invoke(t, append([]string{"--lang", "zh"}, args...)...)
 		if code != 0 || !strings.Contains(out, "版本") || !strings.Contains(out, "v1.2.3") || errOut != "" {
 			t.Fatalf("参数=%v 退出码=%d 标准输出=%q 标准错误=%q", args, code, out, errOut)
 		}
 	}
-	code, out, errOut := invoke(t, "schema", "greet")
+	code, out, errOut := invoke(t, "--lang", "zh", "schema", "greet")
 	var got struct {
 		Commands []commandSchema `json:"commands"`
 	}
@@ -165,7 +166,7 @@ func TestCancellationExitCode(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	code, out, errOut := invokeContext(t, ctx, "greet", "--name", "Codex")
-	if code != 130 || out != "" || !strings.Contains(errOut, "操作已取消") {
+	if code != 130 || out != "" || !strings.Contains(errOut, "Operation cancelled") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, out, errOut)
 	}
 }
@@ -237,4 +238,10 @@ func TestOutputFailureIsRuntimeError(t *testing.T) {
 }
 
 // metadataRoot 仅用于无业务执行的命令元数据测试。业务测试统一通过 Run 托管资源。
-func metadataRoot(opts Options) *cobra.Command { root, _ := buildRoot(defaults(opts)); return root }
+func metadataRoot(opts Options) *cobra.Command {
+	root, _, err := buildRoot(defaults(opts), locales.LoadBundle)
+	if err != nil {
+		panic(err)
+	}
+	return root
+}

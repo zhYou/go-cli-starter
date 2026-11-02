@@ -44,9 +44,9 @@ func TestLanguageScanRespectsFlagValuesAndSeparator(t *testing.T) {
 		code int
 		want string
 	}{
-		{[]string{"greet", "--name", "--lang", "--json"}, 0, "你好，--lang！"},
-		{[]string{"greet", "--name", "--lang=en"}, 0, "你好，--lang=en！"},
-		{[]string{"greet", "--name=x", "--", "--lang=en"}, 2, "错误："},
+		{[]string{"greet", "--name", "--lang", "--json"}, 0, "Hello, --lang!"},
+		{[]string{"greet", "--name", "--lang=en"}, 0, "Hello, --lang=en!"},
+		{[]string{"greet", "--name=x", "--", "--lang=en"}, 2, "Error:"},
 		{[]string{"--lang", "zh", "greet", "--name=x"}, 0, "你好，x！"},
 		{[]string{"__complete", "greet", "--lang", ""}, 0, ":0"},
 	} {
@@ -155,13 +155,13 @@ func TestLanguageSelectionWithFlagsBeforeCommand(t *testing.T) {
 		want string
 		code int
 	}{
-		{"值为语言", []string{"--name", "--lang=en", "greet"}, "你好，--lang=en！", 0},
-		{"值为未知语言", []string{"--name", "--lang=de", "greet"}, "你好，--lang=de！", 0},
-		{"布尔选项穿插", []string{"--json", "--name", "--lang=de", "greet"}, `{"message":"你好，--lang=de！"}`, 0},
-		{"显式布尔值", []string{"--json=false", "--name", "--lang=en", "greet"}, "你好，--lang=en！", 0},
+		{"值为语言", []string{"--name", "--lang=en", "greet"}, "Hello, --lang=en!", 0},
+		{"值为未知语言", []string{"--name", "--lang=de", "greet"}, "Hello, --lang=de!", 0},
+		{"布尔选项穿插", []string{"--json", "--name", "--lang=de", "greet"}, `{"message":"Hello, --lang=de!"}`, 0},
+		{"显式布尔值", []string{"--json=false", "--name", "--lang=en", "greet"}, "Hello, --lang=en!", 0},
 		{"实际语言选项优先", []string{"--name", "--lang=de", "--lang", "en", "greet"}, "Hello, --lang=de!", 0},
 		{"实际语言在前", []string{"--lang=en", "--name", "--lang=de", "greet"}, "Hello, --lang=de!", 0},
-		{"分隔符后的语言不生效", []string{"--name", "Ada", "greet", "--", "--lang=en"}, "错误：", 2},
+		{"分隔符后的语言不生效", []string{"--name", "Ada", "greet", "--", "--lang=en"}, "Error:", 2},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			code, out, stderr := invoke(t, tc.args...)

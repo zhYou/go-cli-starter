@@ -39,7 +39,7 @@
                 "type": "bool"
               },
               "lang": {
-                "default": "zh-CN",
+                "default": "en",
                 "inherited": true,
                 "name": "lang",
                 "required": false,
@@ -80,7 +80,7 @@
                 "type": "bool"
               },
               "lang": {
-                "default": "zh-CN",
+                "default": "en",
                 "inherited": true,
                 "name": "lang",
                 "required": false,
@@ -141,7 +141,7 @@
                 "type": "bool"
               },
               "lang": {
-                "default": "zh-CN",
+                "default": "en",
                 "inherited": true,
                 "name": "lang",
                 "required": false,
@@ -182,7 +182,7 @@
                 "type": "bool"
               },
               "lang": {
-                "default": "zh-CN",
+                "default": "en",
                 "inherited": true,
                 "name": "lang",
                 "required": false,
@@ -223,7 +223,7 @@
                 "type": "bool"
               },
               "lang": {
-                "default": "zh-CN",
+                "default": "en",
                 "inherited": true,
                 "name": "lang",
                 "required": false,
@@ -288,7 +288,7 @@
             "type": "bool"
           },
           "lang": {
-            "default": "zh-CN",
+            "default": "en",
             "inherited": false,
             "name": "lang",
             "required": false,

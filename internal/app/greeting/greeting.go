@@ -3,10 +3,10 @@ package greeting
 
 import (
 	"context"
-	"sync"
 
 	"github.com/zhYou/go-cli-starter/internal/base/messages"
 	"github.com/zhYou/go-cli-starter/internal/base/validation"
+	"github.com/zhYou/go-cli-starter/internal/locales"
 )
 
 // Options 声明本次调用的显式依赖与覆盖选项。
@@ -48,13 +48,15 @@ func (s *Service) Run(ctx context.Context, opts Options) (Result, error) {
 	}
 	l := opts.Localizer
 	if l == nil {
-		b, err := defaultBundle()
+		b, err := locales.LoadBundle()
 		if err != nil {
 			return Result{}, err
 		}
-		l = b.Localizer("zh-CN")
+		l = b.Localizer("en")
 	}
-	return Result{Message: l.Text("greeting.message", map[string]any{"Name": opts.Name})}, nil
+	message, err := l.Format("greeting.message", messages.FormatOptions{Params: map[string]any{"Name": opts.Name}})
+	if err != nil {
+		return Result{}, err
+	}
+	return Result{Message: message}, nil
 }
-
-var defaultBundle = sync.OnceValues(func() (*messages.Bundle, error) { return messages.NewBundle(Catalog()) })

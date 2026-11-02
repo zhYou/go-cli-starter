@@ -1,3 +1,4 @@
+env GO_CLI_STARTER_LANG=zh-CN
 cli 0 version --config bad.toml --json
 stdout '"version":'
 cli 0 help greet --config bad.toml

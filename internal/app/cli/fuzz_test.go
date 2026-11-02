@@ -11,6 +11,7 @@ import (
 
 	"github.com/zhYou/go-cli-starter/internal/app/config"
 	"github.com/zhYou/go-cli-starter/internal/base/paths"
+	"github.com/zhYou/go-cli-starter/internal/locales"
 )
 
 // isolatedOptions 显式注入配置、目录与环境；任何 argv 都不读取或写入用户状态。
@@ -103,7 +104,9 @@ func BenchmarkBuildRoot(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		buildRoot(opts)
+		if _, _, err := buildRoot(opts, locales.LoadBundle); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 func BenchmarkRunGreet(b *testing.B) {

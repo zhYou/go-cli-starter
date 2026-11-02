@@ -12,11 +12,11 @@ import (
 
 	"github.com/zhYou/go-cli-starter/internal/base/fault"
 	"github.com/zhYou/go-cli-starter/internal/base/logging"
-	"github.com/zhYou/go-cli-starter/internal/base/messages"
+	"github.com/zhYou/go-cli-starter/internal/locales"
 )
 
 func TestCommandErrorsHaveOwnedBilingualDefinitions(t *testing.T) {
-	bundle, err := messages.NewBundle(Catalog())
+	bundle, err := locales.LoadBundle()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestCommandErrorsHaveOwnedBilingualDefinitions(t *testing.T) {
 }
 
 func TestCommandLogsUseExplicitLanguageAndStableFields(t *testing.T) {
-	bundle, err := messages.NewBundle(Catalog())
+	bundle, err := locales.LoadBundle()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestCommandLogsUseExplicitLanguageAndStableFields(t *testing.T) {
 				t.Fatal(err)
 			}
 			wantBegin, wantEnd := "开始执行外部工具", "外部工具执行结束"
-			if language == "en" {
+			if language != "zh-CN" {
 				wantBegin, wantEnd = "External tool started", "External tool finished"
 			}
 			if begin["msg"] != wantBegin || end["msg"] != wantEnd {

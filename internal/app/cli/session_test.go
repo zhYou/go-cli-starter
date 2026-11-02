@@ -24,7 +24,7 @@ func TestBusinessCreatesPersistentEvents(t *testing.T) {
 		return "", false
 	}})
 	require.Zero(t, code, stderr.String())
-	require.JSONEq(t, `{"message":"你好，Codex！"}`, out.String())
+	require.JSONEq(t, `{"message":"Hello, Codex!"}`, out.String())
 	files, err := filepath.Glob(filepath.Join(home, "state", "logs", "*", "events.jsonl"))
 	require.NoError(t, err)
 	require.Len(t, files, 1)

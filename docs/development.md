@@ -1,7 +1,7 @@
 # 开发说明
 
 先读 [README](../README.md) 准备环境，再按[设计指南](design-guidelines.md)扩展当前模块。
-项目文档、注释与交流使用中文，CLI 默认中文并支持英文，机器标识保持稳定。
+项目文档、注释与交流使用中文，CLI 默认英文并支持中文，机器标识保持稳定。
 
 ## 协作与环境
 
@@ -30,11 +30,12 @@ Codex、RTK、superpowers 复用用户级安装；模型、认证、权限和插
 | `internal/app/session` | 自建日志、Trace、诊断及工作收尾 |
 | `internal/app/greeting` | 可移除业务示例 |
 | `internal/base` | fault、messages、paths、validation、IO、logging、telemetry、diagnostics、结果 schema |
+| `internal/locales` | 集中双语 TOML 消息目录与共享 Bundle |
 | `internal/tools/command` | 独立 argv、进程所有权、捕获和有界批量执行 |
 | `internal/dev`、根 `tools/` | 模板、契约快照、开发与发布验收 |
 | `configs/`、`test/integration/`、`test/testdata/contracts/` | 配置示例、真实进程脚本、共享契约基线 |
 
-base 不依赖 app、tools、dev 或 Cobra。领域码、文案及结果由所属模块定义；新目录按实际职责增加。
+base 不依赖 app、tools、dev 或 Cobra。领域码及结果由所属模块定义，文案集中维护；新目录按实际职责增加。
 开发工具用 `scaffold.Inspect` 静态识别唯一入口，不根据模块路径末段猜测命令名。
 
 ## 实现与检查
@@ -43,8 +44,9 @@ base 不依赖 app、tools、dev 或 Cobra。领域码、文案及结果由所�
    先通过 `mise exec -- gopls mcp -instructions` 阅读说明。普通操作按需使用等价 CLI，不机械调用工具填清单。
 2. 参照 greet 分离有类型业务选项、结果及 Validate。CLI 的 Args、必填及组合校验在读取配置和创建资源前完成，
    业务入口也调用同一校验。新命令补双语帮助、示例和结果注册，不新增交互输入。
-3. 新配置同步模块 Config、defaults、环境映射、TOML、校验和测试。仅 Changed 的 flag 覆盖，
-   禁止逐键 koanf getter；缺译、系统原因和结构化 fault 的规则见指南。
+3. 新配置同步模块 Config、defaults、环境映射、TOML、校验和测试，并使用统一加载入口。
+   双语消息在同次修改中维护，分别运行 `mise run config:check` 和 `mise run i18n:check`。
+   仅 Changed 的 flag 覆盖，禁止逐键 koanf getter；缺译、系统原因和结构化 fault 的规则见指南。
 4. 为行为变化运行针对性测试，观察真实结果，修改后检查 gopls 诊断。保留用户已有修改，格式化限于授权范围。
 5. 交付前运行 `mise run fmt`、`mise run check`，支持的宿主运行 `mise run test:race`。
    模板/身份变更增加 `template:check`，工具集成增加 `mcp:check`；受信任会话确认 `codex mcp list` 有 gopls。
@@ -81,6 +83,28 @@ contextcheck nilnesserr durationcheck nolintlint thelper usetesting goconst depg
 koanf 只可在精确的 `internal/app/config/load.go` 导入，且仅整体解码；禁用 typed/Must getter、
 Get、Raw、All 等绕过结构体的入口。zap 只在 base/logging，OTel SDK/exporter 只在 base/telemetry。
 `mise run rules:check` 在临时模块运行真实类型分析，验证违规与合规 fixture，并纳入 check。
+
+`mise run i18n:check` 检查 `internal/locales/active.en.toml` 与 `active.zh-CN.toml`：
+目录非空，消息 ID 不重复，字段与消息内容有效，模板语法正确；两种语言的 ID 和模板参数集合一致，
+复数形式的参数按并集比较。每条消息必须有 other，允许 description 和 zero、one、two、few、many。
+检查器支持直接字段、根别名、括号、`if`/`with`/`range`、被调用的非递归命名模板，以及根对象上
+字符串字面量或可静态确定的字面量变量 `index`；管道中的字面量键也可识别。`and`/`or` 只有在各个值
+都可确定为根对象时才被视为根别名。根对象的动态 `index` 键、无法确定的字段/链/模板上下文，
+控制结构或其分支内的变量赋值，以及嵌套管道中的变量声明或赋值会报错；请改为直接字段或在分支外
+确定的变量。子对象上的动态键
+不会引入额外的根参数。新增或修改消息时同时维护两种语言，稳定 ID 不随语言改变。
+
+`mise run config:check` 递归检查 `configs/` 应用配置、`internal/locales/` 语言资源，以及根目录
+明确登记的 `config.toml`、`config.example.toml` 和同名 JSON/YAML 变体。`configs/config.example.toml`
+必须存在；`configs/` 仅接受 TOML，`internal/locales/` 接受 TOML 和 Go 文件。两处直接子目录
+`testdata/` 只放测试 fixture，检查会跳过；其他受管文件必须是普通文件，不接受符号链接。扩展名
+不区分大小写。应用 TOML 禁用环境变量覆盖并经 `config.Load` 校验语法、未知键、类型和值域；
+语言 TOML 检查语法，消息语义由 i18n:check 检查。
+
+新增应用配置放入 `configs/` 并通过 `internal/app/config/load.go` 统一加载；确需其他路径时先登记到
+`internal/dev/configpolicy`。mise、`.codex`、CI、golangci 等工具配置沿用工具自身格式，其他位置的
+业务 JSON、测试数据和协议/契约数据不纳入扫描。两项检查由 lint 调用并纳入 check；它们不会自动安装
+工具或修复文件。
 
 `fmt` 使用 golangci-lint 的 gofmt、goimports；`fmt:check` 只展示差异并失败，不改源码。
 check 不改写源码，但会使用 Go 缓存、临时文件和 bin 产物。

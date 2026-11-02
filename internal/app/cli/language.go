@@ -4,40 +4,19 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/zhYou/go-cli-starter/internal/app/config"
-	"github.com/zhYou/go-cli-starter/internal/app/greeting"
-	"github.com/zhYou/go-cli-starter/internal/app/session"
-	"github.com/zhYou/go-cli-starter/internal/base/diagnostics"
 	"github.com/zhYou/go-cli-starter/internal/base/fault"
-	"github.com/zhYou/go-cli-starter/internal/base/logging"
-	"github.com/zhYou/go-cli-starter/internal/base/messages"
 	"github.com/zhYou/go-cli-starter/internal/base/paths"
-	"github.com/zhYou/go-cli-starter/internal/base/telemetry"
-	"github.com/zhYou/go-cli-starter/internal/base/validation"
-	"github.com/zhYou/go-cli-starter/internal/tools/command"
 )
 
-var loadBundle = sync.OnceValues(func() (*messages.Bundle, error) {
-	return messages.NewBundle(Catalog(), config.Catalog(), session.Catalog(), logging.Catalog(), telemetry.Catalog(), diagnostics.Catalog(), greeting.Catalog(), paths.Catalog(), validation.Catalog(), command.Catalog())
-})
-
-func newLocalizer(lang string) *messages.Localizer {
-	b, err := loadBundle()
-	if err != nil {
-		b, _ = messages.NewBundle()
-	}
-	return b.Localizer(lang)
-}
 func canonicalLanguage(value string) (string, bool) {
 	switch value {
 	case "zh", languageChinese:
 		return languageChinese, true
-	case "en":
-		return "en", true
+	case languageEnglish:
+		return languageEnglish, true
 	default:
 		return "", false
 	}
@@ -61,7 +40,7 @@ func languageEnvironment(opts Options) string {
 func selectLanguage(root *cobra.Command, args []string, env string) (string, error) {
 	selected := env
 	if selected == "" {
-		selected = languageChinese
+		selected = languageEnglish
 	}
 	// 与 Execute 使用相同的命令查找，子命令选项也可能位于命令名之前。
 	// Find 不执行选项 Set；查找错误留给实际执行路径处理。
@@ -132,7 +111,7 @@ func selectLanguage(root *cobra.Command, args []string, env string) (string, err
 	if lang, ok := canonicalLanguage(selected); ok {
 		return lang, nil
 	}
-	fallback := languageChinese
+	fallback := languageEnglish
 	if lang, ok := canonicalLanguage(env); ok {
 		fallback = lang
 	}
@@ -140,8 +119,9 @@ func selectLanguage(root *cobra.Command, args []string, env string) (string, err
 }
 
 type languageValue struct {
-	call *invocation
-	root *cobra.Command
+	call        *invocation
+	root        *cobra.Command
+	preselected bool
 }
 
 func (v *languageValue) String() string { return v.call.localizer.Language() }
@@ -151,36 +131,12 @@ func (v *languageValue) Set(s string) error {
 	if !ok {
 		return usageProblem("language", fault.Params{paramValue: strconv.Quote(s)})
 	}
-	v.call.localizer = newLocalizer(lang)
-	localizeTree(v.root, v.call.localizer)
-	return nil
-}
-func localizeTree(root *cobra.Command, l *messages.Localizer) {
-	var visit func(*cobra.Command)
-	visit = func(cmd *cobra.Command) {
-		key := cmd.Name()
-		if cmd == root {
-			key = commandRoot
-		}
-		ids := map[string]string{commandRoot: commandRoot, commandGreet: commandGreet, commandHelp: commandHelp, commandSchemaName: commandSchemaName, commandCompletion: commandCompletion, commandVersion: commandVersion}
-		if id, ok := ids[key]; ok {
-			cmd.Short = l.Text("cli."+id, nil)
-		}
-		if key == commandGreet || key == commandHelp || key == commandSchemaName {
-			cmd.Use = l.Text("cli."+key+"_use", nil)
-		}
-		flagIDs := map[string]string{flagJSON: flagJSON, flagConfig: flagConfig, flagLogLevel: "log_level", flagLanguage: flagLanguage, flagName: flagName, flagHelp: "help_flag", flagVersion: "version_flag"}
-		for _, set := range []*pflag.FlagSet{cmd.Flags(), cmd.PersistentFlags()} {
-			set.VisitAll(func(f *pflag.Flag) {
-				if id, ok := flagIDs[f.Name]; ok {
-					f.Usage = l.Text("cli."+id, nil)
-				}
-			})
-		}
-		cmd.SetVersionTemplate(l.Text("cli.version_template", map[string]any{"Name": "{{.Name}}", "Version": "{{.Version}}"}) + "\n")
-		for _, child := range cmd.Commands() {
-			visit(child)
-		}
+	// Run 已按完整 argv 选择最后生效的语言；解析中间值时只校验。
+	if v.preselected {
+		return nil
 	}
-	visit(root)
+	if err := v.call.localizeTree(v.root, lang); err != nil {
+		return fault.Wrap(fault.Runtime, "", err)
+	}
+	return nil
 }
