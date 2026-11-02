@@ -14,11 +14,14 @@
 - 当前只支持 Codex。个人模型、凭据、权限和插件偏好保留在用户配置中。
 - 仓库文档记录当前能力、约束、使用和维护方法。superpowers 设计和实施计划只写入
   本地忽略目录 `docs/superpowers/`，不提交；交付时将已实现行为同步到正式文档。
-- 后续工作统一记录在带 `backlog` 标签的 [GitHub Issues](https://github.com/zhYou/go-cli-starter/issues?q=is%3Aissue+state%3Aopen+label%3Abacklog)，
-  不另建仓库 backlog 文件。规划或开始前运行 `gh issue list --state open --label backlog`，
-  Issue 编号是唯一待办 ID，背景、范围和验收标准以正文为准。
-- 待办 Issue 不代表已经授权实施；新增待办须先确认范围，实施 PR 关联对应 Issue，
-  合并后由关联关系关闭 Issue。GitHub 状态和时间戳取代手工维护的状态、日期。
+- 当前会话中已明确要求实施的任务，按已确认范围推进，无需先创建 Issue 或添加 `backlog` 标签。
+  规划或开始前运行 `gh issue list --state open --label backlog`，用于查重和获取上下文，
+  不要求当前任务必须对应某个 Issue。
+- 尚未安排实施的后续工作统一记录在带 `backlog` 标签的 [GitHub Issues](https://github.com/zhYou/go-cli-starter/issues?q=is%3Aissue+state%3Aopen+label%3Abacklog)，
+  不另建仓库 backlog 文件。新增待办先确认范围；Issue 编号是唯一待办 ID，背景、范围和验收标准以正文为准。
+- 待办 Issue 本身不代表实施授权。任务已有对应 Issue 时，PR 关联它；完整解决时使用关闭关联，
+  部分解决时仅引用。没有对应 Issue 时直接交付 PR，无需补建 Issue。
+  GitHub 状态和时间戳取代手工维护的状态、日期。
 
 ## 隔离开发与交付
 
