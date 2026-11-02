@@ -1,0 +1,3 @@
+# 仅在显式选择 agent 环境时加载；预装工具由用户维护。
+[tools]
+"go:golang.org/x/tools/gopls" = "0.24.0"

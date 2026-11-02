@@ -12,17 +12,17 @@
 ## 仓库管理员设置
 
 - 首次启用 GitHub Issues 时创建 `backlog` 标签；Issue 表单和智能体查询依赖这个稳定标识，不把待办写回仓库 Markdown。
-- 为 main 设置规则集，要求 PR、审查通过、分支更新及必需检查。按实际 Actions 检查名称启用 `CI / check`、`CI / platforms (macos-latest)`、`CI / platforms (windows-latest)`、`Security / vulnerability`，首次运行后核对名称。
+- 为 main 设置规则集，要求 PR、审查通过、分支更新及必需检查。按实际 Actions 检查名称启用 `CI / check`、`CI / agent-mcp`、`CI / platforms (macos-latest)`、`CI / platforms (windows-latest)`、`Security / vulnerability`，首次运行后核对名称。
 - 保护发布标签 `v*`，限制创建和修改权限；采用不可变发布资产策略。
 - 按 [SECURITY](../SECURITY.md) 填写私密报告入口并启用对应功能；发布支持版本和响应安排。
-- 安装或授权 Renovate。现有配置覆盖 Go、Actions SHA 和 mise，禁用自动合并及预发布更新。若平台限制锁更新所需的受信任命令，维护者本地补齐六平台锁，不能跳过版本检查。
+- 安装或授权 Renovate。现有配置覆盖 Go、Actions SHA 和两份 mise 配置，禁用自动合并及预发布更新。维护者审查准确版本声明并完成版本检查，项目不维护 mise 锁文件。
 - 确认 release job 能申请 OIDC 和 attestations 写权限，满足所在 GitHub 套餐、组织与仓库策略。普通 PR 和定时扫描只读，不使用发布凭据。
 - 确认定时安全扫描持续运行，并指定失败通知的接收人；停用或归档仓库前交接维护责任。
 
 ## 升级和发布
 
 源码检查见[开发说明](development.md)，模板迁移见[模板升级](template-upgrades.md)，接口政策见[兼容性规则](compatibility.md)。
-工具升级同步当前版本表、Go 声明、锁和 CI；历史变更通过 Git 追溯。
+工具升级同步当前版本表、两份 mise 配置、Go 声明和 CI；历史变更通过 Git 追溯。
 
 发布前运行 check、test:race、vuln、release:snapshot、release:verify。检查六目标归档、各自 SPDX 与最终摘要。
 macOS/Windows 的运行结果以对应 CI 为准，Linux 上的交叉编译不证明这些系统上的运行行为。
@@ -34,9 +34,11 @@ Release 创建后证明失败时，workflow 失败；重试必须针对同一批
 
 ## 环境、诊断与验收证据
 
-首次使用或锁变更后显式 setup，再 doctor；普通 check 不安装、升级或修复环境。
-README 的受检工具表、mise 精确版本及六平台锁保持一致，不提交个人模型、凭据、权限或插件配置。
-Codex、RTK、superpowers 为可选用户级工具，Serena/Graphify 尚在待办，不得作为基础 CI 前置条件。
+首次使用及工具版本或 Go 模块变更后显式 setup，再 doctor；智能体环境使用 setup:agent 和 doctor:agent。
+普通 check 不安装、升级或修复环境。README、两份 mise 版本声明、Go 和 CI 保持一致；不提交个人模型、凭据、权限或插件配置。
+mise、git、gh、Codex、RTK、superpowers 属于预装层，项目不安装或更新；基础检查只要求其中的 mise、git。
+doctor:agent 额外要求 gh、Codex、gopls，RTK 仅报告，superpowers 由会话确认。Serena/Graphify 尚在待办。
+智能体配套不作为基础 CI 前置条件，gopls MCP 在独立 job 验证；平台支持通过原生 CI 和六目标发布构建验证。
 
 日志默认 info/file，Trace 默认 none；file Trace 只供本地诊断，不承诺 OTLP 或重放。
 诊断文件属于各次运行，由系统锁与元数据保护；未知内容和活跃运行不清理，总量为软限制。

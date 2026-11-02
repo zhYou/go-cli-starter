@@ -16,33 +16,47 @@ import (
 	"golang.org/x/mod/semver"
 )
 
-// VersionSet 保存项目声明的工具版本及发布平台。
+// VersionSet 保存所选工具层的固定版本和 mise 最低版本。
 type VersionSet struct {
 	MiseMinimum string
 	Tools       map[string]string
-	Platforms   []string
 }
 
-func loadVersions(root string) (VersionSet, error) {
-	//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
-	data, err := os.ReadFile(filepath.Join(root, "mise.toml"))
-	if err != nil {
-		return VersionSet{}, err
+func loadVersions(root string, agent bool) (VersionSet, error) {
+	files := []string{miseConfig}
+	if agent {
+		files = append(files, "mise.agent.toml")
 	}
-	var cfg struct {
-		Minimum string            `toml:"min_version"`
-		Tools   map[string]string `toml:"tools"`
+	v := VersionSet{Tools: make(map[string]string)}
+	for _, name := range files {
+		//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
+		data, err := os.ReadFile(filepath.Join(root, name))
+		if err != nil {
+			return v, err
+		}
+		var cfg struct {
+			Minimum string            `toml:"min_version"`
+			Tools   map[string]string `toml:"tools"`
+		}
+		if err := toml.Unmarshal(data, &cfg); err != nil {
+			return v, err
+		}
+		if name == miseConfig {
+			v.MiseMinimum = cfg.Minimum
+		}
+		for key, version := range cfg.Tools {
+			if _, exists := v.Tools[key]; exists {
+				return v, fmt.Errorf("工具 %s 在多个层级重复声明", key)
+			}
+			v.Tools[key] = version
+		}
 	}
-	if err := toml.Unmarshal(data, &cfg); err != nil {
-		return VersionSet{}, err
-	}
-	v := VersionSet{cfg.Minimum, cfg.Tools, []string{"linux-x64", "linux-arm64", "macos-x64", "macos-arm64", "windows-x64", "windows-arm64"}}
 	if !regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`).MatchString(v.MiseMinimum) {
-		return v, fmt.Errorf("mise 最低版本必须精确锁定")
+		return v, fmt.Errorf("mise 最低版本必须精确固定")
 	}
 	for key, version := range v.Tools {
 		if !regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`).MatchString(version) {
-			return v, fmt.Errorf("工具 %s 必须锁定稳定的精确版本", key)
+			return v, fmt.Errorf("工具 %s 必须固定稳定的精确版本", key)
 		}
 	}
 	return v, nil
@@ -55,9 +69,11 @@ type toolSpec struct {
 
 func versionTool(key string) (toolSpec, error) {
 	switch key {
+	case miseProgram:
+		return toolSpec{miseProgram, miseProgram, `(?m)^([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`, []string{versionFlag}}, nil
 	case "go":
 		return toolSpec{"go", "Go", `\bgo([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`, []string{versionCommand}}, nil
-	case "go:golang.org/x/tools/gopls":
+	case goplsTool:
 		return toolSpec{goplsProgram, goplsProgram, `(?m)^golang.org/x/tools/gopls v([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`, []string{versionCommand}}, nil
 	case lintProgram:
 		return toolSpec{lintProgram, lintProgram, `\bgolangci-lint has version ([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`, []string{versionCommand}}, nil
@@ -77,60 +93,28 @@ func matchToolVersion(key, output, want string) error {
 		return err
 	}
 	match := regexp.MustCompile(spec.Pattern).FindStringSubmatch(output)
+	if key == miseProgram {
+		if len(match) != 2 || semver.Compare("v"+match[1], "v"+want) < 0 {
+			return fmt.Errorf("mise 版本无效或低于最低版本 %s", want)
+		}
+		return nil
+	}
 	if len(match) != 2 || match[1] != want {
-		return fmt.Errorf("%s 与锁定版本 %s 不符，请运行 mise run setup", spec.Name, want)
+		setup := "setup"
+		if key == goplsTool {
+			setup = "setup:agent"
+		}
+		return fmt.Errorf("%s 与固定版本 %s 不符，请运行 mise run %s", spec.Name, want, setup)
 	}
 	return nil
 }
 func checkVersions(root string) error {
-	versions, err := loadVersions(root)
+	versions, err := loadVersions(root, true)
 	if err != nil {
 		return err
-	}
-	//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
-	data, err := os.ReadFile(filepath.Join(root, "mise.lock"))
-	if err != nil {
-		return err
-	}
-	var lock struct {
-		Version int                         `toml:"lockfile_version"`
-		Tools   map[string][]map[string]any `toml:"tools"`
-	}
-	if err := toml.Unmarshal(data, &lock); err != nil {
-		return err
-	}
-	if lock.Version != 3 {
-		return fmt.Errorf("不支持的 mise 锁格式")
-	}
-	if len(lock.Tools) != len(versions.Tools) {
-		return fmt.Errorf("工具声明与锁文件数量不符")
-	}
-	for key, want := range versions.Tools {
-		entries := lock.Tools[key]
-		if len(entries) != 1 || entries[0][lockVersionField] != want {
-			return fmt.Errorf("%s 锁版本不符", key)
-		}
-		// Go 后端从固定模块版本构建，各平台使用同一来源；没有下载归档的平台记录。
-		if strings.HasPrefix(key, "go:") {
-			if entries[0]["backend"] != key {
-				return fmt.Errorf("%s 来源后端不符", key)
-			}
-			continue
-		}
-		for _, platform := range versions.Platforms {
-			entry, ok := entries[0]["platforms."+platform].(map[string]any)
-			if !ok {
-				return fmt.Errorf("%s 缺少 %s 锁", key, platform)
-			}
-			checksum, _ := entry["checksum"].(string)
-			url, _ := entry["url"].(string)
-			if !regexp.MustCompile(`^sha256:[0-9a-f]{64}$`).MatchString(checksum) || !strings.HasPrefix(url, "https://") {
-				return fmt.Errorf("%s 的 %s 校验或 URL 无效", key, platform)
-			}
-		}
 	}
 	//nolint:gosec // G304：开发工具读取显式项目文件或执行固定 Git 子命令，不经过 shell，不是外部服务入口。
-	data, err = os.ReadFile(filepath.Join(root, moduleFile))
+	data, err := os.ReadFile(filepath.Join(root, moduleFile))
 	if err != nil {
 		return err
 	}
@@ -242,7 +226,7 @@ func sortedTools(v VersionSet) []string {
 // matchGovulncheckBuildInfo 离线核验真实 Go 可执行文件，避免 -version 访问漏洞库。
 func matchGovulncheckBuildInfo(info *buildinfo.BuildInfo, want string) error {
 	if info.Path != "golang.org/x/vuln/cmd/govulncheck" || info.Main.Path != "golang.org/x/vuln" || info.Main.Version != "v"+want || info.Main.Replace != nil {
-		return fmt.Errorf("govulncheck 与锁定来源和版本 %s 不符，请运行 mise run setup", want)
+		return fmt.Errorf("govulncheck 与固定来源和版本 %s 不符，请运行 mise run setup", want)
 	}
 	return nil
 }

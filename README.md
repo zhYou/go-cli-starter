@@ -25,23 +25,48 @@ mise run check
 
 [安装 mise](https://mise.jdx.dev/getting-started.html)。已有 mise 按其安装方式升级；独立安装的版本可运行 `mise self-update`。
 
+工具分为三层：默认预装、开发工具、智能体辅助工具。
+
+- 默认预装：mise、git、gh、Codex、RTK、superpowers，由用户维护，项目不安装或更新。
+  基础开发使用 mise、git；智能体工作流还要求 gh、Codex。RTK 只报告状态，superpowers 以会话技能列表为准。
+- 开发工具：由 `mise.toml` 声明，`setup` 安装，`doctor` 检查。
+- 智能体辅助工具：目前只有 gopls，由 `mise.agent.toml` 声明；使用 `setup:agent` 准备，
+  `doctor:agent` 检查。普通开发和基础 CI 无需 gopls。
+
 <!-- tool-versions:start -->
+
+预装工具的版本门槛：
 
 | 工具 | 固定版本 |
 | --- | --- |
 | mise（本地最低版本、CI 固定版本） | 2026.10.21 |
+
+开发工具：
+
+| 工具 | 固定版本 |
+| --- | --- |
 | Go | 1.27.3 |
-| gopls | 0.24.0 |
 | golangci-lint | 2.15.0 |
 | GoReleaser | 2.19.0 |
 | govulncheck | 1.9.0 |
 | Syft | 1.55.0 |
 
+智能体辅助工具：
+
+| 工具 | 固定版本 |
+| --- | --- |
+| gopls | 0.24.0 |
+
 <!-- tool-versions:end -->
 
-有官方 LTS 时使用最新 LTS 补丁版，否则使用最新稳定版；核验后锁定具体版本。本地和 CI 读取相同配置。Go 没有单独的 LTS 渠道，模板采用上表锁定的稳定版本。
+有官方 LTS 时使用最新 LTS 补丁版，否则使用最新稳定版；核验后固定具体版本。本地和 CI 按工具层读取相同配置。Go 没有单独的 LTS 渠道，模板采用上表固定的稳定版本。
 
-首次使用及 mise/模块锁变更后运行 `setup`：只安装项目锁定工具并下载模块，不安装用户全局配置中的其他工具。普通任务和 exec 均关闭自动安装，`GOTOOLCHAIN=local` 防止隐式下载；日常检查不会安装、升级或修复环境。
+首次使用及工具版本或 Go 模块变更后运行 `setup`：只按显式清单安装开发工具并下载模块，不安装用户全局配置中的其他工具。
+智能体开发使用 `setup:agent`，它先执行 `setup`，再安装 gopls。普通任务和 exec 均关闭自动安装，
+`GOTOOLCHAIN=local` 防止隐式下载；日常检查不会安装、升级或修复环境。
+
+项目关闭 mise 锁文件机制，准确版本来自上述 TOML；安装时由各后端解析来源并执行其校验，
+仓库不再保存六平台工具下载 URL 和校验和。`go.sum` 继续校验 Go 模块，平台支持通过原生 CI 与发布构建验证。
 
 ```sh
 mise run doctor
@@ -165,12 +190,13 @@ GO_CLI_STARTER_HOME="$example_home" ./bin/go-cli-starter greet --name Codex --la
 先准备环境，再从项目根目录启动 Codex：
 
 ```sh
-mise run setup
+mise run setup:agent
 mise run doctor:agent
 codex
 ```
 
-`AGENTS.md` 记录仓库约定和验证命令。`.codex/config.toml` 为受信任项目配置 gopls MCP，通过 mise 选择固定版本，启动失败不会阻塞 Codex。验证连接：
+`AGENTS.md` 记录仓库约定和验证命令。`.codex/config.toml` 为受信任项目配置 gopls MCP，
+通过 `mise -E agent exec` 选择固定版本，启动失败不会阻塞 Codex。验证连接：
 
 ```sh
 mise run mcp:check
@@ -179,7 +205,10 @@ codex mcp list
 
 `mcp:check` 真正完成初始化、发现工具，并对当前项目运行 Go 诊断。Codex 需重新启动或重新连接，才能加载新增配置。
 
-RTK 和 superpowers 使用用户目录中的安装。模板不复制全局技能，不写个人路径、模型、认证或权限偏好。`doctor:agent` 报告辅助工具状态；superpowers 是否加载，以 Codex 中的技能列表为准。缺少辅助工具不影响基础检查。
+RTK 和 superpowers 暂归预装层，使用用户目录中的安装。模板不复制全局技能，不写个人路径、模型、认证或权限偏好。
+`doctor:agent` 要求 gh、Codex 和固定版本的 gopls 可用；RTK 缺失只报告，superpowers 是否加载以 Codex 会话中的技能列表为准。
+gh、Codex、RTK 不限定固定版本，也不在 doctor 中检查认证。基础检查无需这些预装智能体工具，
+CI 的独立 `agent-mcp` job 只准备 gopls 并验证真实连接，无需安装 Codex、RTK 或 superpowers。
 
 当前仅支持 Codex。Claude Code 和 OpenCode 支持见[项目待办](https://github.com/zhYou/go-cli-starter/issues?q=is%3Aissue+state%3Aopen+label%3Abacklog)；TUI 和 CLI 自身的 MCP 服务暂不在范围内。
 
@@ -189,8 +218,10 @@ RTK 和 superpowers 使用用户目录中的安装。模板不复制全局技能
 
 | 命令 | 用途 |
 | --- | --- |
-| `mise run setup` | 安装锁定工具，下载模块 |
-| `mise run doctor` | 检查工具和版本 |
+| `mise run setup` | 安装固定版本的开发工具，下载模块 |
+| `mise run setup:agent` | 准备开发工具，再安装 gopls |
+| `mise run doctor` | 检查 mise、git 和开发工具版本 |
+| `mise run doctor:agent` | 检查开发与智能体环境，报告预装辅助工具状态 |
 | `mise run fmt` / `fmt:check` | gofmt + goimports；后者只读检查差异 |
 | `mise run test` | 单元与命令测试 |
 | `mise run test:race` | 竞态检测，需要 C 编译器 |

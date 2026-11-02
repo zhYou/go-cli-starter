@@ -6,6 +6,9 @@ import (
 	"debug/buildinfo"
 	"encoding/json"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"strings"
 	"testing"
@@ -125,4 +128,81 @@ func TestDoctorConcurrencyLimit(t *testing.T) {
 		}
 	}
 	require.Equal(t, 4, maxActive, "真实进程区间应恰好达到四并发")
+}
+
+// doctorToolFixture 仅模拟命令边界；真实工具和 MCP 在交付验收中独立执行。
+func doctorToolFixture(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	source := filepath.Join(dir, "main.go")
+	require.NoError(t, os.WriteFile(source, []byte(`package main
+import ("fmt"; "os"; "path/filepath"; "strings")
+func main() {
+    name := strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe")
+    arg := "--version"
+    if name == "gopls" { arg = "version" }
+    if len(os.Args) != 2 || os.Args[1] != arg { os.Exit(2) }
+    switch name {
+    case "mise": fmt.Println(os.Getenv("DOCTOR_MISE_VERSION"))
+    case "gopls": fmt.Println("golang.org/x/tools/gopls v0.24.0")
+    default: fmt.Println(name + " fixture")
+    }
+}
+`), 0600))
+	binary := filepath.Join(dir, "probe")
+	if runtime.GOOS == windowsPlatform {
+		binary += executableSuffix
+	}
+	//nolint:gosec // G204：只构建固定的版本探测 fixture 到临时目录，不证明实际工具安装。
+	output, err := exec.Command("go", "build", "-o", binary, source).CombinedOutput()
+	require.NoError(t, err, "%s", output)
+	return binary
+}
+
+func doctorLayerFixture(t *testing.T, binary, missing string) {
+	t.Helper()
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "mise.toml"), []byte("min_version = \"2026.10.21\"\n[tools]\n"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "mise.agent.toml"), []byte("[tools]\n\"go:golang.org/x/tools/gopls\" = \"0.24.0\"\n"), 0600))
+	bin := t.TempDir()
+	for _, name := range []string{"mise", "git", "gh", "codex", "gopls"} {
+		if name == missing || missing == "agent" && name != "mise" && name != "git" {
+			continue
+		}
+		if runtime.GOOS == windowsPlatform {
+			name += executableSuffix
+		}
+		require.NoError(t, copyFile(binary, filepath.Join(bin, name)))
+	}
+	t.Setenv("PATH", bin)
+	t.Setenv("DOCTOR_MISE_VERSION", "2026.10.25 linux-x64")
+	t.Setenv("GO_CLI_STARTER_HOME", t.TempDir())
+	t.Chdir(root)
+}
+
+func TestDoctorLayerRequirements(t *testing.T) {
+	binary := doctorToolFixture(t)
+	t.Run("base-without-agent", func(t *testing.T) {
+		doctorLayerFixture(t, binary, "agent")
+		require.NoError(t, doctor(false))
+	})
+	t.Run("agent-without-optional-rtk", func(t *testing.T) {
+		doctorLayerFixture(t, binary, "")
+		require.NoError(t, doctor(true))
+	})
+	for _, name := range []string{"gh", "codex", "gopls"} {
+		t.Run("agent-without-"+name, func(t *testing.T) {
+			doctorLayerFixture(t, binary, name)
+			require.ErrorContains(t, doctor(true), name)
+		})
+	}
+	t.Run("mise-below-minimum", func(t *testing.T) {
+		doctorLayerFixture(t, binary, "agent")
+		t.Setenv("DOCTOR_MISE_VERSION", "2026.10.20 linux-x64")
+		require.ErrorContains(t, doctor(false), "mise")
+	})
+}
+
+func TestGoplsVersionMismatchSuggestsAgentSetup(t *testing.T) {
+	require.ErrorContains(t, matchToolVersion("go:golang.org/x/tools/gopls", "golang.org/x/tools/gopls v0.24.1", "0.24.0"), "mise run setup:agent")
 }
