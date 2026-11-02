@@ -11,6 +11,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// 补全协议中的 shell 名称也用于对应文件和生成器分派。
+const (
+	shellBash       = "bash"
+	shellZsh        = "zsh"
+	shellFish       = "fish"
+	shellPowerShell = "powershell"
+)
+
 func resolveCommand(root *cobra.Command, args []string) (*cobra.Command, error) {
 	target := root
 	for _, name := range args {
@@ -45,7 +53,7 @@ func newHelpCommand(root *cobra.Command) *cobra.Command {
 }
 
 func newCompletionCommand(root *cobra.Command, call *invocation, name string) *cobra.Command {
-	shells := []string{"bash", "zsh", "fish", "powershell"}
+	shells := []string{shellBash, shellZsh, shellFish, shellPowerShell}
 	completion := &cobra.Command{
 		Use: "completion", Short: "生成 Shell 补全脚本",
 		Annotations: map[string]string{annotationSkipConfig: annotationEnabled},
@@ -72,11 +80,11 @@ func newCompletionCommand(root *cobra.Command, call *invocation, name string) *c
 			RunE: func(cmd *cobra.Command, _ []string) error {
 				return writeText(cmd.OutOrStdout(), func(w io.Writer) error {
 					switch shell {
-					case "bash":
+					case shellBash:
 						return root.GenBashCompletionV2(w, true)
-					case "zsh":
+					case shellZsh:
 						return root.GenZshCompletion(w)
-					case "fish":
+					case shellFish:
 						return root.GenFishCompletion(w, true)
 					default:
 						return root.GenPowerShellCompletionWithDesc(w)
@@ -86,9 +94,9 @@ func newCompletionCommand(root *cobra.Command, call *invocation, name string) *c
 		}
 		file := name + "." + shell
 		switch shell {
-		case "zsh":
+		case shellZsh:
 			file = "_" + name
-		case "powershell":
+		case shellPowerShell:
 			file = name + ".ps1"
 		}
 		params := map[string]any{paramName: name, "Shell": shell, "File": file}
