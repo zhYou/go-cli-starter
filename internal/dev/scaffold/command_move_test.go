@@ -2,7 +2,6 @@ package scaffold
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -13,18 +12,6 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 )
-
-func commandTransactionFixture(t *testing.T) (*Initializer, string, []change, *commandMove) {
-	t.Helper()
-	i, root := memoryInitializer(t)
-	from := "cmd/" + TemplateName
-	require.NoError(t, i.FS.MkdirAll(filepath.Join(root, from), 0755))
-	source := []byte("package main\nconst appName=\"" + TemplateName + "\"\nfunc main(){}\n")
-	require.NoError(t, afero.WriteFile(i.FS, filepath.Join(root, from, "main.go"), source, 0640))
-	require.NoError(t, afero.WriteFile(i.FS, filepath.Join(root, from, "main_test.go"), []byte("package main\n"), 0600))
-	changes := []change{{filepath.Join(root, "go.mod"), []byte("module example.com/team/repository\n\ngo 1.27.0\n"), 0600}, {filepath.Join(root, from, "main.go"), []byte(strings.ReplaceAll(string(source), TemplateName, "my-cli")), 0640}}
-	return i, root, changes, &commandMove{From: from, To: "cmd/my-cli"}
-}
 
 func TestCommandMoveHardExitHelper(t *testing.T) {
 	if os.Getenv("LAYOUT_HARD_EXIT_HELPER") != "1" {
@@ -122,35 +109,6 @@ func TestCommandMovePreflightProtectsUserFiles(t *testing.T) {
 			require.False(t, ok)
 		})
 	}
-}
-
-func crashCommandMove(t *testing.T, point string) (*Initializer, string, *commandMove) {
-	t.Helper()
-	i, root, changes, move := commandTransactionFixture(t)
-	base := i.FS
-	i.FS = faultFS{Fs: base, rename: func(a, b string) error {
-		if point == "before" && a == filepath.Join(root, move.From) {
-			panic("移动前中断")
-		}
-		err := base.Rename(a, b)
-		if err == nil && point == "after" && b == filepath.Join(root, move.To) {
-			panic("移动后中断")
-		}
-		if err == nil && point == "committed" && b == filepath.Join(root, journalDir, "journal.json") {
-			raw, _ := afero.ReadFile(base, b)
-			var tx transaction
-			require.NoError(t, json.Unmarshal(raw, &tx))
-			if tx.Phase == "committed" {
-				panic("提交后中断")
-			}
-		}
-		return err
-	}}
-	require.Panics(t, func() {
-		_, _ = i.apply(context.Background(), root, "example.com/team/repository", "my-cli", changes, move)
-	})
-	i.FS = base
-	return i, root, move
 }
 
 func TestCommandMoveRecovery(t *testing.T) {

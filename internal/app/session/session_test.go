@@ -10,18 +10,103 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/fstest"
 	"time"
-
-	"go.opentelemetry.io/otel/trace"
 
 	"github.com/gofrs/flock"
 	"github.com/stretchr/testify/require"
 	appconfig "github.com/zhYou/go-cli-starter/internal/app/config"
 	"github.com/zhYou/go-cli-starter/internal/base/diagnostics"
+	"github.com/zhYou/go-cli-starter/internal/base/fault"
 	"github.com/zhYou/go-cli-starter/internal/base/logging"
+	"github.com/zhYou/go-cli-starter/internal/base/messages"
 	"github.com/zhYou/go-cli-starter/internal/base/paths"
 	"github.com/zhYou/go-cli-starter/internal/base/telemetry"
+	"github.com/zhYou/go-cli-starter/internal/locales"
+	"go.opentelemetry.io/otel/trace"
 )
+
+func TestSessionUsesDefaultEnglishAndExplicitChinese(t *testing.T) {
+	bundle, err := locales.LoadBundle()
+	require.NoError(t, err)
+	cases := []struct {
+		name          string
+		localizer     *messages.Localizer
+		start, finish string
+	}{
+		{"default", nil, "Command started", "Command finished"},
+		{"chinese", bundle.Localizer("zh-CN"), "命令开始", "命令结束"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := defaultConfig()
+			cfg.Logging.Output = "stderr"
+			var sink bytes.Buffer
+			ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: &sink, Localizer: tc.localizer}, func(err error) { t.Error(err) })
+			s.Finish(ctx, logging.CommandResult{})
+			lines := bytes.Split(bytes.TrimSpace(sink.Bytes()), []byte("\n"))
+			require.Len(t, lines, 2)
+			var start, finish map[string]any
+			require.NoError(t, json.Unmarshal(lines[0], &start))
+			require.NoError(t, json.Unmarshal(lines[1], &finish))
+			require.Equal(t, tc.start, start["msg"])
+			require.Equal(t, tc.finish, finish["msg"])
+			require.Equal(t, "command_finished", finish["event"])
+		})
+	}
+}
+
+func TestSessionBrokenDiagnosticsPreserveBusinessFailure(t *testing.T) {
+	bundle, err := messages.NewBundle(fstest.MapFS{"active.en.toml": {Data: []byte("[\"session.started\"]\nother = \"partial {{.Missing}}\"\n")}})
+	require.NoError(t, err)
+	cfg := defaultConfig()
+	cfg.Logging.Output = "stderr"
+	var sink bytes.Buffer
+	ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: &sink, Localizer: bundle.Localizer("en")}, func(err error) { t.Error(err) })
+	businessErr := (fault.Definition{Code: "example.business", Kind: fault.Runtime}).New()
+	s.Finish(ctx, logging.CommandResult{ExitCode: 1, Err: businessErr})
+	lines := bytes.Split(bytes.TrimSpace(sink.Bytes()), []byte("\n"))
+	require.Len(t, lines, 2)
+	var start, finish map[string]any
+	require.NoError(t, json.Unmarshal(lines[0], &start))
+	require.NoError(t, json.Unmarshal(lines[1], &finish))
+	require.Equal(t, "Operation failed [session.started]", start["msg"])
+	require.Equal(t, "Operation failed [session.finished]", finish["msg"])
+	require.Equal(t, float64(1), finish["exit_code"])
+	require.Equal(t, "example.business", finish["error_code"])
+	require.NotContains(t, sink.String(), "partial")
+}
+
+func TestSessionConcurrentLocalizersRemainIsolated(t *testing.T) {
+	bundle, err := locales.LoadBundle()
+	require.NoError(t, err)
+	var wg sync.WaitGroup
+	for range 20 {
+		for _, tc := range []struct{ lang, want string }{{"en", "Command finished"}, {"zh-CN", "命令结束"}} {
+			wg.Go(func() {
+				cfg := defaultConfig()
+				cfg.Logging.Output = "stderr"
+				var sink bytes.Buffer
+				ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: &sink, Localizer: bundle.Localizer(tc.lang)}, func(err error) { t.Error(err) })
+				s.Finish(ctx, logging.CommandResult{})
+				if !bytes.Contains(sink.Bytes(), []byte(tc.want)) {
+					t.Errorf("%s: %s", tc.lang, sink.Bytes())
+				}
+			})
+		}
+	}
+	wg.Wait()
+}
+
+func TestSessionUninitializedLocalizerUsesEnglishFallback(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.Logging.Output = "stderr"
+	var sink bytes.Buffer
+	ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: &sink, Localizer: &messages.Localizer{}}, func(err error) { t.Error(err) })
+	s.Finish(ctx, logging.CommandResult{})
+	require.Contains(t, sink.String(), "Operation failed [session.started]")
+	require.Contains(t, sink.String(), "Operation failed [session.finished]")
+}
 
 func defaultConfig() appconfig.Config {
 	return appconfig.Config{Logging: logging.Defaults(), Diagnostics: diagnostics.Defaults(), Telemetry: telemetry.Defaults()}
@@ -134,15 +219,44 @@ func TestFinishWaitsForRegisteredWorkBeforeEndingSpanAndClosingFiles(t *testing.
 	cfg.Telemetry.Exporter = telemetry.File
 	ctx, s := Begin(t.Context(), cfg, logging.RunInfo{Component: "test", Command: "work"}, Options{Directories: &paths.Directories{State: t.TempDir()}}, func(err error) { t.Error(err) })
 	started, release, finished := make(chan struct{}), make(chan struct{}), make(chan struct{})
-	require.True(t, s.Go(func(ctx context.Context) {
+	workerDone := make(chan struct{})
+	registered := false
+	var releaseOnce, finishOnce sync.Once
+	releaseWork := func() { releaseOnce.Do(func() { close(release) }) }
+	finish := func() {
+		finishOnce.Do(func() { go func() { s.Finish(ctx, logging.CommandResult{}); close(finished) }() })
+	}
+	t.Cleanup(func() {
+		releaseWork()
+		finish()
+		if registered {
+			select {
+			case <-workerDone:
+			case <-time.After(3 * time.Second):
+				t.Error("已登记 worker 未完成收尾")
+			}
+		}
+		select {
+		case <-finished:
+		case <-time.After(3 * time.Second):
+			t.Error("已登记工作或 Session 未完成收尾")
+		}
+	})
+	registered = s.Go(func(ctx context.Context) {
+		defer close(workerDone)
 		_, span := s.Tracer.Start(ctx, "worker")
 		defer span.End()
 		close(started)
 		<-release
 		s.Logger.WithContext(ctx).Infow("worker_completed")
-	}))
-	<-started
-	go func() { s.Finish(ctx, logging.CommandResult{}); close(finished) }()
+	})
+	require.True(t, registered)
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("登记的工作未启动")
+	}
+	finish()
 	require.Eventually(t, func() bool { s.mu.Lock(); defer s.mu.Unlock(); return s.finishing }, time.Second, time.Millisecond)
 	require.False(t, s.Go(func(context.Context) { t.Error("关闭后不应接受新工作") }))
 	select {
@@ -151,7 +265,7 @@ func TestFinishWaitsForRegisteredWorkBeforeEndingSpanAndClosingFiles(t *testing.
 	default:
 	}
 	require.True(t, trace.SpanFromContext(ctx).IsRecording())
-	close(release)
+	releaseWork()
 	select {
 	case <-finished:
 	case <-time.After(time.Second):
@@ -160,7 +274,11 @@ func TestFinishWaitsForRegisteredWorkBeforeEndingSpanAndClosingFiles(t *testing.
 	require.False(t, trace.SpanFromContext(ctx).IsRecording())
 	data, err := os.ReadFile(filepath.Join(s.files.Path, diagnostics.EventsFile))
 	require.NoError(t, err)
-	require.Less(t, bytes.Index(data, []byte("worker_completed")), bytes.Index(data, []byte("command_finished")))
+	workerIndex := bytes.Index(data, []byte("worker_completed"))
+	finishedIndex := bytes.Index(data, []byte("command_finished"))
+	require.NotEqual(t, -1, workerIndex, "缺少工作完成事件")
+	require.NotEqual(t, -1, finishedIndex, "缺少命令完成事件")
+	require.Less(t, workerIndex, finishedIndex)
 	spans, err := os.ReadFile(filepath.Join(s.files.Path, diagnostics.TraceFile))
 	require.NoError(t, err)
 	require.Contains(t, string(spans), "worker")

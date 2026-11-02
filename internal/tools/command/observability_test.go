@@ -8,7 +8,51 @@ import (
 
 	"github.com/zhYou/go-cli-starter/internal/base/logging"
 	"github.com/zhYou/go-cli-starter/internal/base/telemetry"
+	"github.com/zhYou/go-cli-starter/internal/locales"
 )
+
+func TestCommandLogsUseExplicitLanguageAndStableFields(t *testing.T) {
+	bundle, err := locales.LoadBundle()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, language := range []string{"zh-CN", "en", "default"} {
+		t.Run(language, func(t *testing.T) {
+			var sink bytes.Buffer
+			logger := logging.New(logging.RunInfo{}, logging.Options{Config: logging.Config{Level: "debug", Output: "stderr"}, Writer: &sink}, func(err error) { t.Error(err) })
+			call, options := helper(t, "bytes")
+			options.Logger = logger
+			if language != "default" {
+				options.Localizer = bundle.Localizer(language)
+			}
+			result := Capture(t.Context(), call, options, CaptureOptions{})
+			if result.Err != nil {
+				t.Fatal(result.Err)
+			}
+			lines := bytes.Split(bytes.TrimSpace(sink.Bytes()), []byte("\n"))
+			if len(lines) != 2 {
+				t.Fatalf("日志数量 %s", sink.Bytes())
+			}
+			var begin, end map[string]any
+			if err := json.Unmarshal(lines[0], &begin); err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal(lines[1], &end); err != nil {
+				t.Fatal(err)
+			}
+			wantBegin, wantEnd := "开始执行外部工具", "外部工具执行结束"
+			if language != "zh-CN" {
+				wantBegin, wantEnd = "External tool started", "External tool finished"
+			}
+			if begin["msg"] != wantBegin || end["msg"] != wantEnd {
+				t.Fatalf("工具日志语言未生效 %s", sink.Bytes())
+			}
+			if end["event"] != "tool_finished" || end["operation"] != "test.helper" || end["outcome"] != "success" || end["exit_code"] != float64(0) {
+				t.Fatalf("机器字段变化 %v", end)
+			}
+		})
+	}
+}
 
 func TestOnlyStartedItemsEmitSpansAndNoRawData(t *testing.T) {
 	var traceOutput bytes.Buffer

@@ -3,31 +3,11 @@ package cli
 import (
 	"bytes"
 	"context"
-	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/zhYou/go-cli-starter/internal/app/config"
-	"github.com/zhYou/go-cli-starter/internal/base/paths"
-	"github.com/zhYou/go-cli-starter/internal/locales"
 )
 
-// isolatedOptions 显式注入配置、目录与环境；任何 argv 都不读取或写入用户状态。
-func isolatedOptions(home string, out, stderr io.Writer) Options {
-	dirs := paths.Directories{Config: home, Data: filepath.Join(home, "data"), State: filepath.Join(home, "state"), Cache: filepath.Join(home, "cache")}
-	return Options{Directories: &dirs, Out: out, ErrOut: stderr, LookupEnv: func(key string) (string, bool) {
-		if key == "GO_CLI_STARTER_HOME" {
-			return home, true
-		}
-		return "", false
-	}, Dependencies: &Dependencies{LoadConfig: func(config.Options) (config.Config, error) {
-		cfg := config.Defaults()
-		cfg.Logging.Output = "none"
-		return cfg, nil
-	}}}
-}
 func FuzzArgv(f *testing.F) {
 	for _, seed := range []struct {
 		args   []string
@@ -86,37 +66,4 @@ func FuzzArgv(f *testing.F) {
 			t.Fatalf("隔离注入仍产生状态：%v", entries)
 		}
 	})
-}
-func TestArgvCancellationReturns130(t *testing.T) {
-	home := t.TempDir()
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
-	var out, stderr bytes.Buffer
-	if code := Run(ctx, []string{"greet", "--name", "你好"}, isolatedOptions(home, &out, &stderr)); code != 130 {
-		t.Fatalf("取消退出码=%d", code)
-	}
-	if out.Len() != 0 || stderr.Len() == 0 {
-		t.Fatalf("取消输出不满足约定：stdout=%q stderr=%q", out.String(), stderr.String())
-	}
-}
-func BenchmarkBuildRoot(b *testing.B) {
-	opts := isolatedOptions(b.TempDir(), io.Discard, io.Discard)
-	b.ReportAllocs()
-	b.ResetTimer()
-	for b.Loop() {
-		if _, _, err := buildRoot(opts, locales.LoadBundle); err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-func BenchmarkRunGreet(b *testing.B) {
-	opts := isolatedOptions(b.TempDir(), io.Discard, io.Discard)
-	args := []string{"greet", "--name", "Codex", "--json"}
-	b.ReportAllocs()
-	b.ResetTimer()
-	for b.Loop() {
-		if code := Run(b.Context(), args, opts); code != 0 {
-			b.Fatalf("退出码=%d", code)
-		}
-	}
 }

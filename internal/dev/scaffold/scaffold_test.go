@@ -5,44 +5,84 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
-func fixture(t *testing.T) string {
-	t.Helper()
-	root := t.TempDir()
-	files := map[string]string{
-		"go.mod":                           "module github.com/zhYou/go-cli-starter\n\ngo 1.27.0\n",
-		"cmd/" + TemplateName + "/main.go": "package main\nconst appName = \"go-cli-starter\"\nfunc main() {}\n",
-		"README.md":                        "go-cli-starter github.com/zhYou/go-cli-starter GO_CLI_STARTER_LOG_LEVEL\n",
-		"user.txt":                         "go-cli-starter\n",
-	}
-	for name, content := range files {
-		//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
-		if err := os.MkdirAll(filepath.Dir(filepath.Join(root, name)), 0755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	return root
+func TestInitializeMovesCommandDirectory(t *testing.T) {
+	root := projectFixture(t, TemplateModule, TemplateName)
+	source := `package main
+import _ "` + TemplateModule + `/internal/app/cli"
+const appName = "` + TemplateName + `"
+func main() {}
+`
+	//nolint:gosec // G306：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
+	require.NoError(t, os.WriteFile(filepath.Join(root, "cmd", TemplateName, "main.go"), []byte(source), 0640))
+	changed, err := Initialize(root, "example.com/team/repository", "my-cli")
+	require.NoError(t, err)
+	require.NotEmpty(t, changed)
+	project, err := Inspect(root)
+	require.NoError(t, err)
+	require.Equal(t, Project{"example.com/team/repository", "my-cli", "cmd/my-cli"}, project)
+	require.NoDirExists(t, filepath.Join(root, "cmd", TemplateName))
+	//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
+	data, err := os.ReadFile(filepath.Join(root, "cmd/my-cli/main.go"))
+	require.NoError(t, err)
+	require.Contains(t, string(data), "example.com/team/repository/internal/app/cli")
+	changed, err = Initialize(root, "example.com/team/repository", "my-cli")
+	require.NoError(t, err)
+	require.Empty(t, changed)
 }
 
-func read(t *testing.T, root, name string) string {
-	t.Helper()
-	if name == "main.go" {
-		matches, err := filepath.Glob(filepath.Join(root, "cmd", "*", "main.go"))
-		if err != nil || len(matches) != 1 {
-			t.Fatalf("查找测试入口失败：%v %v", matches, err)
-		}
-		name, _ = filepath.Rel(root, matches[0])
+func TestInitializeSameNameDoesNotMove(t *testing.T) {
+	root := projectFixture(t, TemplateModule, TemplateName)
+	_, err := Initialize(root, "example.com/team/repository", TemplateName)
+	require.NoError(t, err)
+	require.FileExists(t, filepath.Join(root, "cmd", TemplateName, "main.go"))
+	changed, err := Initialize(root, "example.com/team/repository", TemplateName)
+	require.NoError(t, err)
+	require.Empty(t, changed)
+}
+
+func TestInitializeRejectsGoVersionNamesBeforeWriting(t *testing.T) {
+	for _, name := range []string{"v2", "v10", "v999999999999999999999999999999999999999"} {
+		t.Run(name, func(t *testing.T) {
+			root := projectFixture(t, TemplateModule, TemplateName)
+			//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
+			before, err := os.ReadFile(filepath.Join(root, "go.mod"))
+			require.NoError(t, err)
+			_, err = Initialize(root, "example.com/tool", name)
+			require.Error(t, err)
+			//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
+			after, err := os.ReadFile(filepath.Join(root, "go.mod"))
+			require.NoError(t, err)
+			require.Equal(t, before, after)
+			require.NoDirExists(t, filepath.Join(root, "cmd", name))
+		})
 	}
-	//nolint:gosec // G304：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
-	data, err := os.ReadFile(filepath.Join(root, name))
-	if err != nil {
-		t.Fatal(err)
+}
+
+func TestInitializeAcceptanceIdentityWhitelist(t *testing.T) {
+	root := projectFixture(t, TemplateModule, TemplateName)
+	for _, name := range []string{"tools/dev/acceptance.go", "tools/dev/release_install.go"} {
+		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(root, name)), 0700))
+		content := "package main\nimport _ \"" + TemplateModule + "/internal/base/paths\"\n"
+		require.NoError(t, os.WriteFile(filepath.Join(root, name), []byte(content), 0600))
 	}
-	return string(data)
+	unknown := filepath.Join(root, "user.toml")
+	require.NoError(t, os.WriteFile(unknown, []byte("name = \""+TemplateName+"\""), 0600))
+	_, err := Initialize(root, "example.com/team/mycli", "mycli")
+	require.NoError(t, err)
+	for _, name := range []string{"tools/dev/acceptance.go", "tools/dev/release_install.go"} {
+		//nolint:gosec // G304：仅读取本测试的临时 fixture。
+		data, err := os.ReadFile(filepath.Join(root, name))
+		require.NoError(t, err)
+		require.Contains(t, string(data), "example.com/team/mycli/internal/base/paths")
+	}
+	//nolint:gosec // G304：仅读取本测试临时目录中的未知文件。
+	data, err := os.ReadFile(unknown)
+	require.NoError(t, err)
+	require.Contains(t, string(data), TemplateName)
 }
 
 func TestInitializeRewritesOnlyTemplateFiles(t *testing.T) {

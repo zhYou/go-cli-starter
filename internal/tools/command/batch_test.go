@@ -2,7 +2,9 @@ package command
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -95,17 +97,6 @@ func TestBatchFirstCauseSurvivesCleanup(t *testing.T) {
 		})
 	}
 }
-func waitMarker(t *testing.T, path string) {
-	t.Helper()
-	limit := time.Now().Add(3 * time.Second)
-	for time.Now().Before(limit) {
-		if _, err := os.Stat(path); err == nil {
-			return
-		}
-		time.Sleep(time.Millisecond)
-	}
-	t.Fatalf("未出现进程同步标记 %s", path)
-}
 
 // 一纳秒期限在构造子 context 时已到期，直接覆盖拿到名额但尚未进入 Run 的路径。
 func TestBatchImmediateItemDeadlineIsNotSkipped(t *testing.T) {
@@ -146,5 +137,127 @@ func TestBatchImmediateItemDeadlineIsNotSkipped(t *testing.T) {
 		if results[0].Status != Skipped || !errors.Is(results[0].Err, parent.Err()) || !errors.Is(err, parent.Err()) {
 			t.Fatalf("父先取消应 skipped: %v %+v", err, results)
 		}
+	}
+}
+
+func TestBatchOrderCollectAllAndTimeoutClassification(t *testing.T) {
+	first, options := helper(t, "sleep", "140ms", "first")
+	second := first
+	second.Args = append([]string(nil), first.Args...)
+	second.Args[len(second.Args)-1] = "second"
+	failed := first
+	failed.Args = []string{"-test.run=^TestHelperProcess$", "--", "exit"}
+	items := []Invocation{first, failed, second}
+	results, err := RunBatch(t.Context(), items, options, BatchOptions{Concurrency: 1, ItemTimeout: 200 * time.Millisecond})
+	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("整体分类 %v", err)
+	}
+	if string(results[0].Stdout) != "first" || results[1].ExitCode != 7 || string(results[2].Stdout) != "second" {
+		t.Fatalf("顺序 %+v", results)
+	}
+	results, err = RunBatch(t.Context(), []Invocation{first}, options, BatchOptions{ItemTimeout: 10 * time.Millisecond})
+	if err == nil || errors.Is(err, context.DeadlineExceeded) || !errors.Is(results[0].Err, context.DeadlineExceeded) {
+		t.Fatalf("单项超时: %v %+v", err, results)
+	}
+}
+
+func TestBatchFailFastAndParentCancellation(t *testing.T) {
+	fail, options := helper(t, "exit")
+	sleep := fail
+	sleep.Args = []string{"-test.run=^TestHelperProcess$", "--", "sleep", "1m", "never"}
+	results, err := RunBatch(t.Context(), []Invocation{fail, sleep, sleep}, options, BatchOptions{Concurrency: 1, FailFast: true})
+	if err == nil || errors.Is(err, context.Canceled) || results[1].Status != Skipped || results[2].Status != Skipped {
+		t.Fatalf("fail-fast %v %+v", err, results)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	results, err = RunBatch(ctx, []Invocation{sleep, sleep}, options, BatchOptions{})
+	if !errors.Is(err, context.Canceled) || results[0].Status != Skipped || results[1].Status != Skipped {
+		t.Fatalf("父取消 %v %+v", err, results)
+	}
+}
+
+func TestBatchConcurrencyBound(t *testing.T) {
+	call, options := helper(t, "interval")
+	items := make([]Invocation, 6)
+	for i := range items {
+		items[i] = call
+		items[i].Args = append(append([]string{}, call.Args...), filepath.Join(options.Dir, fmt.Sprintf("ready-%d", i)), filepath.Join(options.Dir, fmt.Sprintf("gate-%d", i/2)))
+	}
+	done := startBatch(t, t.Context(), items, options, BatchOptions{Concurrency: 2})
+	for wave := 0; wave < 3; wave++ {
+		for slot := 0; slot < 2; slot++ {
+			waitMarker(t, filepath.Join(options.Dir, fmt.Sprintf("ready-%d", wave*2+slot)))
+		}
+		if err := os.WriteFile(filepath.Join(options.Dir, fmt.Sprintf("gate-%d", wave)), nil, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	result := awaitBatch(t, done)
+	if result.err != nil {
+		t.Fatal(result.err)
+	}
+	results := result.items
+	intervals := make([][2]int64, len(results))
+	for i, r := range results {
+		if err := json.Unmarshal(r.Stdout, &intervals[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	maxActive := 0
+	for _, period := range intervals {
+		active := 0
+		for _, other := range intervals {
+			if other[0] <= period[0] && period[0] < other[1] {
+				active++
+			}
+		}
+		if active > maxActive {
+			maxActive = active
+		}
+	}
+	if maxActive != 2 {
+		t.Fatalf("实际最大并发 %d", maxActive)
+	}
+}
+
+func TestConcurrentFailFastKeepsItemCauseOnly(t *testing.T) {
+	failure, options := helper(t, "gate-fail")
+	ready, gate := filepath.Join(options.Dir, "ready"), filepath.Join(options.Dir, "gate")
+	failureReady := filepath.Join(options.Dir, "failure-ready")
+	failure.Args = append(failure.Args, failureReady, gate)
+	sleeping := failure
+	sleeping.Args = []string{"-test.run=^TestHelperProcess$", "--", "ready-sleep", ready, "1m", "never"}
+	done := startBatch(t, t.Context(), []Invocation{sleeping, failure, sleeping}, options, BatchOptions{Concurrency: 2, FailFast: true})
+	waitMarker(t, ready)
+	waitMarker(t, failureReady)
+	if err := os.WriteFile(gate, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	result := awaitBatch(t, done)
+	results, err := result.items, result.err
+	var exit *exec.ExitError
+	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || !errors.As(err, &exit) || exit.ExitCode() != 7 {
+		t.Fatalf("整体错误 %v", err)
+	}
+	if results[0].Status != Canceled || !errors.Is(results[0].Err, context.Canceled) || results[1].Status != Failed || results[1].ExitCode != 7 || results[2].Status != Skipped {
+		t.Fatalf("派生取消 %+v", results)
+	}
+}
+
+func TestActiveParentCancelStopsQueueAndRetainsCause(t *testing.T) {
+	call, options := helper(t, "ready-sleep")
+	ready := filepath.Join(options.Dir, "ready")
+	call.Args = append(call.Args, ready, "1m", "never")
+	ctx, cancel := context.WithCancelCause(t.Context())
+	defer cancel(nil)
+	cause := errors.New("父调用终止")
+	done := startBatch(t, ctx, []Invocation{call, call, call}, options, BatchOptions{Concurrency: 1})
+	waitMarker(t, ready)
+	cancel(cause)
+	result := awaitBatch(t, done)
+	results, err := result.items, result.err
+	if !errors.Is(err, context.Canceled) || !errors.Is(err, cause) || results[0].Status != Canceled || !errors.Is(results[0].Err, cause) || results[1].Status != Skipped || results[2].Status != Skipped {
+		t.Fatalf("父取消 %v %+v", err, results)
 	}
 }
