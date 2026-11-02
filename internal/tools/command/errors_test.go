@@ -8,10 +8,13 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/zhYou/go-cli-starter/internal/base/fault"
 	"github.com/zhYou/go-cli-starter/internal/base/logging"
+	"github.com/zhYou/go-cli-starter/internal/base/messages"
 	"github.com/zhYou/go-cli-starter/internal/locales"
 )
 
@@ -75,45 +78,53 @@ func TestCommandErrorsHaveOwnedBilingualDefinitions(t *testing.T) {
 	}
 }
 
-func TestCommandLogsUseExplicitLanguageAndStableFields(t *testing.T) {
-	bundle, err := locales.LoadBundle()
-	if err != nil {
-		t.Fatal(err)
+func TestCommandDefaultLocalizerUsesCentralPluralMessages(t *testing.T) {
+	localizer := commandLocalizer(nil)
+	definition := fault.Definition{Code: "cli.shell_count", Kind: fault.Usage}
+	for _, tc := range []struct {
+		count int
+		want  string
+	}{
+		{1, "Expected at most one shell name, received 1 argument"},
+		{2, "Expected at most one shell name, received 2 arguments"},
+	} {
+		err := definition.New(fault.WithParams(fault.Params{"Count": tc.count}))
+		require.Equal(t, tc.want, localizer.Render(err))
 	}
-	for _, language := range []string{"zh-CN", "en", "default"} {
-		t.Run(language, func(t *testing.T) {
-			var sink bytes.Buffer
-			logger := logging.New(logging.RunInfo{}, logging.Options{Config: logging.Config{Level: "debug", Output: "stderr"}, Writer: &sink}, func(err error) { t.Error(err) })
-			call, options := helper(t, "bytes")
-			options.Logger = logger
-			if language != "default" {
-				options.Localizer = bundle.Localizer(language)
-			}
-			result := Capture(t.Context(), call, options, CaptureOptions{})
-			if result.Err != nil {
-				t.Fatal(result.Err)
-			}
-			lines := bytes.Split(bytes.TrimSpace(sink.Bytes()), []byte("\n"))
-			if len(lines) != 2 {
-				t.Fatalf("日志数量 %s", sink.Bytes())
-			}
-			var begin, end map[string]any
-			if err := json.Unmarshal(lines[0], &begin); err != nil {
-				t.Fatal(err)
-			}
-			if err := json.Unmarshal(lines[1], &end); err != nil {
-				t.Fatal(err)
-			}
-			wantBegin, wantEnd := "开始执行外部工具", "外部工具执行结束"
-			if language != "zh-CN" {
-				wantBegin, wantEnd = "External tool started", "External tool finished"
-			}
-			if begin["msg"] != wantBegin || end["msg"] != wantEnd {
-				t.Fatalf("工具日志语言未生效 %s", sink.Bytes())
-			}
-			if end["event"] != "tool_finished" || end["operation"] != "test.helper" || end["outcome"] != "success" || end["exit_code"] != float64(0) {
-				t.Fatalf("机器字段变化 %v", end)
-			}
-		})
-	}
+}
+
+func TestCommandBrokenDiagnosticsPreserveChildFailure(t *testing.T) {
+	bundle, err := messages.NewBundle(fstest.MapFS{"active.en.toml": {Data: []byte("[\"command.started\"]\nother = \"partial {{.Missing}}\"\n")}})
+	require.NoError(t, err)
+	var sink bytes.Buffer
+	logger := logging.New(logging.RunInfo{}, logging.Options{Config: logging.Config{Level: "debug", Output: "stderr"}, Writer: &sink}, func(err error) { t.Error(err) })
+	call, options := helper(t, "exit")
+	options.Logger, options.Localizer = logger, bundle.Localizer("en")
+	err = Run(t.Context(), call, options)
+	var exit *exec.ExitError
+	require.True(t, errors.As(err, &exit))
+	require.Equal(t, 7, exit.ExitCode())
+	lines := bytes.Split(bytes.TrimSpace(sink.Bytes()), []byte("\n"))
+	require.Len(t, lines, 2)
+	var start, finish map[string]any
+	require.NoError(t, json.Unmarshal(lines[0], &start))
+	require.NoError(t, json.Unmarshal(lines[1], &finish))
+	require.Equal(t, "Operation failed [command.started]", start["msg"])
+	require.Equal(t, "Operation failed [command.finished]", finish["msg"])
+	require.Equal(t, "failed", finish["outcome"])
+	require.Equal(t, float64(7), finish["exit_code"])
+	require.NotContains(t, sink.String(), "partial")
+}
+
+func TestCommandUninitializedLocalizerUsesEnglishFallback(t *testing.T) {
+	var sink bytes.Buffer
+	logger := logging.New(logging.RunInfo{}, logging.Options{Config: logging.Config{Level: "debug", Output: "stderr"}, Writer: &sink}, func(err error) { t.Error(err) })
+	call, options := helper(t, "exit")
+	options.Logger, options.Localizer = logger, &messages.Localizer{}
+	err := Run(t.Context(), call, options)
+	var exit *exec.ExitError
+	require.True(t, errors.As(err, &exit))
+	require.Equal(t, 7, exit.ExitCode())
+	require.Contains(t, sink.String(), "Operation failed [command.started]")
+	require.Contains(t, sink.String(), "Operation failed [command.finished]")
 }
