@@ -65,18 +65,31 @@ func reportDoctorProbes(out io.Writer, probes []doctorProbe, results []cmdexec.R
 				continue
 			}
 		}
-		if _, err := fmt.Fprintf(out, "通过：%s\n", strings.TrimSpace(probe.spec.Name+" "+probe.want)); err != nil {
+		version := probe.want
+		if probe.key == miseProgram {
+			version = ">= " + version
+		}
+		if _, err := fmt.Fprintf(out, "通过：%s\n", strings.TrimSpace(probe.spec.Name+" "+version)); err != nil {
 			problems = append(problems, err)
 		}
 	}
 	return errors.Join(problems...)
 }
 func doctor(agent bool) error {
-	versions, err := loadVersions(".")
+	versions, err := loadVersions(".", agent)
 	if err != nil {
 		return err
 	}
-	probes := []doctorProbe{{spec: toolSpec{Name: gitProgram, Args: []string{versionFlag}}}}
+	miseSpec, err := versionTool(miseProgram)
+	if err != nil {
+		return err
+	}
+	probes := []doctorProbe{{key: miseProgram, want: versions.MiseMinimum, spec: miseSpec}, {spec: toolSpec{Name: gitProgram, Args: []string{versionFlag}}}}
+	if agent {
+		for _, name := range []string{"gh", "codex"} {
+			probes = append(probes, doctorProbe{spec: toolSpec{Name: name, Args: []string{versionFlag}}})
+		}
+	}
 	for _, key := range sortedTools(versions) {
 		spec, err := versionTool(key)
 		if err != nil {
@@ -113,12 +126,12 @@ func doctor(agent bool) error {
 	}
 	err = reportDoctorProbes(os.Stdout, probes, results)
 	if agent {
-		optional := []cmdexec.Invocation{{Program: "codex", Args: []string{versionFlag}}, {Program: "rtk", Args: []string{versionFlag}}}
-		for i, result := range runDoctorProbes(context.Background(), optional) {
-			if problem := doctorProbeError(optional[i].Program, result); problem != nil {
+		optional := cmdexec.Invocation{Program: "rtk", Args: []string{versionFlag}}
+		for _, result := range runDoctorProbes(context.Background(), []cmdexec.Invocation{optional}) {
+			if problem := doctorProbeError(optional.Program, result); problem != nil {
 				fmt.Printf("可选工具：%v\n", problem)
 			} else {
-				fmt.Printf("用户工具：%s：%s\n", optional[i].Program, result.Stdout)
+				fmt.Printf("用户工具：%s：%s\n", optional.Program, result.Stdout)
 			}
 		}
 		fmt.Println("用户工具：superpowers，请确认用户级技能在 Codex 中可用，项目不限定安装路径。")

@@ -74,7 +74,7 @@
    schema_version 仍为 1，12 项机器快照差异为各命令 lang 与 info 默认值；
    TOML、日志落盘和路径另有手工迁移。应用 v0.1.0→v0.2.0 是兼容决策，本次不创建发布标签。
    模板来源记录和初始化事务格式不因分层迁移升级，不运行 init 覆盖业务。
-7. 暂存移动及新增文件，显式 setup/doctor 后运行 fmt、check、race；涉及 MCP 时运行 mcp:check。
+7. 暂存移动及新增文件，显式 setup/doctor 后运行 fmt、check、race；涉及 MCP 时先 setup:agent，再运行 mcp:check。
    提交最终源码后重新 snapshot 与 release:verify，核对六归档、TOML、SPDX、最终摘要及宿主安装。
    macOS/Windows 运行行为以对应原生 CI 为准。记录采用的模板版本与提交，保留来源历史和个人配置外置。
 

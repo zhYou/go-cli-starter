@@ -15,11 +15,19 @@
 `text=auto eol=lf` 约束 Git 提交和检出，包括 Windows；二进制文件由 Git 自动识别。
 调整换行规则时，确认工作区只有本次修改，再执行 `git add --renormalize .`，审查差异后提交。
 
-首次使用及锁变更后显式运行 `mise run setup`，然后运行 `mise run doctor`。
-setup 只安装项目声明的锁定工具、下载模块，不更新锁。普通任务与 exec 的自动安装均关闭，
+首次使用及工具版本或 Go 模块变更后显式运行 `mise run setup`，然后运行 `mise run doctor`。
+setup 只按显式清单安装开发工具并下载模块。智能体开发使用 `setup:agent`，它先完成 setup，
+再安装智能体辅助工具。普通任务与 exec 的自动安装均关闭，
 `GOTOOLCHAIN=local` 禁止 Go 隐式下载工具链。缺工具应报错，检查不能兼任安装、升级或修复。
-Codex、RTK、superpowers 复用用户级安装；模型、认证、权限和插件偏好不进入仓库。
-基础检查无需这些可选智能体工具。`doctor:agent` 只附加报告，加载技能以实际会话列表为准。
+预装层包括 mise、git、gh、Codex、RTK、superpowers，由用户维护；模型、认证、权限和插件偏好不进入仓库。
+开发层由 `mise.toml` 声明 Go、golangci-lint、GoReleaser、govulncheck、Syft；
+智能体辅助层由 `mise.agent.toml` 声明 gopls，显式选择 agent 环境才加载。
+doctor 检查 mise 最低版本、git 和开发层准确版本；doctor:agent 额外要求 gh、Codex、gopls 可用，
+RTK 仅报告状态，superpowers 以实际会话技能列表为准。gh、Codex、RTK 只检查可运行性，不检查认证或固定版本。
+基础检查无需智能体配套；CI 的独立 agent-mcp job 运行 setup:agent 和 mcp:check，无需这些预装智能体工具。
+
+项目设置 `lockfile = false`，不维护 mise 锁文件。准确版本仍由 TOML 声明，安装时由后端解析下载来源并执行其校验，
+不再预先保存六平台工具下载 URL 和 SHA-256。Go 模块继续使用 go.sum；运行时系统锁与此无关，不可删除。
 
 ## 目录和依赖
 
@@ -42,7 +50,7 @@ base 不依赖 app、tools、dev 或 Cobra。领域码及结果由所属模块�
 ## 实现与检查
 
 1. 查阅设计指南对应场景，用 gopls 查询 Go 符号、引用和诊断，确认工作区是实际 checkout。
-   先通过 `mise exec -- gopls mcp -instructions` 阅读说明。普通操作按需使用等价 CLI，不机械调用工具填清单。
+   先通过 `mise -E agent exec -- gopls mcp -instructions` 阅读说明。普通操作按需使用等价 CLI，不机械调用工具填清单。
 2. 参照 greet 分离有类型业务选项、结果及 Validate。CLI 的 Args、必填及组合校验在读取配置和创建资源前完成，
    业务入口也调用同一校验。新命令补双语帮助、示例和结果注册，不新增交互输入。
 3. 新配置同步模块 Config、defaults、环境映射、TOML、校验和测试，并使用统一加载入口。
@@ -150,19 +158,21 @@ check 不改写源码，但会使用 Go 缓存、临时文件和 bin 产物。
 旧项目迁移与事务恢复见[模板升级](template-upgrades.md)，初始化不承担升级。
 
 升级选择官方最新 LTS 补丁，无 LTS 则最新稳定版，排除预发布；先查 Go、gopls、golangci-lint 兼容性。
-同步 mise.toml、mise.lock、Go 声明、doctor 预期、README 受检工具表及 CI 引导，再执行：
+同步 mise.toml、mise.agent.toml、Go 声明、doctor 预期、README 受检工具表及 CI 引导，再执行：
 
 ```sh
-mise lock --platform linux-x64,linux-arm64,macos-x64,macos-arm64,windows-x64,windows-arm64
 mise run setup
 mise run doctor
+mise run setup:agent
+mise run doctor:agent
 mise run versions:check
 ```
 
-随后按受影响范围运行 check、race、mcp:check 与 snapshot/verify。提交锁；二进制后端核验六平台
-归档，Go 后端锁同一模块版本、在各平台本地编译，不虚构平台归档记录。
+随后按受影响范围运行 check、race、mcp:check 与 snapshot/verify。提交两份准确版本声明，
+通过原生 CI 和六目标发布构建验证平台支持；gopls 等 Go 后端从固定模块版本在宿主平台编译。
 README 的 tool-versions 标记与工具显示标签由 versions:check 解析，修改表格时保留它们。
-Renovate 由管理员启用，权限不足时人工补齐锁，不放宽检查。用户级可选工具通过各自渠道维护。
+Renovate 由管理员启用，覆盖两份 mise 配置；权限不足时人工更新版本声明并完成检查，不放宽检查。
+预装工具通过各自渠道维护，项目 setup 不安装或更新它们。
 
 ## 安装发布程序
 
