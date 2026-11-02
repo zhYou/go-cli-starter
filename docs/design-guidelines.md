@@ -158,7 +158,7 @@ Text/Render 仅用于安全诊断兜底，不能凭非空字符串判断渲染�
 zh-CN 是中文、zh 是别名，不从 OS 区域推断。稳定命令、选项、JSON 字段、错误码和状态枚举不翻译；
 第三方错误叶子保留原文。Help、version、completion、schema 在坏配置下仍可运行，不创建诊断目录。
 
-退出码为成功 0、运行/配置 1、调用无效 2、调用者取消 130。stdout 只提交成功结果；
+退出码为成功 0、运行/配置 1、调用无效 2、调用者取消 130。stdout 只提交成功结果；doctor 的已完成失败报告例外，见“扩展 doctor”。
 `--json` 为一个文档，序列化失败保持空输出，底层写失败可能留下部分字节。消费方先检查退出码。
 错误和告警写 stderr；日志按独立出口写入。库依据：
 [Go errors](https://pkg.go.dev/errors@go1.27.3)、
@@ -272,3 +272,17 @@ CommandContext 默认取消单个进程，并不承诺清理整棵树；errgroup
 检查只检查，安装由 setup 显式完成。固定工具表、18 lint、2 formatter 与规则 fixture 的运行入口见
 [开发说明](development.md)；平台运行证据、发布摘要与托管设置见[维护清单](maintenance.md)。
 Serena 和 Graphify 尚未集成，范围仅在带 `backlog` 标签的 GitHub Issues，不能作为开发前置依赖。
+
+## 扩展 doctor
+
+`internal/app/doctor.Run` 是空检查入口，CLI 通过 `Dependencies.Doctor` 注入。
+添加检查时维护有类型的 Options 和 Check，校验在副作用前完成；不要把开发工具清单作为产品依赖。
+当前空实现不加载配置或创建诊断资源。需要这些资源的真实检查须按 Session 所有权规则显式接入。
+
+Result 的 checks 始终编码为数组。RequiredAvailable 表示所有必需检查均可用；可选失败不能将它改为 false。
+检查项的 name、status、required 是机器接口，detail 提供当前语言说明。已完成的负向报告返回 Result、nil，
+将 RequiredAvailable 置 false；CLI 完整渲染后输出并返回 1，不附加重复错误。
+未能完成检查则返回 error，CLI 保持 stdout 为空并按已有规则报告；取消返回 130。
+
+帮助、示例和 shell 子命令沿用具体命令对象绑定集中目录。补全请求仅消费有效的完整语言参数，
+未完成参数使用有效环境或 en 兜底；普通调用仍严格校验。补全不读取应用配置、不创建诊断资源。

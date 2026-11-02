@@ -307,3 +307,15 @@ other = "Generate {{.Shell}} completion scripts"
 
 ["cli.completion_shell_example"]
 other = "  {{.Name}} completion {{.Shell}} > {{.File}}"
+
+["cli.doctor"]
+other = "Report application checks (empty extension point)"
+
+["cli.doctor_example"]
+other = "  {{.Name}} doctor\n  {{.Name}} doctor --json"
+
+["doctor.empty"]
+other = "No checks configured."
+
+["doctor.check"]
+other = "{{.Name}} {{.Status}} {{.Detail}}"

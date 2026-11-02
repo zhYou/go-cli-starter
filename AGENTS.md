@@ -67,7 +67,8 @@
 - 命令仅凭参数完成运行，缺少输入立即失败。不添加交互提示、自动分页、进度动画或默认 TUI。
   Args、必填/组合 flag 校验在配置读取与资源创建前完成；业务直接调用也校验同一选项。
 - 默认文本，`--json` 向 stdout 写一个完整渲染的 JSON 文档；执行或序列化失败时 stdout 为空。
-  底层写失败可能留下部分字节，消费方先检查退出码。错误与告警写 stderr；日志默认 info/file，
+  底层写失败可能留下部分字节，消费方先检查退出码。doctor 已完成检查但必需项失败时，
+  stdout 保留完整报告并返回 1；执行或渲染失败仍为空 stdout。错误与告警写 stderr；日志默认 info/file，
   可显式选择 stderr 或 none。帮助是文本，补全是原生脚本，schema 始终是 JSON。
 - CLI 语言按 `--lang` > `<PREFIX>_LANG` > en，zh-CN 为中文、zh 为别名，不读取系统区域。
   每语言在 `internal/locales/` 维护一份集中 TOML，双语消息 ID 和参数同次更新；冻结共享 Bundle，

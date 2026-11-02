@@ -306,3 +306,15 @@ other = "生成 {{.Shell}} 自动补全脚本"
 
 ["cli.completion_shell_example"]
 other = "  {{.Name}} completion {{.Shell}} > {{.File}}"
+
+["cli.doctor"]
+other = "报告应用检查结果（待扩展入口）"
+
+["cli.doctor_example"]
+other = "  {{.Name}} doctor\n  {{.Name}} doctor --json"
+
+["doctor.empty"]
+other = "尚未配置检查。"
+
+["doctor.check"]
+other = "{{.Name}} {{.Status}} {{.Detail}}"

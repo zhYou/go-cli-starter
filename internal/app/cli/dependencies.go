@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/zhYou/go-cli-starter/internal/app/config"
+	"github.com/zhYou/go-cli-starter/internal/app/doctor"
 	"github.com/zhYou/go-cli-starter/internal/app/greeting"
 	"github.com/zhYou/go-cli-starter/internal/app/session"
 	"github.com/zhYou/go-cli-starter/internal/base/logging"
@@ -14,6 +15,7 @@ import (
 // Dependencies 描述命令依赖；构造时复制并补齐默认值，不修改调用者对象。
 type Dependencies struct {
 	LoadConfig func(config.Options) (config.Config, error)
+	Doctor     func(context.Context, doctor.Options) (doctor.Result, error)
 	Validator  *validation.Validator
 	Greet      func(context.Context, greeting.Options) (greeting.Result, error)
 	NewLogger  func(logging.RunInfo, logging.Options, func(error)) *logging.Logger
@@ -25,6 +27,7 @@ type invocation struct {
 	commandTexts         []commandTextBinding
 	flagTexts            []flagTextBinding
 	helpErr              error
+	reportExitCode       int
 	results              resultRegistry
 	asJSON               bool
 	configPath, logLevel string
@@ -43,6 +46,9 @@ func newInvocation(provided *Dependencies) *invocation {
 	}
 	if deps.LoadConfig == nil {
 		deps.LoadConfig = config.Load
+	}
+	if deps.Doctor == nil {
+		deps.Doctor = doctor.Run
 	}
 	if deps.Greet == nil {
 		deps.Greet = greeting.New(deps.Validator).Run

@@ -73,7 +73,7 @@ func run(ctx context.Context, args []string, opts Options, loadBundle func() (*m
 	err = classifyExecutionError(err)
 	executionErr = err
 	if err == nil {
-		return 0
+		return call.reportExitCode
 	}
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		message := call.localizer.Text("cli.cancelled", nil)
@@ -161,7 +161,9 @@ func buildRoot(opts Options, loadBundle func() (*messages.Bundle, error), args .
 	version := newVersionCommand(opts, call)
 	schema := newSchemaCommand(root, &call.results)
 	completion := newCompletionCommand(root, call, opts.Name)
-	root.AddCommand(greet, version, schema, completion)
+	doctorCommand := newDoctorCommand(call)
+	root.AddCommand(greet, version, schema, completion, doctorCommand)
+	call.bindCommand(doctorCommand, commandTexts{short: message("cli.doctor"), example: textMessage{id: "cli.doctor_example", params: map[string]any{paramName: opts.Name}}})
 	call.bindCommand(root, commandTexts{example: textMessage{id: "cli.root_example", params: map[string]any{paramName: opts.Name}}, short: message("cli.root")})
 	call.bindCommand(help, commandTexts{example: textMessage{id: "cli.help_example", params: map[string]any{paramName: opts.Name}}, short: message("cli.help"), use: message("cli.help_use")})
 	call.bindCommand(greet, commandTexts{short: message("cli.greet"), use: message("cli.greet_use"), example: textMessage{id: "cli.greet_example", params: map[string]any{paramName: opts.Name}}})

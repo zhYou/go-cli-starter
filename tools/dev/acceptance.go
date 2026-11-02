@@ -89,6 +89,29 @@ func verifyExecutable(executable, dir, name, example, version, commit string) er
 		}
 		baseline = normalized
 	}
+	// 空 doctor 与补全帮助在改名后的真实二进制中也必须可发现。
+	stdout, stderr, err = run(nil, doctorCommand, jsonFlag)
+	var report struct {
+		RequiredAvailable bool  `json:"required_available"`
+		Checks            []any `json:"checks"`
+	}
+	if err != nil || len(stderr) != 0 {
+		return errors.Join(fmt.Errorf("doctor 空报告验收失败：%s", stderr), err)
+	}
+	if err := json.Unmarshal(stdout, &report); err != nil {
+		return err
+	}
+	if !report.RequiredAvailable || report.Checks == nil || len(report.Checks) != 0 {
+		return fmt.Errorf("doctor 空报告不符合契约：%s", stdout)
+	}
+	stdout, stderr, err = run(nil, "help", "completion", "bash")
+	if err != nil || len(stderr) != 0 || !bytes.Contains(stdout, []byte(name+" completion bash")) {
+		return errors.Join(fmt.Errorf("补全专属帮助验收失败：%s", stderr), err)
+	}
+	stdout, stderr, err = run(nil, "__complete", "--lang", "")
+	if err != nil || len(stderr) != 0 || !bytes.Contains(stdout, []byte("en\n")) || !bytes.Contains(stdout, []byte(":4\n")) {
+		return errors.Join(fmt.Errorf("语言补全验收失败：%s", stderr), err)
+	}
 	// 发现命令不得创建诊断目录。
 	entries, err := os.ReadDir(home)
 	if err != nil {

@@ -62,6 +62,8 @@ go install github.com/zhYou/go-cli-starter/cmd/go-cli-starter@latest
 ./bin/go-cli-starter --help
 ./bin/go-cli-starter schema
 ./bin/go-cli-starter schema greet
+./bin/go-cli-starter doctor --json
+./bin/go-cli-starter help completion bash
 GO_CLI_STARTER_HOME="$(mktemp -d)" ./bin/go-cli-starter greet --name Codex --json
 ./bin/go-cli-starter version --json
 ```
@@ -73,9 +75,9 @@ GO_CLI_STARTER_HOME="$(mktemp -d)" ./bin/go-cli-starter greet --name Codex --jso
 ```
 
 - 默认文本；`--json` 不随终端环境改变，也不由配置或环境变量隐式开启。
-- 成功结果写 stdout，错误和诊断告警写 stderr；日志默认写应用私有状态目录，显式配置后可写 stderr。执行或序列化失败时 stdout 为空，错误输出为文本。底层写入失败可能留下部分字节，消费方须先检查退出码。
+- 成功结果写 stdout，错误和诊断告警写 stderr；日志默认写应用私有状态目录，显式配置后可写 stderr。执行或序列化失败时 stdout 为空，错误输出为文本。doctor 的已完成失败报告例外，见下文。底层写入失败可能留下部分字节，消费方须先检查退出码。
 - 缺少必需参数直接失败。
-- `schema [命令路径...]` 总是输出 JSON，包含命令树、用法、示例、参数类型、必填标记、默认值和退出码。greet/version 的 result_schema 公开 Draft 2020-12 结果结构。消费方应忽略新增字段；配置文件仍拒绝未知键。
+- `schema [命令路径...]` 总是输出 JSON，包含命令树、用法、示例、参数类型、必填标记、默认值和退出码。greet/version/doctor 的 result_schema 公开 Draft 2020-12 结果结构。消费方应忽略新增字段；配置文件仍拒绝未知键。
 - 帮助输出文本，补全输出 shell 脚本；它们不受 `--json` 影响。
 - 检查退出状态后再解析 JSON。测试真实退出码时使用构建后的程序；`go run` 会包装非零退出码。
 
@@ -85,6 +87,27 @@ GO_CLI_STARTER_HOME="$(mktemp -d)" ./bin/go-cli-starter greet --name Codex --jso
 | 1 | 运行或配置错误 |
 | 2 | 命令或参数错误 |
 | 130 | 信号或 context 取消 |
+
+## doctor 与 shell 补全
+
+`doctor` 是供派生项目扩展的空入口：默认文本说明尚未配置检查，`--json` 返回
+`{"required_available":true,"checks":[]}`，退出码为 0。它不探测开发工具、不读取应用配置、
+不创建日志或 Trace。开发环境检查继续使用 `mise run doctor` 和 `doctor:agent`。
+
+扩展后，已完成检查但必需项不可用时，doctor 仍输出完整报告并返回 1；可选项失败不影响整体成功。
+执行或渲染失败仍保持 stdout 为空，写入失败可能留下部分字节。消费方须先检查退出码，再解析报告。
+
+`completion bash|zsh|fish|powershell` 生成对应 shell 的脚本，各 shell 都是独立子命令：
+`help completion bash` 和 `schema completion bash` 可查看专属帮助和元数据。
+帮助包含双语示例；语言、日志级别和多级 help 主题支持候选补全。
+
+Bash 先加载系统已有的 bash-completion，再加载生成脚本；其他 shell 按其标准方式加载脚本。
+CLI 只输出脚本，不自动安装或修改 shell 配置。真实使用示例：
+
+```sh
+./bin/go-cli-starter completion bash > go-cli-starter.bash
+source ./go-cli-starter.bash
+```
 
 ## 配置、语言和诊断
 
