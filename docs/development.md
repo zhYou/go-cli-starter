@@ -71,6 +71,31 @@ Session 关闭顺序、借用资源和永久阻塞 IO 的边界见设计指南�
 需要对应 OS 原生 helper；交叉编译不证明运行、取消或句柄回收成功。CI 配置了三 OS 原生测试，
 报告交付结果时以实际 job 结果为准，不把配置存在写成验收完成。
 
+## 测试组织与可靠性
+
+单个源码文件的单元测试尽量放入同名 `*_test.go`；跨文件契约使用清晰的行为名，
+例如 `process_tree_test.go`、`stderr_test.go`。无需为常量文件创建空测试，也不为文件名对应拆分生产源码。
+多处使用的 fixture 放在所属包的 `helpers_test.go`，平台专用 helper 保留 `_windows_test.go` 等后缀。
+单处使用的测试类型就近保留；真实配置加载与注入 stub 的 fixture 各自保持原有边界。
+`fuzz_test.go` 维护 fuzz 入口和 seeds，`benchmark_test.go` 维护 benchmark，普通行为测试按实现归位。
+
+集中消息目录损坏场景由 `test/integration/catalog_test.go` 使用 Go overlay 运行 greeting、Session 和
+command 三个包的 `TestCorruptCatalogProcess`。完整测试会执行该集成入口；单独运行所属包时，
+这些 worker 会明确跳过。可在隔离应用目录下单独验收：
+
+```sh
+test_home=$(mktemp -d)
+GO_CLI_STARTER_HOME="$test_home" mise exec -- go test ./test/integration -run '^TestCorruptCatalogEndToEnd$' -count=1
+```
+
+进程启动、取消和并发先后使用就绪、释放信号协调，并为等待设置截止时间。资源取得后立即登记清理；
+断言中途失败也释放阻塞、取消工作，并等待子进程和 goroutine 收尾。直接子进程由唯一调用方完成 Wait。
+心跳检查验证观察期内的写入行为，进程退出和句柄回收使用相应平台的原生测试证据。
+时间本身属于被测行为的超时、排空宽限和观察窗口可以保留。
+
+检查成功、失败和取消时同时核对状态、退出码及错误链；根进程成功退出而后代持有管道的场景，
+明确验证 `exec.ErrWaitDelay` 的既有边界。事件顺序断言先确认事件存在，无状态场景同时核对预期退出码。
+
 ## 静态规则与开发探测
 
 `mise run lint` 启用以下 18 项，生产导出 API 需中文 GoDoc；测试仅豁免 GoDoc，其他边界仍生效：
