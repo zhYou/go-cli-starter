@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -42,7 +44,16 @@ func TestMainSignalCancellation(t *testing.T) {
 	defer cancel()
 	//nolint:gosec // G204：测试只运行当前测试二进制或固定 Git/Go 命令，参数来自临时 fixture。
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestSignalHelper$")
-	cmd.Env = append(os.Environ(), "CLI_SIGNAL_HELPER=1", paths.EnvPrefix(appName)+"_HOME="+t.TempDir(), paths.EnvPrefix(appName)+"_LANG=")
+
+	prefix := paths.EnvPrefix(appName) + "_"
+	var environment []string
+	for _, entry := range os.Environ() {
+		if !strings.HasPrefix(strings.ToUpper(entry), prefix) {
+			environment = append(environment, entry)
+		}
+	}
+	cmd.Env = append(environment, "CLI_SIGNAL_HELPER=1", prefix+"HOME="+t.TempDir())
+	cmd.WaitDelay = time.Second
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	stderr, err := cmd.StderrPipe()
@@ -50,9 +61,24 @@ func TestMainSignalCancellation(t *testing.T) {
 	stdin, err := cmd.StdinPipe()
 	require.NoError(t, err)
 	require.NoError(t, cmd.Start())
+	readDone := make(chan struct{})
+	var waitOnce sync.Once
+	var waitErr error
+	waitChild := func() error { waitOnce.Do(func() { waitErr = cmd.Wait() }); return waitErr }
+	t.Cleanup(func() {
+		cancel()
+		_ = stdin.Close()
+		_ = cmd.Process.Kill()
+		_ = waitChild()
+		select {
+		case <-readDone:
+		case <-time.After(time.Second):
+			t.Error("信号 helper 就绪读取未结束")
+		}
+	})
 	reader := bufio.NewReader(stderr)
 	ready := make(chan string, 1)
-	go func() { line, _ := reader.ReadString('\n'); ready <- line }()
+	go func() { defer close(readDone); line, _ := reader.ReadString('\n'); ready <- line }()
 	select {
 	case line := <-ready:
 		require.Equal(t, "就绪\n", line)
@@ -68,7 +94,7 @@ func TestMainSignalCancellation(t *testing.T) {
 	require.NoError(t, err)
 	rest, err := io.ReadAll(reader)
 	require.NoError(t, err)
-	err = cmd.Wait()
+	err = waitChild()
 	require.Error(t, err)
 	require.Equal(t, 130, cmd.ProcessState.ExitCode())
 	require.Empty(t, out.String())

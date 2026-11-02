@@ -2,6 +2,7 @@ package diagnostics
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -49,34 +50,36 @@ func TestProcessesProtectLiveRunAndReclaimKilledWriter(t *testing.T) {
 	base := t.TempDir()
 	exe, err := os.Executable()
 	require.NoError(t, err)
-	// #nosec G204 -- 仅执行当前测试二进制的专用子进程。
-	child := exec.CommandContext(t.Context(), exe, "-test.run=^TestDiagnosticLeaseHelper$")
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	//nolint:gosec // G204：仅执行当前测试二进制的专用子进程。
+	child := exec.CommandContext(ctx, exe, "-test.run=^TestDiagnosticLeaseHelper$")
+	child.WaitDelay = time.Second
 	child.Env = append(os.Environ(), helperRootEnv+"="+base)
 	input, err := child.StdinPipe()
 	require.NoError(t, err)
 	output, err := child.StdoutPipe()
 	require.NoError(t, err)
-	require.NoError(t, child.Start())
-	t.Cleanup(func() { _ = input.Close(); _ = child.Process.Kill(); _ = child.Wait() })
+	t.Cleanup(func() { _ = input.Close() })
+	waitChild := startDiagnosticProcess(t, child)
 	line, err := bufio.NewReader(output).ReadString('\n')
 	require.NoError(t, err)
 	path := strings.TrimSpace(line)
 	require.Equal(t, base, filepath.Dir(path))
-	var cleaners []*exec.Cmd
+	var cleaners []func() error
 	for range 3 {
 		// #nosec G204 -- 仅执行当前测试二进制的专用清理子进程。
-		cleaner := exec.CommandContext(t.Context(), exe, "-test.run=^TestDiagnosticCleanupHelper$")
+		cleaner := exec.CommandContext(ctx, exe, "-test.run=^TestDiagnosticCleanupHelper$")
 		cleaner.Env = append(os.Environ(), helperRootEnv+"="+base)
-		require.NoError(t, cleaner.Start())
-		cleaners = append(cleaners, cleaner)
+		cleaners = append(cleaners, startDiagnosticProcess(t, cleaner))
 	}
-	for _, cleaner := range cleaners {
-		require.NoError(t, cleaner.Wait())
+	for _, wait := range cleaners {
+		require.NoError(t, wait())
 	}
 	_, err = os.Stat(path)
 	require.NoError(t, err)
 	require.NoError(t, child.Process.Kill())
-	require.Error(t, child.Wait())
+	require.Error(t, waitChild())
 	cfg := Defaults()
 	cfg.RetentionDays = 0
 	cfg.MaxTotalSizeMiB = 1
@@ -161,17 +164,35 @@ func TestInterruptedCleanupDoesNotOrphanData(t *testing.T) {
 	require.NoError(t, writeMetadataPath(active.Path, metadata{Version: metadataVersion, ID: active.ID, Started: old, Finished: old}))
 	exe, err := os.Executable()
 	require.NoError(t, err)
-	// #nosec G204 -- 仅执行当前测试二进制的清理 helper。
-	child := exec.CommandContext(t.Context(), exe, "-test.run=^TestDiagnosticInterruptedCleanupHelper$")
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	//nolint:gosec // G204：仅执行当前测试二进制的专用子进程。
+	child := exec.CommandContext(ctx, exe, "-test.run=^TestDiagnosticInterruptedCleanupHelper$")
+	child.WaitDelay = time.Second
 	child.Env = append(os.Environ(), helperRootEnv+"="+base)
 	input, err := child.StdinPipe()
 	require.NoError(t, err)
 	output, err := child.StdoutPipe()
 	require.NoError(t, err)
-	require.NoError(t, child.Start())
-	t.Cleanup(func() { _ = input.Close(); _ = child.Process.Kill(); _ = child.Wait() })
+	t.Cleanup(func() { _ = input.Close() })
+	waitChild := startDiagnosticProcess(t, child)
 	ready := make(chan string, 1)
-	go func() { line, _ := bufio.NewReader(output).ReadString('\n'); ready <- strings.TrimSpace(line) }()
+	readDone := make(chan struct{})
+	go func() {
+		defer close(readDone)
+		line, _ := bufio.NewReader(output).ReadString('\n')
+		ready <- strings.TrimSpace(line)
+	}()
+	t.Cleanup(func() {
+		_ = input.Close()
+		_ = child.Process.Kill()
+		_ = waitChild()
+		select {
+		case <-readDone:
+		case <-time.After(time.Second):
+			t.Error("诊断 helper 就绪读取未结束")
+		}
+	})
 	var removed string
 	select {
 	case removed = <-ready:
@@ -191,7 +212,7 @@ func TestInterruptedCleanupDoesNotOrphanData(t *testing.T) {
 	}
 	require.Equal(t, 2, remaining, "中断前必须还剩两个真实数据文件")
 	require.NoError(t, child.Process.Kill())
-	require.Error(t, child.Wait())
+	require.Error(t, waitChild())
 	cfg.RetentionDays = 1
 	require.NoError(t, Cleanup(base, cfg))
 	require.NoDirExists(t, expired.Path)

@@ -3,58 +3,150 @@ package scaffold
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 )
 
-type faultFS struct {
+type cleanupFaultFS struct {
 	afero.Fs
-	rename func(string, string) error
+	root, point                          string
+	rollback, failedCleanup, failedApply bool
 }
 
-func (f faultFS) Rename(a, b string) error {
-	if f.rename != nil {
-		return f.rename(a, b)
+func (f *cleanupFaultFS) Rename(a, b string) error {
+	if f.rollback && !f.failedApply && b == filepath.Join(f.root, "cmd", TemplateName, "main.go") {
+		f.failedApply = true
+		return errors.New("模拟应用失败")
 	}
 	return f.Fs.Rename(a, b)
 }
-func memoryInitializer(t *testing.T) (*Initializer, string) {
-	t.Helper()
-	fs := afero.NewMemMapFs()
-	root, err := filepath.Abs(filepath.Join(t.TempDir(), "repo"))
-	require.NoError(t, err)
-	require.NoError(t, fs.MkdirAll(root, 0755))
-	for n, s := range map[string]string{"go.mod": "module " + TemplateModule + "\n\ngo 1.27.0\n", "cmd/" + TemplateName + "/main.go": "package main\nconst appName = \"" + TemplateName + "\"\nfunc main(){}\n", "README.md": TemplateName} {
-		require.NoError(t, fs.MkdirAll(filepath.Dir(filepath.Join(root, n)), 0755))
-		require.NoError(t, afero.WriteFile(fs, filepath.Join(root, n), []byte(s), 0600))
+
+func (f *cleanupFaultFS) Remove(path string) error {
+	dir := filepath.Join(f.root, journalDir)
+	match := false
+	switch f.point {
+	case "before":
+		match = path == filepath.Join(dir, "000000.before")
+	case "after":
+		match = path == filepath.Join(dir, "000000.after")
+	case "journal":
+		match = path == filepath.Join(dir, "journal.json")
+	case "directory":
+		match = path == dir
 	}
-	return &Initializer{FS: fs, RunCommand: func(context.Context, string, ...string) ([]byte, error) { return nil, nil }, Lock: func(string) (func() error, error) { return func() error { return nil }, nil }}, root
-}
-func crashedTransaction(t *testing.T) (*Initializer, string) {
-	t.Helper()
-	i, root := memoryInitializer(t)
-	base := i.FS
-	i.FS = faultFS{Fs: base, rename: func(a, b string) error {
-		err := base.Rename(a, b)
-		if err == nil && b == filepath.Join(root, "go.mod") {
-			panic("模拟进程中断")
+	if match && !f.failedCleanup {
+		f.failedCleanup = true
+		if f.point != "directory" {
+			if err := f.Fs.Remove(path); err != nil {
+				return err
+			}
 		}
-		return err
-	}}
-	require.Panics(t, func() {
-		_, err := i.Initialize(context.Background(), root, "example.com/tool", "tool")
-		require.NoError(t, err)
-	})
-	i.FS = base
-	return i, root
+		return errors.New("模拟部分清理后中断")
+	}
+	return f.Fs.Remove(path)
 }
+
+func (f *cleanupFaultFS) RemoveAll(path string) error {
+	if path == filepath.Join(f.root, journalDir) && !f.failedCleanup {
+		f.failedCleanup = true
+		suffix := "000000." + f.point
+		if f.point == "journal" {
+			suffix = "journal.json"
+		}
+		if f.point == "directory" {
+			if err := f.Fs.RemoveAll(path); err != nil {
+				return err
+			}
+			if err := f.Mkdir(path, 0700); err != nil {
+				return err
+			}
+		} else if err := f.Fs.Remove(filepath.Join(path, suffix)); err != nil {
+			return err
+		}
+		return errors.New("模拟部分清理后中断")
+	}
+	return f.Fs.RemoveAll(path)
+}
+
+func TestTerminalCleanupIsRetryable(t *testing.T) {
+	for _, outcome := range []string{"committed", "rolled-back"} {
+		for _, point := range []string{"before", "after", "journal", "directory"} {
+			t.Run(outcome+"/"+point, func(t *testing.T) {
+				i, root := memoryInitializer(t)
+				base := i.FS
+				fault := &cleanupFaultFS{Fs: base, root: root, point: point, rollback: outcome == "rolled-back"}
+				i.FS = fault
+				_, err := i.Initialize(context.Background(), root, "example.com/tool", "tool")
+				require.Error(t, err)
+				require.True(t, fault.failedCleanup)
+				mod, err := afero.ReadFile(base, filepath.Join(root, "go.mod"))
+				require.NoError(t, err)
+				if outcome == "committed" {
+					require.Contains(t, string(mod), "example.com/tool")
+				} else {
+					require.Contains(t, string(mod), TemplateModule)
+				}
+				i.FS = base
+				_, err = i.Initialize(context.Background(), root, "example.com/tool", "tool")
+				require.NoError(t, err)
+				mod, err = afero.ReadFile(base, filepath.Join(root, "go.mod"))
+				require.NoError(t, err)
+				require.True(t, strings.Contains(string(mod), "example.com/tool"))
+				ok, err := afero.Exists(base, filepath.Join(root, journalDir))
+				require.NoError(t, err)
+				require.False(t, ok)
+			})
+		}
+	}
+}
+
+func TestRecoveryRejectsInconsistentExistence(t *testing.T) {
+	for _, mode := range []string{"false", "missing", "null", "missing-mode"} {
+		t.Run(mode, func(t *testing.T) {
+			i, root := crashedTransaction(t)
+			path := filepath.Join(root, journalDir, "journal.json")
+			data, err := afero.ReadFile(i.FS, path)
+			require.NoError(t, err)
+			var doc map[string]any
+			require.NoError(t, json.Unmarshal(data, &doc))
+			file := doc["files"].([]any)[0].(map[string]any)
+			switch mode {
+			case "false":
+				file["existed"] = false
+			case "missing":
+				delete(file, "existed")
+			case "null":
+				file["existed"] = nil
+			case "missing-mode":
+				delete(file, "mode")
+			}
+			modified, err := json.Marshal(doc)
+			require.NoError(t, err)
+			require.NoError(t, afero.WriteFile(i.FS, path, modified, 0600))
+			before, err := afero.ReadFile(i.FS, filepath.Join(root, "go.mod"))
+			require.NoError(t, err)
+			_, err = i.Initialize(context.Background(), root, "example.com/tool", "tool")
+			require.Error(t, err)
+			after, err := afero.ReadFile(i.FS, filepath.Join(root, "go.mod"))
+			require.NoError(t, err)
+			require.Equal(t, before, after)
+			backup, err := afero.ReadFile(i.FS, filepath.Join(root, journalDir, "000000.before"))
+			require.NoError(t, err)
+			require.Contains(t, string(backup), TemplateModule)
+		})
+	}
+}
+
 func TestRecoverBeforeIdentityCheck(t *testing.T) {
 	i, root := crashedTransaction(t)
 	module, _ := afero.ReadFile(i.FS, filepath.Join(root, "go.mod"))
@@ -66,6 +158,7 @@ func TestRecoverBeforeIdentityCheck(t *testing.T) {
 	main, _ = afero.ReadFile(i.FS, filepath.Join(root, "cmd", "tool", "main.go"))
 	require.Contains(t, string(main), `"tool"`)
 }
+
 func TestRecoveryRejectsEditedOrEscapingPaths(t *testing.T) {
 	for _, mode := range []string{"edited", "escape", "conflict", "corrupt"} {
 		t.Run(mode, func(t *testing.T) {
@@ -95,6 +188,7 @@ func TestRecoveryRejectsEditedOrEscapingPaths(t *testing.T) {
 		})
 	}
 }
+
 func TestRollbackFailureKeepsRecoveryData(t *testing.T) {
 	i, root := memoryInitializer(t)
 	base := i.FS
@@ -116,6 +210,7 @@ func TestRollbackFailureKeepsRecoveryData(t *testing.T) {
 	_, err = i.Initialize(context.Background(), root, "example.com/tool", "tool")
 	require.NoError(t, err)
 }
+
 func TestWriteFailureRestoresOriginalBytes(t *testing.T) {
 	for failAt := 1; failAt <= 3; failAt++ {
 		i, root := memoryInitializer(t)
@@ -142,6 +237,7 @@ func TestWriteFailureRestoresOriginalBytes(t *testing.T) {
 		}
 	}
 }
+
 func TestLockHelper(t *testing.T) {
 	if os.Getenv("TEMPLATE_LOCK_HELPER") != "1" {
 		return
@@ -154,18 +250,26 @@ func TestLockHelper(t *testing.T) {
 	_, _ = os.Stdout.WriteString("就绪\n")
 	_, _ = os.Stdin.Read(make([]byte, 1))
 }
+
 func TestConcurrentInitializationDoesNotRecoverLiveTransaction(t *testing.T) {
 	root := fixture(t)
 	lock := filepath.Join(root, ".template-init.lock")
-	//nolint:gosec // G204：测试只运行当前测试二进制或固定 Git/Go 命令，参数来自临时 fixture。
-	cmd := exec.Command(os.Args[0], "-test.run=^TestLockHelper$")
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	//nolint:gosec // G204：锁 helper 只执行当前测试二进制。
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestLockHelper$")
+	cmd.WaitDelay = time.Second
 	cmd.Env = append(os.Environ(), "TEMPLATE_LOCK_HELPER=1", "TEMPLATE_LOCK_PATH="+lock)
 	in, err := cmd.StdinPipe()
 	require.NoError(t, err)
 	out, err := cmd.StdoutPipe()
 	require.NoError(t, err)
 	require.NoError(t, cmd.Start())
-	t.Cleanup(func() { _ = in.Close(); _ = cmd.Process.Kill() })
+
+	var waitOnce sync.Once
+	var waitErr error
+	waitChild := func() error { waitOnce.Do(func() { waitErr = cmd.Wait() }); return waitErr }
+	t.Cleanup(func() { cancel(); _ = in.Close(); _ = cmd.Process.Kill(); _ = waitChild() })
 	line, err := bufio.NewReader(out).ReadString('\n')
 	require.NoError(t, err)
 	require.Equal(t, "就绪\n", line)
@@ -173,7 +277,7 @@ func TestConcurrentInitializationDoesNotRecoverLiveTransaction(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, read(t, root, "go.mod"), TemplateModule)
 	require.NoError(t, cmd.Process.Kill())
-	require.Error(t, cmd.Wait())
+	require.Error(t, waitChild())
 	_, err = Initialize(root, "example.com/tool", "tool")
 	require.NoError(t, err)
 }

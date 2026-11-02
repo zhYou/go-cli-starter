@@ -9,7 +9,7 @@ import (
 	"github.com/zhYou/go-cli-starter/internal/base/messages"
 )
 
-// 由工具包的覆盖构建测试运行，替换真实内嵌目录后验证调用边界。
+// 由 test/integration 的覆盖构建测试运行，替换真实内嵌目录后验证调用边界。
 func TestCorruptCatalogProcess(t *testing.T) {
 	if os.Getenv("TEST_CORRUPT_I18N_CATALOG") != "1" {
 		t.Skip("仅由损坏目录子进程执行")

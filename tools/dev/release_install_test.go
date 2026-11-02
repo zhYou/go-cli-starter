@@ -14,6 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestReleaseVerificationRequiresInstalledArtifact(t *testing.T) {
+	require.Error(t, verifyRelease(releaseFixture(t)), "仅归档结构通过不能替代真实安装验收")
+}
+
 // installBoundaryObserver 只记录 mise 是否被调用，不模拟或证明实际安装。
 func installBoundaryObserver(t *testing.T) string {
 	t.Helper()

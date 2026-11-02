@@ -9,10 +9,20 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zhYou/go-cli-starter/internal/app/greeting"
-
 	"github.com/stretchr/testify/require"
+	"github.com/zhYou/go-cli-starter/internal/app/greeting"
 )
+
+func TestDebugLogsDoNotPolluteJSON(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("[logging]\noutput = \"stderr\"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	code, out, errOut := invoke(t, "greet", "--name", "Codex", "--json", "--log-level", "debug", "--config", path)
+	if code != 0 || !json.Valid([]byte(out)) || !strings.Contains(errOut, `"level":"debug"`) {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, out, errOut)
+	}
+}
 
 func TestBusinessCreatesPersistentEvents(t *testing.T) {
 	home := t.TempDir()
@@ -35,18 +45,27 @@ func TestBusinessCreatesPersistentEvents(t *testing.T) {
 }
 
 func TestDiscoveryAndInvalidCallsCreateNoState(t *testing.T) {
-	for _, args := range [][]string{{"greet"}, {"greet", "--name", " "}, {"greet", "--name", "x", "--log-level", "bad"}, {"help"}, {"version"}, {"schema"}, {"completion", "bash"}, {"__complete", "greet", ""}} {
-		t.Run(args[0]+"-"+args[len(args)-1], func(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		code int
+	}{
+		{[]string{"greet"}, 2},
+		{[]string{"greet", "--name", " "}, 2},
+		{[]string{"greet", "--name", "x", "--log-level", "bad"}, 2},
+		{[]string{"help"}, 0}, {[]string{"version"}, 0}, {[]string{"schema"}, 0},
+		{[]string{"completion", "bash"}, 0}, {[]string{"__complete", "greet", ""}, 0},
+	} {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
 			home := t.TempDir()
 			var out, stderr bytes.Buffer
-			Run(context.Background(), args, Options{Out: &out, ErrOut: &stderr, LookupEnv: func(key string) (string, bool) {
-				if key == "GO_CLI_STARTER_HOME" {
-					return home, true
-				}
-				return "", false
-			}})
+			code := Run(t.Context(), tc.args, Options{Out: &out, ErrOut: &stderr, LookupEnv: func(key string) (string, bool) { return home, key == "GO_CLI_STARTER_HOME" }})
+			require.Equal(t, tc.code, code, stderr.String())
+			if tc.code != 0 {
+				require.Empty(t, out.String())
+				require.NotEmpty(t, stderr.String())
+			}
 			_, err := os.Stat(filepath.Join(home, "state"))
-			require.True(t, os.IsNotExist(err), "%v", err)
+			require.ErrorIs(t, err, os.ErrNotExist)
 		})
 	}
 }

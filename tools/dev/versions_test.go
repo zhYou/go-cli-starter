@@ -1,13 +1,34 @@
 package main
 
 import (
+	"debug/buildinfo"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestGovulncheckBuildInfoExact(t *testing.T) {
+	valid := buildinfo.BuildInfo{Path: "golang.org/x/vuln/cmd/govulncheck", Main: debug.Module{Path: "golang.org/x/vuln", Version: "v1.9.0"}}
+	require.NoError(t, matchGovulncheckBuildInfo(&valid, "1.9.0"))
+	for _, mutate := range []func(*buildinfo.BuildInfo){
+		func(b *buildinfo.BuildInfo) { b.Path = "example.org/other" },
+		func(b *buildinfo.BuildInfo) { b.Main.Path = "example.org/other" },
+		func(b *buildinfo.BuildInfo) { b.Main.Version = "v1.9.00" },
+		func(b *buildinfo.BuildInfo) { b.Main.Version = "v1.9.0-rc.1" },
+		func(b *buildinfo.BuildInfo) { b.Main.Replace = &debug.Module{Path: "local"} },
+	} {
+		b := valid
+		mutate(&b)
+		require.Error(t, matchGovulncheckBuildInfo(&b, "1.9.0"))
+	}
+	spec, err := versionTool("go:golang.org/x/vuln/cmd/govulncheck")
+	require.NoError(t, err)
+	require.Equal(t, []string{"-h"}, spec.Args)
+}
 
 func versionFixture(t *testing.T) string {
 	t.Helper()
@@ -20,6 +41,7 @@ func versionFixture(t *testing.T) string {
 	}
 	return root
 }
+
 func TestVersionsWithoutLock(t *testing.T) {
 	require.Error(t, matchToolVersion("go", "go version go1.27.30 linux/amd64", "1.27.3"))
 	require.NoError(t, matchToolVersion("go", "go version go1.27.3 linux/amd64", "1.27.3"))
@@ -53,6 +75,7 @@ func TestVersionsRejectCIMismatch(t *testing.T) {
 	require.NoError(t, os.WriteFile(path, []byte(strings.ReplaceAll(string(data), "version: 2026.10.21", "version: 2026.10.20")), 0600))
 	require.ErrorContains(t, checkVersions(root), "CI mise 版本不一致")
 }
+
 func TestHistoricalVersionTextIsNotCurrentDeclaration(t *testing.T) {
 	root := versionFixture(t)
 	path := filepath.Join(root, "docs/superpowers/specs/history.md")

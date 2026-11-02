@@ -151,4 +151,5 @@ func (e *contextExporter) ExportSpans(ctx context.Context, _ []sdktrace.ReadOnly
 	close(e.canceled)
 	return ctx.Err()
 }
+
 func (*contextExporter) Shutdown(context.Context) error { return nil }
