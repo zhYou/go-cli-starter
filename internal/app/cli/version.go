@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
+	"github.com/zhYou/go-cli-starter/internal/base/messages"
 )
 
 func newVersionCommand(opts Options, call *invocation) *cobra.Command {
@@ -16,7 +17,11 @@ func newVersionCommand(opts Options, call *invocation) *cobra.Command {
 				return writeJSON(cmd.OutOrStdout(), versionResult{opts.Name, opts.Version, opts.Commit, opts.Date})
 			}
 			return writeText(cmd.OutOrStdout(), func(w io.Writer) error {
-				_, err := fmt.Fprintln(w, call.localizer.Text("cli.version_text", map[string]any{"Name": opts.Name, "Version": opts.Version, "Commit": opts.Commit, "Date": opts.Date}))
+				text, err := call.localizer.Format("cli.version_text", messages.FormatOptions{Params: map[string]any{"Name": opts.Name, "Version": opts.Version, "Commit": opts.Commit, "Date": opts.Date}})
+				if err != nil {
+					return err
+				}
+				_, err = fmt.Fprintln(w, text)
 				return err
 			})
 		},

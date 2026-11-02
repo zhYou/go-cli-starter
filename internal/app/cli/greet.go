@@ -9,12 +9,11 @@ import (
 	"go.opentelemetry.io/otel/codes"
 )
 
-func newGreetCommand(opts Options, call *invocation) *cobra.Command {
+func newGreetCommand(call *invocation) *cobra.Command {
 	var name string
 	greet := &cobra.Command{
-		Use:     "greet --name 姓名",
-		Short:   "输出问候语（可移除的示例）",
-		Example: fmt.Sprintf("  %s greet --name Codex\n  %s greet --name Codex --json", opts.Name, opts.Name),
+		Use:   "greet --name 姓名",
+		Short: "输出问候语（可移除的示例）",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if err := noArgs(cmd, args); err != nil {
 				return err

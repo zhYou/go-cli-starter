@@ -6,6 +6,7 @@ const (
 	paramValue           = "Value"
 	paramFlag            = "Flag"
 	languageChinese      = "zh-CN"
+	languageEnglish      = "en"
 	flagJSON             = "json"
 	outputJSON           = "json"
 	flagHelp             = "help"
@@ -19,9 +20,6 @@ const (
 	flagName             = "name"
 	commandHelp          = "help"
 	commandVersion       = "version"
-	commandRoot          = "root"
 
-	flagLogLevel      = "log-level"
-	commandGreet      = "greet"
-	commandSchemaName = "schema"
+	flagLogLevel = "log-level"
 )

@@ -17,7 +17,9 @@ import (
 	"github.com/zhYou/go-cli-starter/internal/base/fault"
 	"github.com/zhYou/go-cli-starter/internal/base/iostreams"
 	"github.com/zhYou/go-cli-starter/internal/base/logging"
+	"github.com/zhYou/go-cli-starter/internal/base/messages"
 	"github.com/zhYou/go-cli-starter/internal/base/paths"
+	"github.com/zhYou/go-cli-starter/internal/locales"
 )
 
 // Options 提供进程依赖；每次调用均创建新的命令树。
@@ -34,7 +36,11 @@ type Options struct {
 }
 
 // Run 执行一次命令并返回约定的退出码，不直接退出进程。
-func Run(ctx context.Context, args []string, opts Options) (code int) {
+func Run(ctx context.Context, args []string, opts Options) int {
+	return run(ctx, args, opts, locales.LoadBundle)
+}
+
+func run(ctx context.Context, args []string, opts Options, loadBundle func() (*messages.Bundle, error)) (code int) {
 	code = 1
 	started := time.Now()
 	var executionErr error
@@ -44,22 +50,22 @@ func Run(ctx context.Context, args []string, opts Options) (code int) {
 	sink := &recordingWriter{writer: opts.Out}
 	opts.Out = sink
 	//nolint:contextcheck // Cobra 构造阶段不执行请求，下面 ExecuteContextC 才注入调用者 ctx。
-	root, call := buildRoot(opts)
+	root, call, err := buildRoot(opts, loadBundle, args...)
+	if root == nil {
+		_, _ = fmt.Fprintf(opts.ErrOut, "Error: %v\n", err)
+		return 1
+	}
 	defer func() {
 		if call.session != nil {
 			call.session.Finish(ctx, logging.CommandResult{ExitCode: code, Duration: time.Since(started), Err: executionErr})
 		}
 	}()
-	envLang := languageEnvironment(opts)
-	if opts.Language != "" {
-		envLang = opts.Language
-	}
-	lang, err := selectLanguage(root, args, envLang)
-	call.localizer = newLocalizer(lang)
-	localizeTree(root, call.localizer)
 	if err == nil {
 		root.SetArgs(args)
 		_, err = root.ExecuteContextC(ctx)
+	}
+	if err == nil && call.helpErr != nil {
+		err = call.helpErr
 	}
 	if err == nil && sink.Err() != nil {
 		err = (fault.Definition{Code: "cli.write", Kind: fault.Runtime}).Wrap(sink.Err())
@@ -99,18 +105,17 @@ func defaults(opts Options) Options {
 	return opts
 }
 
-func buildRoot(opts Options) (*cobra.Command, *invocation) {
+func buildRoot(opts Options, loadBundle func() (*messages.Bundle, error), args ...string) (*cobra.Command, *invocation, error) {
 	call := newInvocation(opts.Dependencies)
-	lang := opts.Language
-	if lang == "" {
-		lang = languageEnvironment(opts)
+	bundle, err := loadBundle()
+	if err != nil {
+		return nil, call, err
 	}
-	if normalized, ok := canonicalLanguage(lang); ok {
-		lang = normalized
-	} else {
-		lang = languageChinese
+	if bundle == nil {
+		return nil, call, fmt.Errorf("message bundle is nil")
 	}
-	call.localizer = newLocalizer(lang)
+	call.bundle = bundle
+	call.localizer = bundle.Localizer(languageEnglish)
 	root := &cobra.Command{Use: opts.Name, Short: "供用户和自动化工具使用的 CLI 模板", Version: opts.Version, Args: noArgs, SilenceErrors: true, SilenceUsage: true, RunE: func(cmd *cobra.Command, _ []string) error { return cmd.Help() }}
 	root.SetIn(opts.In)
 	root.SetOut(opts.Out)
@@ -118,8 +123,8 @@ func buildRoot(opts Options) (*cobra.Command, *invocation) {
 	root.PersistentFlags().BoolVar(&call.asJSON, flagJSON, false, "以 JSON 格式输出结果")
 	root.PersistentFlags().StringVar(&call.configPath, flagConfig, "", "从指定的 TOML 文件读取配置")
 	root.PersistentFlags().StringVar(&call.logLevel, flagLogLevel, defaultLogLevel, "日志级别：debug、info、warn、error")
-	root.PersistentFlags().Var(&languageValue{call: call, root: root}, flagLanguage, "显示语言")
-	root.PersistentFlags().Lookup(flagLanguage).DefValue = languageChinese
+	root.PersistentFlags().Var(&languageValue{call: call, root: root, preselected: len(args) > 0}, flagLanguage, "显示语言")
+	root.PersistentFlags().Lookup(flagLanguage).DefValue = languageEnglish
 	root.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
 		if err := validateFlags(cmd, call); err != nil {
 			return err
@@ -151,14 +156,37 @@ func buildRoot(opts Options) (*cobra.Command, *invocation) {
 	root.CompletionOptions.DisableDefaultCmd = true
 	help := newHelpCommand(root)
 	root.SetHelpCommand(help)
-	root.AddCommand(newGreetCommand(opts, call), newVersionCommand(opts, call), newSchemaCommand(root, &call.results), newCompletionCommand(root))
+	greet := newGreetCommand(call)
+	version := newVersionCommand(opts, call)
+	schema := newSchemaCommand(root, &call.results)
+	completion := newCompletionCommand(root)
+	root.AddCommand(greet, version, schema, completion)
+	call.bindCommand(root, commandTexts{short: message("cli.root")})
+	call.bindCommand(help, commandTexts{short: message("cli.help"), use: message("cli.help_use")})
+	call.bindCommand(greet, commandTexts{short: message("cli.greet"), use: message("cli.greet_use"), example: textMessage{id: "cli.greet_example", params: map[string]any{"Name": opts.Name}}})
+	call.bindCommand(version, commandTexts{short: message("cli.version")})
+	call.bindCommand(schema, commandTexts{short: message("cli.schema"), use: message("cli.schema_use")})
+	call.bindCommand(completion, commandTexts{short: message("cli.completion")})
+	for _, binding := range []struct{ flag, id string }{
+		{flagJSON, "cli.json"}, {flagConfig, "cli.config"}, {flagLogLevel, "cli.log_level"}, {flagLanguage, "cli.lang"},
+	} {
+		call.bindFlag(root.PersistentFlags().Lookup(binding.flag), message(binding.id))
+	}
+	call.bindFlag(greet.Flags().Lookup(flagName), message("cli.name"))
 	configureHelp(root, call)
 	configureHelp(help, call)
 	protectCommand(root)
 	protectCommand(help)
-	localizeTree(root, call.localizer)
-	localizeTreeHelp(help, call)
-	return root, call
+	selected := opts.Language
+	if selected == "" {
+		selected = languageEnvironment(opts)
+	}
+	lang, selectionErr := selectLanguage(root, args, selected)
+	call.localizer = bundle.Localizer(lang)
+	if err := call.localizeTree(root, lang); err != nil {
+		return root, call, fault.Wrap(fault.Runtime, "", err)
+	}
+	return root, call, selectionErr
 }
 func skipsConfig(cmd, root *cobra.Command) bool {
 	if cmd == root || cmd.Annotations[annotationSkipConfig] == annotationEnabled {
@@ -232,8 +260,4 @@ func validateFlags(cmd *cobra.Command, call *invocation) error {
 		}
 	}
 	return nil
-}
-func localizeTreeHelp(help *cobra.Command, call *invocation) {
-	help.Short = call.localizer.Text("cli.help", nil)
-	help.Use = call.localizer.Text("cli.help_use", nil)
 }
