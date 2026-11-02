@@ -285,3 +285,24 @@ other = "{{.Field}} 必须提供"
 
 ["validation.rule"]
 other = "{{.Field}} 不满足校验规则 {{.Rule}} {{.Param}}"
+
+["cli.root_example"]
+other = "  {{.Name}} --help\n  {{.Name}} schema\n  {{.Name}} greet --name Codex --json"
+
+["cli.help_example"]
+other = "  {{.Name}} help\n  {{.Name}} help completion bash"
+
+["cli.version_example"]
+other = "  {{.Name}} version\n  {{.Name}} version --json"
+
+["cli.schema_example"]
+other = "  {{.Name}} schema\n  {{.Name}} schema greet"
+
+["cli.completion_example"]
+other = "  {{.Name}} completion bash\n  {{.Name}} help completion powershell"
+
+["cli.completion_shell"]
+other = "生成 {{.Shell}} 自动补全脚本"
+
+["cli.completion_shell_example"]
+other = "  {{.Name}} completion {{.Shell}} > {{.File}}"

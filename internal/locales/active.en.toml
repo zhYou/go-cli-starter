@@ -286,3 +286,24 @@ other = "{{.Field}} is required"
 
 ["validation.rule"]
 other = "{{.Field}} must satisfy {{.Rule}} {{.Param}}"
+
+["cli.root_example"]
+other = "  {{.Name}} --help\n  {{.Name}} schema\n  {{.Name}} greet --name Codex --json"
+
+["cli.help_example"]
+other = "  {{.Name}} help\n  {{.Name}} help completion bash"
+
+["cli.version_example"]
+other = "  {{.Name}} version\n  {{.Name}} version --json"
+
+["cli.schema_example"]
+other = "  {{.Name}} schema\n  {{.Name}} schema greet"
+
+["cli.completion_example"]
+other = "  {{.Name}} completion bash\n  {{.Name}} help completion powershell"
+
+["cli.completion_shell"]
+other = "Generate {{.Shell}} completion scripts"
+
+["cli.completion_shell_example"]
+other = "  {{.Name}} completion {{.Shell}} > {{.File}}"

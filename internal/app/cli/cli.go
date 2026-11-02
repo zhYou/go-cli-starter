@@ -123,7 +123,8 @@ func buildRoot(opts Options, loadBundle func() (*messages.Bundle, error), args .
 	root.PersistentFlags().BoolVar(&call.asJSON, flagJSON, false, "以 JSON 格式输出结果")
 	root.PersistentFlags().StringVar(&call.configPath, flagConfig, "", "从指定的 TOML 文件读取配置")
 	root.PersistentFlags().StringVar(&call.logLevel, flagLogLevel, defaultLogLevel, "日志级别：debug、info、warn、error")
-	root.PersistentFlags().Var(&languageValue{call: call, root: root, preselected: len(args) > 0}, flagLanguage, "显示语言")
+	languageFlagValue := &languageValue{call: call, root: root, preselected: len(args) > 0}
+	root.PersistentFlags().Var(languageFlagValue, flagLanguage, "显示语言")
 	root.PersistentFlags().Lookup(flagLanguage).DefValue = languageEnglish
 	root.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
 		if err := validateFlags(cmd, call); err != nil {
@@ -159,20 +160,29 @@ func buildRoot(opts Options, loadBundle func() (*messages.Bundle, error), args .
 	greet := newGreetCommand(call)
 	version := newVersionCommand(opts, call)
 	schema := newSchemaCommand(root, &call.results)
-	completion := newCompletionCommand(root)
+	completion := newCompletionCommand(root, call, opts.Name)
 	root.AddCommand(greet, version, schema, completion)
-	call.bindCommand(root, commandTexts{short: message("cli.root")})
-	call.bindCommand(help, commandTexts{short: message("cli.help"), use: message("cli.help_use")})
+	call.bindCommand(root, commandTexts{example: textMessage{id: "cli.root_example", params: map[string]any{paramName: opts.Name}}, short: message("cli.root")})
+	call.bindCommand(help, commandTexts{example: textMessage{id: "cli.help_example", params: map[string]any{paramName: opts.Name}}, short: message("cli.help"), use: message("cli.help_use")})
 	call.bindCommand(greet, commandTexts{short: message("cli.greet"), use: message("cli.greet_use"), example: textMessage{id: "cli.greet_example", params: map[string]any{paramName: opts.Name}}})
-	call.bindCommand(version, commandTexts{short: message("cli.version")})
-	call.bindCommand(schema, commandTexts{short: message("cli.schema"), use: message("cli.schema_use")})
-	call.bindCommand(completion, commandTexts{short: message("cli.completion")})
+	call.bindCommand(version, commandTexts{example: textMessage{id: "cli.version_example", params: map[string]any{paramName: opts.Name}}, short: message("cli.version")})
+	call.bindCommand(schema, commandTexts{example: textMessage{id: "cli.schema_example", params: map[string]any{paramName: opts.Name}}, short: message("cli.schema"), use: message("cli.schema_use")})
+	call.bindCommand(completion, commandTexts{example: textMessage{id: "cli.completion_example", params: map[string]any{paramName: opts.Name}}, short: message("cli.completion")})
 	for _, binding := range []struct{ flag, id string }{
 		{flagJSON, "cli.json"}, {flagConfig, "cli.config"}, {flagLogLevel, "cli.log_level"}, {flagLanguage, "cli.lang"},
 	} {
 		call.bindFlag(root.PersistentFlags().Lookup(binding.flag), message(binding.id))
 	}
 	call.bindFlag(greet.Flags().Lookup(flagName), message("cli.name"))
+	_, completing := completionRequest(root, args)
+	languageFlagValue.completing = completing
+	if completing {
+		// Cobra 的框架提示不属于候选协议；最终应用错误仍写调用者 stderr。
+		root.SetErr(io.Discard)
+		if err := registerCompletionValues(root); err != nil {
+			return root, call, fault.Wrap(fault.Runtime, "", err)
+		}
+	}
 	configureHelp(root, call)
 	configureHelp(help, call)
 	protectCommand(root)

@@ -48,7 +48,7 @@ func TestLanguageScanRespectsFlagValuesAndSeparator(t *testing.T) {
 		{[]string{"greet", "--name", "--lang=en"}, 0, "Hello, --lang=en!"},
 		{[]string{"greet", "--name=x", "--", "--lang=en"}, 2, "Error:"},
 		{[]string{"--lang", "zh", "greet", "--name=x"}, 0, "你好，x！"},
-		{[]string{"__complete", "greet", "--lang", ""}, 0, ":0"},
+		{[]string{"__complete", "greet", "--lang", ""}, 0, ":4"},
 	} {
 		code, out, errOut := invoke(t, tc.args...)
 		require.Equal(t, tc.code, code, "%v: %s", tc.args, errOut)
