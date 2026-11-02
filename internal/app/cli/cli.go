@@ -61,6 +61,32 @@ func run(ctx context.Context, args []string, opts Options, loadBundle func() (*m
 		}
 	}()
 	if err == nil {
+		err = ctx.Err()
+	}
+	if err == nil {
+		if index, protocol := completionRequest(root, args); protocol {
+			// 使用独立树预解析，不能替换全局 os.Stderr，也不能提前改变实际补全状态。
+			shadowOptions := opts
+			shadowOptions.Language = call.localizer.Language()
+			shadowOptions.Out, shadowOptions.ErrOut = io.Discard, io.Discard
+			//nolint:contextcheck // 仅构造独立解析树；实际请求仍由 ExecuteContextC 注入调用者 ctx。
+			shadow, _, setupErr := buildRoot(shadowOptions, func() (*messages.Bundle, error) { return call.bundle, nil })
+			if setupErr != nil {
+				err = fault.Wrap(fault.Runtime, "", setupErr)
+			} else {
+				value := shadow.PersistentFlags().Lookup(flagLanguage).Value.(*languageValue)
+				value.completing, value.preselected = true, true
+				if !validCompletionInput(shadow, args, index) {
+					if writeErr := writeBytes(opts.Out, fmt.Appendf(nil, ":%d\n", cobra.ShellCompDirectiveError|cobra.ShellCompDirectiveNoFileComp)); writeErr != nil {
+						err = fault.Wrap(fault.Runtime, "", writeErr)
+					} else {
+						return 0
+					}
+				}
+			}
+		}
+	}
+	if err == nil {
 		root.SetArgs(args)
 		_, err = root.ExecuteContextC(ctx)
 	}
@@ -73,7 +99,7 @@ func run(ctx context.Context, args []string, opts Options, loadBundle func() (*m
 	err = classifyExecutionError(err)
 	executionErr = err
 	if err == nil {
-		return 0
+		return call.reportExitCode
 	}
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		message := call.localizer.Text("cli.cancelled", nil)
@@ -123,7 +149,8 @@ func buildRoot(opts Options, loadBundle func() (*messages.Bundle, error), args .
 	root.PersistentFlags().BoolVar(&call.asJSON, flagJSON, false, "以 JSON 格式输出结果")
 	root.PersistentFlags().StringVar(&call.configPath, flagConfig, "", "从指定的 TOML 文件读取配置")
 	root.PersistentFlags().StringVar(&call.logLevel, flagLogLevel, defaultLogLevel, "日志级别：debug、info、warn、error")
-	root.PersistentFlags().Var(&languageValue{call: call, root: root, preselected: len(args) > 0}, flagLanguage, "显示语言")
+	languageFlagValue := &languageValue{call: call, root: root, preselected: len(args) > 0}
+	root.PersistentFlags().Var(languageFlagValue, flagLanguage, "显示语言")
 	root.PersistentFlags().Lookup(flagLanguage).DefValue = languageEnglish
 	root.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
 		if err := validateFlags(cmd, call); err != nil {
@@ -159,14 +186,16 @@ func buildRoot(opts Options, loadBundle func() (*messages.Bundle, error), args .
 	greet := newGreetCommand(call)
 	version := newVersionCommand(opts, call)
 	schema := newSchemaCommand(root, &call.results)
-	completion := newCompletionCommand(root)
-	root.AddCommand(greet, version, schema, completion)
-	call.bindCommand(root, commandTexts{short: message("cli.root")})
-	call.bindCommand(help, commandTexts{short: message("cli.help"), use: message("cli.help_use")})
+	completion := newCompletionCommand(root, call, opts.Name)
+	doctorCommand := newDoctorCommand(call)
+	root.AddCommand(greet, version, schema, completion, doctorCommand)
+	call.bindCommand(doctorCommand, commandTexts{short: message("cli.doctor"), example: textMessage{id: "cli.doctor_example", params: map[string]any{paramName: opts.Name}}})
+	call.bindCommand(root, commandTexts{example: textMessage{id: "cli.root_example", params: map[string]any{paramName: opts.Name}}, short: message("cli.root")})
+	call.bindCommand(help, commandTexts{example: textMessage{id: "cli.help_example", params: map[string]any{paramName: opts.Name}}, short: message("cli.help"), use: message("cli.help_use")})
 	call.bindCommand(greet, commandTexts{short: message("cli.greet"), use: message("cli.greet_use"), example: textMessage{id: "cli.greet_example", params: map[string]any{paramName: opts.Name}}})
-	call.bindCommand(version, commandTexts{short: message("cli.version")})
-	call.bindCommand(schema, commandTexts{short: message("cli.schema"), use: message("cli.schema_use")})
-	call.bindCommand(completion, commandTexts{short: message("cli.completion")})
+	call.bindCommand(version, commandTexts{example: textMessage{id: "cli.version_example", params: map[string]any{paramName: opts.Name}}, short: message("cli.version")})
+	call.bindCommand(schema, commandTexts{example: textMessage{id: "cli.schema_example", params: map[string]any{paramName: opts.Name}}, short: message("cli.schema"), use: message("cli.schema_use")})
+	call.bindCommand(completion, commandTexts{example: textMessage{id: "cli.completion_example", params: map[string]any{paramName: opts.Name}}, short: message("cli.completion")})
 	for _, binding := range []struct{ flag, id string }{
 		{flagJSON, "cli.json"}, {flagConfig, "cli.config"}, {flagLogLevel, "cli.log_level"}, {flagLanguage, "cli.lang"},
 	} {
@@ -175,6 +204,15 @@ func buildRoot(opts Options, loadBundle func() (*messages.Bundle, error), args .
 	call.bindFlag(greet.Flags().Lookup(flagName), message("cli.name"))
 	configureHelp(root, call)
 	configureHelp(help, call)
+	_, completing := completionRequest(root, args)
+	languageFlagValue.completing = completing
+	if completing {
+		// Cobra 的框架提示不属于候选协议；最终应用错误仍写调用者 stderr。
+		root.SetErr(io.Discard)
+		if err := registerCompletionValues(root); err != nil {
+			return root, call, fault.Wrap(fault.Runtime, "", err)
+		}
+	}
 	protectCommand(root)
 	protectCommand(help)
 	selected := opts.Language

@@ -30,3 +30,8 @@ initial.json 来自设计确认的代码 54d9dcd，在临时副本捕获；派�
 旧 LOG_LEVEL 兼容入口保留；Trace 默认 none，file 为本地诊断 JSON，不声明 OTLP 或重放兼容。
 模板版本 0.3.0 独立于上述应用版本，来源记录和初始化事务格式保持。
 升级前所有未终结旧初始化事务（包括 format 2）须用旧工具完成，不通过删除日志或刷新基线跳过。
+
+本次补充 doctor 空报告、四个 completion shell 子命令及其帮助和发现能力，schema_version 仍为 1。
+原有 `completion <shell>` 调用保留；新增路径与结果见
+[兼容记录](compatibility/changes/2026-11-02-cli-discovery-doctor.json)。doctor 的完整负向检查报告可伴随退出码 1，
+该行为只适用于已完成报告；真正执行、渲染失败仍不提交 stdout。

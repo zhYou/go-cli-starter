@@ -79,3 +79,13 @@
    macOS/Windows 运行行为以对应原生 CI 为准。记录采用的模板版本与提交，保留来源历史和个人配置外置。
 
 更多实际 API、示例和所有权边界见[设计指南](design-guidelines.md)，托管安全设置见[维护清单](maintenance.md)。
+
+## 补全、帮助与 doctor 入口
+
+保留现有 `completion <shell>` 调用，合并四个 shell 子命令、专属 help/schema 和双语示例绑定。
+补全候选使用当前命令树，语言和日志级别不回退到文件；隐藏协议不打印框架调试提示。
+普通调用保持严格语言校验，补全中的未完成语言参数按有效参数、有效环境、en 兜底。
+
+合并 app/doctor、Dependencies.Doctor 和结果 schema；空入口返回空数组并成功，不新增开发工具依赖。
+真实检查由派生项目补充。已完成报告按 RequiredAvailable 决定 0/1，执行或渲染失败沿用空 stdout。
+同步受管清单与改名验收，保留模板版本 0.3.0，不通过 init 覆盖已有业务。

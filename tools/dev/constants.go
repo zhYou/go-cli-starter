@@ -14,6 +14,7 @@ const (
 	chineseGreeting        = "你好，Ada！"
 	englishGreeting        = "Hello, Ada!"
 	greetCommand           = "greet"
+	doctorCommand          = "doctor"
 	gitProgram             = "git"
 	govulncheckTool        = "go:golang.org/x/vuln/cmd/govulncheck"
 	versionFlag            = "--version"
