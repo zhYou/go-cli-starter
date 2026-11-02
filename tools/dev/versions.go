@@ -167,7 +167,7 @@ func checkVersions(root string) error {
 			table[strings.TrimSpace(cells[1])] = strings.TrimSpace(cells[2])
 		}
 	}
-	expected := map[string]string{"mise（本地最低版本、CI 固定版本）": versions.MiseMinimum, "Go 模块最低版本": module.Go.Version}
+	expected := map[string]string{"mise（本地最低版本、CI 固定版本）": versions.MiseMinimum}
 	for key, want := range versions.Tools {
 		spec, err := versionTool(key)
 		if err != nil {

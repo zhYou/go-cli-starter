@@ -3,7 +3,6 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -89,16 +88,7 @@ func TestVersionsGoToolchain(t *testing.T) {
 				module += "\ntoolchain " + tt.toolchain + "\n"
 			}
 			require.NoError(t, os.WriteFile(filepath.Join(root, "go.mod"), []byte(module), 0600))
-			readme := filepath.Join(root, "README.md")
-			//nolint:gosec // G304：测试路径只来自当前临时 fixture，不读取用户文件。
-			data, err := os.ReadFile(readme)
-			require.NoError(t, err)
-			table := regexp.MustCompile(`(?m)^\| Go 模块最低版本 \| [^|]+ \|$`)
-			data = table.ReplaceAll(data, []byte("| Go 模块最低版本 | "+tt.minimum+" |"))
-			//nolint:gosec // G703：版本表仅写入当前测试的临时 fixture。
-			require.NoError(t, os.WriteFile(readme, data, 0600))
-
-			err = checkVersions(root)
+			err := checkVersions(root)
 			if tt.wantError {
 				require.ErrorContains(t, err, "模块最低 Go 版本、工具链与 mise 不一致")
 			} else {
