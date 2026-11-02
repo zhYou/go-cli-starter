@@ -64,14 +64,16 @@ func TestVersionRejectsPrereleaseOrBuildSuffix(t *testing.T) {
 
 func TestVersionsGoToolchain(t *testing.T) {
 	tests := []struct {
-		name      string
-		minimum   string
-		toolchain string
-		wantError bool
+		name       string
+		minimum    string
+		toolchain  string
+		readmeCRLF bool
+		wantError  bool
 	}{
 		{name: "implicit-matching", minimum: "1.27.3"},
 		{name: "explicit-matching", minimum: "1.27.3", toolchain: "go1.27.3"},
 		{name: "explicit-newer-than-minimum", minimum: "1.27.0", toolchain: "go1.27.3"},
+		{name: "explicit-newer-than-minimum-crlf", minimum: "1.27.0", toolchain: "go1.27.3", readmeCRLF: true},
 		{name: "implicit-mismatching", minimum: "1.27.0", wantError: true},
 		{name: "explicit-mismatching", minimum: "1.27.3", toolchain: "go1.27.4", wantError: true},
 		{name: "minimum-too-new", minimum: "1.27.4", toolchain: "go1.27.3", wantError: true},
@@ -93,7 +95,10 @@ func TestVersionsGoToolchain(t *testing.T) {
 			//nolint:gosec // G304：测试路径只来自当前临时 fixture，不读取用户文件。
 			data, err := os.ReadFile(readme)
 			require.NoError(t, err)
-			table := regexp.MustCompile(`(?m)^\| Go 模块最低版本 \| [^|]+ \|$`)
+			if tt.readmeCRLF {
+				data = []byte(strings.ReplaceAll(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n", "\r\n"))
+			}
+			table := regexp.MustCompile(`(?m)^\| Go 模块最低版本 \| [^|\r\n]+ \|`)
 			data = table.ReplaceAll(data, []byte("| Go 模块最低版本 | "+tt.minimum+" |"))
 			//nolint:gosec // G703：版本表仅写入当前测试的临时 fixture。
 			require.NoError(t, os.WriteFile(readme, data, 0600))
