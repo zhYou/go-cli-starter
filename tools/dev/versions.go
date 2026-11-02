@@ -139,7 +139,14 @@ func checkVersions(root string) error {
 		return err
 	}
 	goVersion := versions.Tools["go"]
-	if module.Go == nil || module.Toolchain == nil || module.Toolchain.Name != "go"+goVersion || semver.Compare("v"+module.Go.Version, "v"+goVersion) > 0 || semver.MajorMinor("v"+module.Go.Version) != semver.MajorMinor("v"+goVersion) {
+	toolchain := ""
+	if module.Toolchain != nil {
+		toolchain = module.Toolchain.Name
+	} else if module.Go != nil {
+		// 未显式声明时，Go 使用与 go 指令同版本的隐式工具链。
+		toolchain = "go" + module.Go.Version
+	}
+	if module.Go == nil || toolchain != "go"+goVersion || semver.Compare("v"+module.Go.Version, "v"+goVersion) > 0 || semver.MajorMinor("v"+module.Go.Version) != semver.MajorMinor("v"+goVersion) {
 		return fmt.Errorf("模块最低 Go 版本、工具链与 mise 不一致")
 	}
 	//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
@@ -160,7 +167,7 @@ func checkVersions(root string) error {
 			table[strings.TrimSpace(cells[1])] = strings.TrimSpace(cells[2])
 		}
 	}
-	expected := map[string]string{"mise（本地最低版本、CI 固定版本）": versions.MiseMinimum, "Go 模块最低版本": module.Go.Version}
+	expected := map[string]string{"mise（本地最低版本、CI 固定版本）": versions.MiseMinimum}
 	for key, want := range versions.Tools {
 		spec, err := versionTool(key)
 		if err != nil {
