@@ -82,8 +82,28 @@ func (call *invocation) localizeTree(root *cobra.Command, language string) error
 		}
 		flags[i] = text
 	}
-	version, err := localizer.Format("cli.version_template", messages.FormatOptions{Params: map[string]any{paramName: root.Name(), "Version": root.Version}})
-	if err != nil {
+	type versionBinding struct {
+		command *cobra.Command
+		text    string
+	}
+	var versions []versionBinding
+	var collectVersions func(*cobra.Command) error
+	collectVersions = func(cmd *cobra.Command) error {
+		if cmd == root || cmd.Version != "" {
+			version, err := localizer.Format("cli.version_template", messages.FormatOptions{Params: map[string]any{paramName: cmd.Name(), "Version": cmd.Version}})
+			if err != nil {
+				return err
+			}
+			versions = append(versions, versionBinding{command: cmd, text: version})
+		}
+		for _, child := range cmd.Commands() {
+			if err := collectVersions(child); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	if err := collectVersions(root); err != nil {
 		return err
 	}
 	for i, binding := range call.commandTexts {
@@ -104,7 +124,9 @@ func (call *invocation) localizeTree(root *cobra.Command, language string) error
 		binding.flag.Usage = flags[i]
 	}
 	// Cobra 解析固定字符串字面量；渲染结果中的分隔符不会被再次解释。
-	root.SetVersionTemplate("{{" + strconv.Quote(version+"\n") + "}}")
+	for _, version := range versions {
+		version.command.SetVersionTemplate("{{" + strconv.Quote(version.text+"\n") + "}}")
+	}
 	call.localizer = localizer
 	return nil
 }

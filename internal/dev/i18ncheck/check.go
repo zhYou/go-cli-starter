@@ -119,11 +119,12 @@ type templateValue struct {
 }
 
 type templateAnalyzer struct {
-	template *template.Template
-	params   map[string]bool
-	active   map[string]bool
-	depth    int
-	err      error
+	template  *template.Template
+	params    map[string]bool
+	active    map[string]bool
+	depth     int
+	pipeDepth int
+	err       error
 }
 
 func (a *templateAnalyzer) collect(node parse.Node, rootDot bool, aliases map[string]templateValue) {
@@ -142,12 +143,18 @@ func (a *templateAnalyzer) collect(node parse.Node, rootDot bool, aliases map[st
 		a.bindAliases(n.Pipe, rootDot, aliases, false)
 	case *parse.PipeNode:
 		if n != nil {
+			if a.pipeDepth > 0 && (len(n.Decl) > 0 || n.IsAssign) {
+				a.err = fmt.Errorf("不支持嵌套管道中的模板变量声明或赋值")
+				return
+			}
+			a.pipeDepth++
 			var previous *templateValue
 			for _, command := range n.Cmds {
 				a.collectCommand(command, rootDot, aliases, previous)
 				value := commandValue(command, rootDot, aliases, previous)
 				previous = &value
 			}
+			a.pipeDepth--
 		}
 	case *parse.FieldNode:
 		if rootDot && len(n.Ident) > 0 {

@@ -406,3 +406,45 @@ func TestVersionFlagRenderingFailureLeavesStdoutEmpty(t *testing.T) {
 	require.Empty(t, out.String())
 	require.Contains(t, stderr.String(), "cli.version_template")
 }
+
+// 独立版本的每个命令使用自身身份，并保留翻译和元数据的字面模板标记。
+func TestVersionUsesExecutingCommandMetadata(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"--version"}, "prefix {{ parent parent-v1\n"},
+		{[]string{"child{{.Name}}", "--version"}, "prefix {{ child{{.Name}} v{{.Missing}}\n"},
+		{[]string{"child{{.Name}}", "grandchild", "--version"}, "prefix {{ grandchild grand-v3\n"},
+	} {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			bundle := catalogFixture(t, "en", "cli.version_template", "other = "+strconv.Quote(`prefix {{"{{"}} {{.Name}} {{.Version}}`)+"\n")
+			var out bytes.Buffer
+			root, call, err := buildRoot(defaults(Options{Name: "parent", Version: "parent-v1", Out: &out, LookupEnv: noFixtureEnv}), func() (*messages.Bundle, error) { return bundle, nil })
+			require.NoError(t, err)
+			child := &cobra.Command{Use: "child{{.Name}}", Version: "v{{.Missing}}", RunE: func(*cobra.Command, []string) error { return nil }}
+			grandchild := &cobra.Command{Use: "grandchild", Version: "grand-v3", RunE: func(*cobra.Command, []string) error { return nil }}
+			child.AddCommand(grandchild)
+			root.AddCommand(child)
+			configureHelp(child, call)
+			require.NoError(t, call.localizeTree(root, "en"))
+			root.SetArgs(tc.args)
+			require.NotPanics(t, func() { require.NoError(t, root.Execute()) })
+			require.Equal(t, tc.want, out.String())
+		})
+	}
+}
+
+// 子命令版本格式化失败时，命令树和输出均不应被部分提交。
+func TestChildVersionRenderFailureDoesNotMutateTree(t *testing.T) {
+	bundle := catalogFixture(t, "en", "cli.version_template", `other = '{{index .Name 1}}'`+"\n")
+	var out bytes.Buffer
+	root, call, err := buildRoot(defaults(Options{Name: "parent", Version: "v1", Out: &out, LookupEnv: noFixtureEnv}), func() (*messages.Bundle, error) { return bundle, nil })
+	require.NoError(t, err)
+	before := root.VersionTemplate()
+	child := &cobra.Command{Use: "x", Version: "v2"}
+	root.AddCommand(child)
+	require.ErrorContains(t, call.localizeTree(root, "en"), "cli.version_template")
+	require.Equal(t, before, root.VersionTemplate())
+	require.Empty(t, out.String())
+}

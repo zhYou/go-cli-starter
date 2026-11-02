@@ -206,3 +206,27 @@ other = '{{range $value := .}}{{else}}{{$value.Title}}{{end}}'
 `
 	require.Error(t, Check(pair(en, zh)))
 }
+
+// 括号管道中的声明和赋值有副作用，不能沿用外层变量的旧值。
+func TestCheckRejectsNestedPipelineDeclarations(t *testing.T) {
+	tests := map[string]string{
+		"nested assignment":           `{{$root := .User}}{{$unused := ($root = .)}}{{$root.Name}}`,
+		"nested branch assignment":    `{{$root := .User}}{{if .Active}}{{$unused := ($root = $)}}{{end}}{{$root.Name}}`,
+		"nested declaration":          `{{$root := .User}}{{$unused := ($root := .)}}{{$root.Name}}`,
+		"nested condition assignment": `{{$root := .User}}{{if ($root = .)}}{{$root.Name}}{{end}}`,
+	}
+	for name, text := range tests {
+		t.Run(name, func(t *testing.T) {
+			content := "[\"sample\"]\nother = " + strconv.Quote(text) + "\n"
+			require.ErrorContains(t, Check(pair(content, content)), "嵌套")
+		})
+	}
+	// 普通括号、声明和分支外重赋值保持可用。
+	en := `["sample"]
+other = '{{$root := (.User)}}{{$root = (.)}}{{$root.Name}}'
+`
+	zh := `["sample"]
+other = '{{.User}}{{.Name}}'
+`
+	require.NoError(t, Check(pair(en, zh)))
+}
