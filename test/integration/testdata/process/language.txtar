@@ -24,3 +24,20 @@ stdout 'en'
 stdout 'zh-CN'
 stdout ':4'
 ! stderr .
+
+# Cobra 的参数解析诊断不得绕过调用级 stderr。
+cli 0 __complete --unknown ''
+stdout ':5'
+! stderr .
+cli 0 __complete --json=invalid ''
+stdout ':5'
+! stderr .
+cli 0 __complete --unknown=value
+stdout ':5'
+! stderr .
+cli 0 --help=false __complete --lang ''
+stdout ':4'
+! stderr .
+cli 0 --version=false __complete --lang ''
+stdout ':4'
+! stderr .

@@ -58,22 +58,8 @@ func selectLanguage(root *cobra.Command, args []string, env string) (string, err
 	// 与 Execute 使用相同的命令查找，子命令选项也可能位于命令名之前。
 	// Find 不执行选项 Set；查找错误留给实际执行路径处理。
 	current, scan, _ := root.Find(args)
-	findFlag := func(name string, short bool) *pflag.Flag {
-		for cmd := current; cmd != nil; cmd = cmd.Parent() {
-			for _, set := range []*pflag.FlagSet{cmd.Flags(), cmd.PersistentFlags()} {
-				var f *pflag.Flag
-				if short {
-					f = set.ShorthandLookup(name)
-				} else {
-					f = set.Lookup(name)
-				}
-				if f != nil {
-					return f
-				}
-			}
-		}
-		return nil
-	}
+	findFlag := func(name string, short bool) *pflag.Flag { return commandFlag(current, name, short) }
+
 	for i := 0; i < len(scan); i++ {
 		arg := scan[i]
 		if arg == "--" {
@@ -156,22 +142,8 @@ func completionRequest(root *cobra.Command, args []string) (int, bool) {
 	if target == nil {
 		target = root
 	}
-	lookup := func(name string, short bool) *pflag.Flag {
-		for cmd := target; cmd != nil; cmd = cmd.Parent() {
-			for _, set := range []*pflag.FlagSet{cmd.Flags(), cmd.PersistentFlags()} {
-				var flag *pflag.Flag
-				if short {
-					flag = set.ShorthandLookup(name)
-				} else {
-					flag = set.Lookup(name)
-				}
-				if flag != nil {
-					return flag
-				}
-			}
-		}
-		return nil
-	}
+	lookup := func(name string, short bool) *pflag.Flag { return commandFlag(target, name, short) }
+
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		if arg == "--" {
@@ -192,6 +164,10 @@ func completionRequest(root *cobra.Command, args []string) (int, bool) {
 				if flag == nil {
 					return 0, false
 				}
+				// -h=false 等带等号的 bool 值不是后续短选项。
+				if j+1 < len(arg) && arg[j+1] == '=' {
+					break
+				}
 				if flag.NoOptDefVal == "" {
 					if j+1 == len(arg) {
 						i++
@@ -204,4 +180,21 @@ func completionRequest(root *cobra.Command, args []string) (int, bool) {
 		}
 	}
 	return 0, false
+}
+
+func commandFlag(target *cobra.Command, name string, short bool) *pflag.Flag {
+	for cmd := target; cmd != nil; cmd = cmd.Parent() {
+		for _, set := range []*pflag.FlagSet{cmd.Flags(), cmd.PersistentFlags()} {
+			var flag *pflag.Flag
+			if short {
+				flag = set.ShorthandLookup(name)
+			} else {
+				flag = set.Lookup(name)
+			}
+			if flag != nil {
+				return flag
+			}
+		}
+	}
+	return nil
 }

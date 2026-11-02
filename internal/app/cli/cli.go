@@ -61,6 +61,32 @@ func run(ctx context.Context, args []string, opts Options, loadBundle func() (*m
 		}
 	}()
 	if err == nil {
+		err = ctx.Err()
+	}
+	if err == nil {
+		if index, protocol := completionRequest(root, args); protocol {
+			// 使用独立树预解析，不能替换全局 os.Stderr，也不能提前改变实际补全状态。
+			shadowOptions := opts
+			shadowOptions.Language = call.localizer.Language()
+			shadowOptions.Out, shadowOptions.ErrOut = io.Discard, io.Discard
+			//nolint:contextcheck // 仅构造独立解析树；实际请求仍由 ExecuteContextC 注入调用者 ctx。
+			shadow, _, setupErr := buildRoot(shadowOptions, func() (*messages.Bundle, error) { return call.bundle, nil })
+			if setupErr != nil {
+				err = fault.Wrap(fault.Runtime, "", setupErr)
+			} else {
+				value := shadow.PersistentFlags().Lookup(flagLanguage).Value.(*languageValue)
+				value.completing, value.preselected = true, true
+				if !validCompletionInput(shadow, args, index) {
+					if writeErr := writeBytes(opts.Out, fmt.Appendf(nil, ":%d\n", cobra.ShellCompDirectiveError|cobra.ShellCompDirectiveNoFileComp)); writeErr != nil {
+						err = fault.Wrap(fault.Runtime, "", writeErr)
+					} else {
+						return 0
+					}
+				}
+			}
+		}
+	}
+	if err == nil {
 		root.SetArgs(args)
 		_, err = root.ExecuteContextC(ctx)
 	}
@@ -176,6 +202,8 @@ func buildRoot(opts Options, loadBundle func() (*messages.Bundle, error), args .
 		call.bindFlag(root.PersistentFlags().Lookup(binding.flag), message(binding.id))
 	}
 	call.bindFlag(greet.Flags().Lookup(flagName), message("cli.name"))
+	configureHelp(root, call)
+	configureHelp(help, call)
 	_, completing := completionRequest(root, args)
 	languageFlagValue.completing = completing
 	if completing {
@@ -185,8 +213,6 @@ func buildRoot(opts Options, loadBundle func() (*messages.Bundle, error), args .
 			return root, call, fault.Wrap(fault.Runtime, "", err)
 		}
 	}
-	configureHelp(root, call)
-	configureHelp(help, call)
 	protectCommand(root)
 	protectCommand(help)
 	selected := opts.Language

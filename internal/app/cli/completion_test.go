@@ -88,6 +88,11 @@ func TestShellSubcommandsHaveHelpSchemaAndScripts(t *testing.T) {
 			require.Zero(t, code, stderr)
 			require.Empty(t, stderr)
 			require.Contains(t, out, "testcli")
+			legacyCode, legacyOut, legacyErr := invoke(t, "completion", "--", shell)
+			require.Zero(t, legacyCode, legacyErr)
+			require.Empty(t, legacyErr)
+			require.Equal(t, out, legacyOut)
+
 			code, out, stderr = invoke(t, "completion", shell, "extra")
 			require.Equal(t, 2, code)
 			require.Empty(t, out)
@@ -148,4 +153,22 @@ func TestConcurrentCompletionLanguageIsolation(t *testing.T) {
 		}
 	}
 	wg.Wait()
+}
+
+func TestCompletionRecognizesInitializedHelpAndVersionFlags(t *testing.T) {
+	for _, flag := range []string{"--help=false", "--version=false", "-h=false", "-v=false"} {
+		code, out, stderr := invoke(t, flag, "__complete", "--lang", "")
+		require.Zero(t, code, stderr)
+		require.Empty(t, stderr)
+		require.Contains(t, out, ":4\n")
+	}
+}
+
+func TestCanceledCompletionDoesNotCommitErrorDirective(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	code, out, stderr := invokeContext(t, ctx, "__complete", "--unknown", "")
+	require.Equal(t, 130, code)
+	require.Empty(t, out)
+	require.NotEmpty(t, stderr)
 }

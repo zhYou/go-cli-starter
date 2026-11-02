@@ -61,12 +61,18 @@ func newCompletionCommand(root *cobra.Command, call *invocation, name string) *c
 			if len(args) > 1 {
 				return usageProblem("shell_count", fault.Params{"Count": len(args)})
 			}
-			if len(args) == 1 {
+			if len(args) == 1 && !slices.Contains(shells, args[0]) {
 				return usageProblem("shell", fault.Params{paramValue: strconv.Quote(args[0])})
 			}
 			return nil
 		},
-		RunE: func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return cmd.Help()
+			}
+			// 保留 completion -- <shell> 这一历史位置参数调用。
+			return writeText(cmd.OutOrStdout(), func(w io.Writer) error { return generateCompletion(root, args[0], w) })
+		},
 	}
 	for _, shell := range shells {
 		child := &cobra.Command{
@@ -79,16 +85,7 @@ func newCompletionCommand(root *cobra.Command, call *invocation, name string) *c
 			},
 			RunE: func(cmd *cobra.Command, _ []string) error {
 				return writeText(cmd.OutOrStdout(), func(w io.Writer) error {
-					switch shell {
-					case shellBash:
-						return root.GenBashCompletionV2(w, true)
-					case shellZsh:
-						return root.GenZshCompletion(w)
-					case shellFish:
-						return root.GenFishCompletion(w, true)
-					default:
-						return root.GenPowerShellCompletionWithDesc(w)
-					}
+					return generateCompletion(root, shell, w)
 				})
 			},
 		}
@@ -135,4 +132,17 @@ func registerCompletionValues(root *cobra.Command) error {
 		}
 	}
 	return nil
+}
+
+func generateCompletion(root *cobra.Command, shell string, w io.Writer) error {
+	switch shell {
+	case shellBash:
+		return root.GenBashCompletionV2(w, true)
+	case shellZsh:
+		return root.GenZshCompletion(w)
+	case shellFish:
+		return root.GenFishCompletion(w, true)
+	default:
+		return root.GenPowerShellCompletionWithDesc(w)
+	}
 }
