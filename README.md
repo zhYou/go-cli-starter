@@ -266,16 +266,17 @@ cmd/<name>/                 程序入口与信号测试
 internal/app/               CLI、配置与业务逻辑
 internal/base/              错误、消息、路径、校验、IO、日志、Trace、诊断、schema
 internal/locales/           集中维护的双语 TOML 消息目录
-internal/tools/command/     外部命令与有界并行
-internal/dev/               模板初始化与机器契约比较
+internal/command/           运行时外部命令与有界并行
 configs/config.example.toml 配置示例
 test/integration/           真实进程测试与脚本
 test/testdata/contracts/    机器契约基线
-tools/                     初始化与开发任务
+tools/dev/                 开发与发布验收入口
+tools/init/                模板初始化入口
+tools/internal/            模板、契约及配置和语言检查的工具共享包
 docs/                      使用和维护说明
 ```
 
-`cmd/<name>` 入口负责信号和退出；`internal/app/cli` 组织命令，`internal/app/config` 加载配置，`internal/app/greeting` 演示业务逻辑；`internal/base` 提供不依赖应用、开发工具或 Cobra 的公共能力；`internal/base/schema` 负责运行时结果结构，`internal/dev/contract` 负责开发期快照比较。`internal/dev/scaffold` 和根目录 `tools` 提供初始化与开发任务。
+`cmd/<name>` 入口负责信号和退出；`internal/app/cli` 组织命令，`internal/app/config` 加载配置，`internal/app/greeting` 演示业务逻辑；`internal/base` 提供不依赖应用、开发工具或 Cobra 的公共能力；`internal/base/schema` 负责运行时结果结构，`tools/internal/contract` 负责开发期快照比较。`internal/command` 提供业务可复用的外部进程执行能力。根目录 `tools` 提供初始化与开发任务，共享实现集中在 `tools/internal`；运行时代码及其测试不依赖这些开发包。
 
 初始化后的命令目录随 `--name` 改名；模板版本为 0.3.0，已有项目迁移见[模板升级](docs/template-upgrades.md)。发布包仍在根目录提供 `config.example.toml`。
 

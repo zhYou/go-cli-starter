@@ -27,7 +27,7 @@ func TestCorruptCatalogEndToEnd(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 	//nolint:gosec // G204：执行固定 Go 测试命令，overlay 路径来自当前测试的临时目录。
-	cmd := exec.CommandContext(ctx, "go", "test", "-count=1", "-overlay", overlayFile, "-run", "^TestCorruptCatalogProcess$", "./internal/app/greeting", "./internal/app/session", "./internal/tools/command")
+	cmd := exec.CommandContext(ctx, "go", "test", "-count=1", "-overlay", overlayFile, "-run", "^TestCorruptCatalogProcess$", "./internal/app/greeting", "./internal/app/session", "./internal/command")
 	cmd.Dir = root
 	cmd.Env = append(isolatedAppEnvironment(t, "go-cli-starter"), "TEST_CORRUPT_I18N_CATALOG=1", "GOPROXY=off", "GOTOOLCHAIN=local")
 	cmd.WaitDelay = time.Second

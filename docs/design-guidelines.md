@@ -8,11 +8,12 @@
 一个命令需要 CLI、业务函数和运行资源时，项目选择由 `cmd/<name>` 处理信号与退出，
 `internal/app/cli` 处理参数和呈现，应用模块定义自己的选项、结果和错误码，消息集中维护在
 `internal/locales/`；`internal/app/session` 组合运行资源。这样业务可直接调用并校验输入，无需导入 Cobra。
-公共机制在 `internal/base`，不得反向依赖 app、tools、dev 或 Cobra；外部进程在
-`internal/tools/command`，模板、快照及工具探测在 `internal/dev` 和根 `tools`。
+公共机制在 `internal/base`，不得反向依赖 app、command、tools 或 Cobra；运行时外部进程在
+`internal/command`。开发维护入口在根 `tools`，模板、快照及配置和语言检查的共享实现放入
+`tools/internal`。运行时代码及其测试不导入开发包，工具可以复用运行时包；Go 的 internal 导入规则约束工具共享包的使用范围。
 
 例如问候逻辑位于 `internal/app/greeting`，结果 schema 的生成机制位于 `internal/base/schema`，
-开发期快照比较位于 `internal/dev/contract`。不要把新业务错误码加入 base 的全局目录，
+开发期快照比较位于 `tools/internal/contract`。不要把新业务错误码加入 base 的全局目录，
 也不要为符合目录图而创建空包。构造函数应完成默认值、校验、依赖组合或资源建立；
 简单选项值可以直接使用字面量。嵌套组合较复杂时逐字段分行，便于审查所有权。
 
@@ -101,7 +102,7 @@ mapstructure 使用 `ErrorUnused=true`、`WeaklyTypedInput=false`、精确名称
 兼容 `GO_CLI_STARTER_LOG_LEVEL` 在新 `GO_CLI_STARTER_LOGGING_LEVEL` 之后应用，flag 最后应用。
 空环境变量视为未设置。非法显式文件立即报错，默认文件缺失可继续；不自动迁移 YAML。
 自行维护的应用配置使用 TOML，新增配置放在 `configs/` 并经统一入口加载。其他应用配置路径
-须先登记到 `internal/dev/configpolicy`；工具配置以及 JSON 业务、测试和契约数据可保持原格式。
+须先登记到 `tools/internal/configpolicy`；工具配置以及 JSON 业务、测试和契约数据可保持原格式。
 检查范围和例外见[开发说明](development.md#静态规则与开发探测)。
 
 validator 实例可复用；项目在使用前完成自定义规则注册，之后只校验。

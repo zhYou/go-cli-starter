@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zhYou/go-cli-starter/internal/dev/configpolicy"
-	"github.com/zhYou/go-cli-starter/internal/dev/i18ncheck"
-	"github.com/zhYou/go-cli-starter/internal/dev/scaffold"
 	"github.com/zhYou/go-cli-starter/internal/locales"
+	"github.com/zhYou/go-cli-starter/tools/internal/configpolicy"
+	"github.com/zhYou/go-cli-starter/tools/internal/i18ncheck"
+	"github.com/zhYou/go-cli-starter/tools/internal/scaffold"
 )
 
 const appName = "go-cli-starter"

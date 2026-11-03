@@ -40,11 +40,13 @@ RTK 仅报告状态，superpowers 以实际会话技能列表为准。gh、Codex
 | `internal/app/greeting` | 可移除业务示例 |
 | `internal/base` | fault、messages、paths、validation、IO、logging、telemetry、diagnostics、结果 schema |
 | `internal/locales` | 集中双语 TOML 消息目录与共享 Bundle |
-| `internal/tools/command` | 独立 argv、进程所有权、捕获和有界批量执行 |
-| `internal/dev`、根 `tools/` | 模板、契约快照、开发与发布验收 |
+| `internal/command` | 独立 argv、进程所有权、捕获和有界批量执行 |
+| `tools/dev/`、`tools/init/` | 开发与发布验收入口、模板初始化入口 |
+| `tools/internal/` | 工具私有共享实现：模板、契约快照、配置与语言检查 |
 | `configs/`、`test/integration/`、`test/testdata/contracts/` | 配置示例、真实进程脚本、共享契约基线 |
 
-base 不依赖 app、tools、dev 或 Cobra。领域码及结果由所属模块定义，文案集中维护；新目录按实际职责增加。
+base 不依赖 app、command、tools 或 Cobra。领域码及结果由所属模块定义，文案集中维护；新目录按实际职责增加。
+运行时代码与测试不依赖开发包；工具可以复用运行时包。`tools/internal` 的导入范围由 Go 限制在 tools 子树内。
 开发工具用 `scaffold.Inspect` 静态识别唯一入口，不根据模块路径末段猜测命令名。
 
 ## 实现与检查
@@ -136,7 +138,7 @@ Get、Raw、All 等绕过结构体的入口。zap 只在 base/logging，OTel SDK
 语言 TOML 检查语法，消息语义由 i18n:check 检查。
 
 新增应用配置放入 `configs/` 并通过 `internal/app/config/load.go` 统一加载；确需其他路径时先登记到
-`internal/dev/configpolicy`。mise、`.codex`、CI、golangci 等工具配置沿用工具自身格式，其他位置的
+`tools/internal/configpolicy`。mise、`.codex`、CI、golangci 等工具配置沿用工具自身格式，其他位置的
 业务 JSON、测试数据和协议/契约数据不纳入扫描。两项检查由 lint 调用并纳入 check；它们不会自动安装
 工具或修复文件。
 
@@ -152,7 +154,7 @@ Linux CI 直接执行五秒 argv 模糊测试，覆盖空值、空格、Unicode�
 
 ## 修改模板与升级工具
 
-初始化只重写 `internal/dev/scaffold/scaffold.go` 的 managedFiles 白名单。
+初始化只重写 `tools/internal/scaffold/scaffold.go` 的 managedFiles 白名单。
 新增身份文件须明确登记；保留初始化实现的原模板身份和 fixture，禁止全仓替换。
 移动或新增文件先暂存，再运行使用 Git 索引清单复制项目的 `template:check`。
 它验证改名、幂等、测试、真实构建与 go install 后的绝对路径二进制、version/help/schema/TOML。

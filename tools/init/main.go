@@ -8,7 +8,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/zhYou/go-cli-starter/internal/dev/scaffold"
+	"github.com/zhYou/go-cli-starter/tools/internal/scaffold"
 )
 
 func main() {

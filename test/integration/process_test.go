@@ -11,7 +11,6 @@ import (
 
 	"github.com/rogpeppe/go-internal/testscript"
 	"github.com/stretchr/testify/require"
-	"github.com/zhYou/go-cli-starter/internal/dev/scaffold"
 )
 
 func TestProcessExitCodes(t *testing.T) {
@@ -22,10 +21,8 @@ func TestProcessExitCodes(t *testing.T) {
 	binary := filepath.Join(t.TempDir(), name)
 	root, err := filepath.Abs("../..")
 	require.NoError(t, err)
-	project, err := scaffold.Inspect(root)
-	require.NoError(t, err)
 	//nolint:gosec // G204：测试只运行当前测试二进制或固定 Git/Go 命令，参数来自临时 fixture。
-	cmd := exec.Command("go", "build", "-o", binary, "./"+project.CommandPath)
+	cmd := exec.Command("go", "build", "-o", binary, "./cmd/...")
 	cmd.Dir = root
 	data, err := cmd.CombinedOutput()
 	require.NoError(t, err, "%s", data)

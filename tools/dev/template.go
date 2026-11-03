@@ -11,7 +11,7 @@ import (
 
 	"github.com/spf13/afero"
 	"github.com/zhYou/go-cli-starter/internal/base/paths"
-	"github.com/zhYou/go-cli-starter/internal/dev/scaffold"
+	"github.com/zhYou/go-cli-starter/tools/internal/scaffold"
 )
 
 func verifyTemplate() error {

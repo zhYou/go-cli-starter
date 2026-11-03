@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/zhYou/go-cli-starter/internal/dev/contract"
+	"github.com/zhYou/go-cli-starter/tools/internal/contract"
 )
 
 func TestBaselineRefreshStillRequiresChangeRecord(t *testing.T) {

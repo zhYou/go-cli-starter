@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	cmdexec "github.com/zhYou/go-cli-starter/internal/tools/command"
+	cmdexec "github.com/zhYou/go-cli-starter/internal/command"
 )
 
 // checkRules 使用真实类型分析及仓库配置验证边界；fixture 不参与产品构建。

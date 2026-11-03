@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/zhYou/go-cli-starter/internal/app/greeting"
-	"github.com/zhYou/go-cli-starter/internal/tools/command"
+	"github.com/zhYou/go-cli-starter/internal/command"
 )
 
 func TestCommandEmbeddingHelper(t *testing.T) {
