@@ -210,7 +210,9 @@ MYCLI_HOME="$(mktemp -d)" mise exec -- mycli version --json
 
 ## 发布与交付
 
-运行 check、race、vuln、release:snapshot、release:verify，核对六目标归档、配置示例、SPDX 和最终摘要。
+发布前运行 `mise run check`、`mise exec -- go test -race ./...` 和 `mise exec -- govulncheck ./...`；
+再运行 `mise exec -- goreleaser release --snapshot --clean --parallelism 2` 与 `mise run release:verify`，
+核对六目标归档、配置示例、SPDX 和最终摘要。
 Syft 固定版本且关闭 enrichment、远程许可证查询及更新检查，SBOM 完成后才生成最终 checksums。
 本地不上传证明；受信任 release workflow 对最终资产生成来源证明。证明失败的重试必须使用同一批
 已发布原始字节，不能重构建或覆盖 Release。安全与托管权限见[维护清单](maintenance.md)。

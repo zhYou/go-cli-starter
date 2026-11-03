@@ -24,7 +24,8 @@
 源码检查见[开发说明](development.md)，模板迁移见[模板升级](template-upgrades.md)，接口政策见[兼容性规则](compatibility.md)。
 工具升级同步当前版本表、两份 mise 配置、Go 声明和 CI；历史变更通过 Git 追溯。
 
-发布前运行 check、test:race、vuln、release:snapshot、release:verify。检查六目标归档、各自 SPDX 与最终摘要。
+发布前按[开发说明的发布与交付步骤](development.md#发布与交付)完成源码检查、竞态与漏洞扫描、
+本地 snapshot 和发布验收。检查六目标归档、各自 SPDX 与最终摘要。
 macOS/Windows 的运行结果以对应 CI 为准，Linux 上的交叉编译不证明这些系统上的运行行为。
 
 Release 创建后证明失败时，workflow 失败；重试必须针对同一批已发布资产的原始字节。核对下载摘要后，在受信任 workflow 中重做证明，不重新构建或覆盖 Release。

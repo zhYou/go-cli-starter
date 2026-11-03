@@ -279,7 +279,7 @@ docs/                      使用和维护说明
 
 初始化后的命令目录随 `--name` 改名；模板版本为 0.3.0，已有项目迁移见[模板升级](docs/template-upgrades.md)。发布包仍在根目录提供 `config.example.toml`。
 
-`check` 在临时仓库中验证发布配置，无需为内部工具配置 remote。真正发布或运行 `release:check` 前，为目标项目设置自己的 GitHub origin。
+`check` 在临时仓库中验证发布配置，无需为内部工具配置 remote。真正发布或运行 `mise exec -- goreleaser check` 前，为目标项目设置自己的 GitHub origin。
 
 新增命令、工具升级和发布步骤见 [开发说明](docs/development.md)，后续工作见[项目待办](https://github.com/zhYou/go-cli-starter/issues?q=is%3Aissue+state%3Aopen+label%3Abacklog)。
 
