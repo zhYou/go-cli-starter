@@ -50,8 +50,6 @@ func runArgs(args []string) error {
 	switch task {
 	case "release-verify":
 		return verifyRelease("dist")
-	case "vuln":
-		return checkVulnerabilities(context.Background(), nil)
 	case "i18n-check":
 		return i18ncheck.Check(locales.Catalog())
 	case "config-check":
@@ -64,10 +62,6 @@ func runArgs(args []string) error {
 		return updateContract(context.Background())
 	case taskBuild:
 		return build()
-	case "fmt":
-		return format(true)
-	case "fmt-check":
-		return format(false)
 	case "doctor":
 		return doctor(false)
 	case "doctor-agent":
@@ -117,19 +111,4 @@ func build() error {
 	}
 	flags := fmt.Sprintf("-s -w -X main.version=%s -X main.commit=%s -X main.date=%s", version, commit, time.Now().UTC().Format(time.RFC3339))
 	return command("", "go", buildCommand, "-trimpath", "-ldflags", flags, "-o", filepath.Join("bin", name), "./"+project.CommandPath)
-}
-
-func format(write bool) error {
-	args := []string{"fmt", "--color=never"}
-	if !write {
-		args = append(args, "--diff")
-	}
-	data, err := exec.Command(lintProgram, args...).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("golangci-lint 格式检查失败：%w\n%s", err, data)
-	}
-	if !write && len(data) != 0 {
-		return fmt.Errorf("请运行 mise run fmt：\n%s", data)
-	}
-	return nil
 }

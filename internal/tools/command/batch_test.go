@@ -140,24 +140,51 @@ func TestBatchImmediateItemDeadlineIsNotSkipped(t *testing.T) {
 	}
 }
 
-func TestBatchOrderCollectAllAndTimeoutClassification(t *testing.T) {
-	first, options := helper(t, "sleep", "140ms", "first")
+func TestBatchOrderCollectAll(t *testing.T) {
+	first, options := helper(t, "gate-output")
+	firstReady, firstGate := filepath.Join(options.Dir, "first-ready"), filepath.Join(options.Dir, "first-gate")
+	secondReady, secondGate := filepath.Join(options.Dir, "second-ready"), filepath.Join(options.Dir, "second-gate")
+	first.Args = append(first.Args, firstReady, firstGate, "first")
 	second := first
-	second.Args = append([]string(nil), first.Args...)
-	second.Args[len(second.Args)-1] = "second"
+	second.Args = []string{"-test.run=^TestHelperProcess$", "--", "gate-output", secondReady, secondGate, "second"}
 	failed := first
 	failed.Args = []string{"-test.run=^TestHelperProcess$", "--", "exit"}
 	items := []Invocation{first, failed, second}
-	results, err := RunBatch(t.Context(), items, options, BatchOptions{Concurrency: 1, ItemTimeout: 200 * time.Millisecond})
+	// 顺序与 collect-all 由文件门闩控制，不对成功进程施加短期限。
+	done := startBatch(t, t.Context(), items, options, BatchOptions{Concurrency: 1})
+	waitMarker(t, firstReady)
+	if err := os.WriteFile(firstGate, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	waitMarker(t, secondReady)
+	if err := os.WriteFile(secondGate, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	outcome := awaitBatch(t, done)
+	results, err := outcome.items, outcome.err
 	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("整体分类 %v", err)
 	}
-	if string(results[0].Stdout) != "first" || results[1].ExitCode != 7 || string(results[2].Stdout) != "second" {
+	if results[0].Status != Succeeded || string(results[0].Stdout) != "first" || results[1].Status != Failed || results[1].ExitCode != 7 || results[2].Status != Succeeded || string(results[2].Stdout) != "second" {
 		t.Fatalf("顺序 %+v", results)
 	}
-	results, err = RunBatch(t.Context(), []Invocation{first}, options, BatchOptions{ItemTimeout: 10 * time.Millisecond})
-	if err == nil || errors.Is(err, context.DeadlineExceeded) || !errors.Is(results[0].Err, context.DeadlineExceeded) {
-		t.Fatalf("单项超时: %v %+v", err, results)
+}
+
+func TestBatchItemTimeoutStartsAfterSlot(t *testing.T) {
+	blocked, options := helper(t, "gate-output")
+	blocked.Args = append(blocked.Args, filepath.Join(options.Dir, "ready"), filepath.Join(options.Dir, "never-release"), "never")
+	next := blocked
+	next.Args = []string{"-test.run=^TestHelperProcess$", "--", "sleep", "0s", "after"}
+	// 第一项等待永不打开的门闩并用尽期限，下一项获得名额后才开始自己的计时。
+	results, err := RunBatch(t.Context(), []Invocation{blocked, next}, options, BatchOptions{Concurrency: 1, ItemTimeout: time.Second})
+	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("整体分类 %v", err)
+	}
+	if results[0].Status != Canceled || !errors.Is(results[0].Err, context.DeadlineExceeded) || len(results[0].Stdout) != 0 {
+		t.Fatalf("单项超时 %+v", results[0])
+	}
+	if results[1].Status != Succeeded || results[1].Err != nil || string(results[1].Stdout) != "after" {
+		t.Fatalf("排队时间占用了单项期限 %+v", results[1])
 	}
 }
 
