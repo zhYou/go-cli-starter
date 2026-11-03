@@ -57,7 +57,7 @@ base 不依赖 app、tools、dev 或 Cobra。领域码及结果由所属模块�
    双语消息在同次修改中维护，分别运行 `mise run config:check` 和 `mise run i18n:check`。
    仅 Changed 的 flag 覆盖，禁止逐键 koanf getter；缺译、系统原因和结构化 fault 的规则见指南。
 4. 为行为变化运行针对性测试，观察真实结果，修改后检查 gopls 诊断。保留用户已有修改，格式化限于授权范围。
-5. 交付前运行 `mise run fmt`、`mise run check`，支持的宿主运行 `mise run test:race`。
+5. 交付前运行 `mise exec -- golangci-lint fmt --color=never`、`mise run check`，支持的宿主运行 `mise exec -- go test -race ./...`。
    模板/身份变更增加 `template:check`，工具集成增加 `mcp:check`；受信任会话确认 `codex mcp list` 有 gopls。
    发布变更增加 snapshot 与 verify；无法执行的检查写明原因。
 
@@ -66,7 +66,7 @@ base 不依赖 app、tools、dev 或 Cobra。领域码及结果由所属模块�
 ```sh
 example_home=$(mktemp -d)
 GO_CLI_STARTER_HOME="$example_home" mise run check
-GO_CLI_STARTER_HOME="$example_home" mise run test:race
+GO_CLI_STARTER_HOME="$example_home" mise exec -- go test -race ./...
 ```
 
 改名为 mycli 后使用 `MYCLI_HOME`，由 `paths.EnvPrefix(name)+"_HOME"` 派生。
@@ -106,7 +106,7 @@ GO_CLI_STARTER_HOME="$test_home" mise exec -- go test ./test/integration -run '^
 
 ## 静态规则与开发探测
 
-`mise run lint` 启用以下 18 项，生产导出 API 需中文 GoDoc；测试仅豁免 GoDoc，其他边界仍生效：
+`mise run lint` 先检查双语消息和应用配置，再启用以下 18 项，生产导出 API 需中文 GoDoc；测试仅豁免 GoDoc，其他边界仍生效：
 
 ```text
 errcheck govet ineffassign staticcheck unused bodyclose errorlint gosec godoclint
@@ -140,14 +140,15 @@ Get、Raw、All 等绕过结构体的入口。zap 只在 base/logging，OTel SDK
 业务 JSON、测试数据和协议/契约数据不纳入扫描。两项检查由 lint 调用并纳入 check；它们不会自动安装
 工具或修复文件。
 
-`fmt` 使用 golangci-lint 的 gofmt、goimports；`fmt:check` 只展示差异并失败，不改源码。
+`mise exec -- golangci-lint fmt --color=never` 使用 gofmt 和 goimports；
+加上 `--diff` 只展示差异并失败，不改源码。
 check 不改写源码，但会使用 Go 缓存、临时文件和 bin 产物。
-`test:fuzz` 对 NUL 分隔的独立 argv 做五秒模糊测试，覆盖空值、空格、Unicode、`--` 和取消；
-`test:bench` 测量树构造和 greet 调用，没有性能门槛，两者在 Linux CI 执行。
+Linux CI 直接执行五秒 argv 模糊测试，覆盖空值、空格、Unicode、`--` 和取消；
+另执行树构造和 greet 调用的 benchmark，没有性能门槛。具体命令见 README 的开发命令。
 
 `doctor` 使用共享执行器，最多四项并行，每项三秒，每流 2 KiB，按固定顺序报告精确版本及
 超时、取消、截断。govulncheck 读取本地 Go 构建信息验证命令、模块来源及版本，再执行 `-h`，
-不访问漏洞库。真正联网扫描由 `mise run vuln` 独立执行，不可用或数据库失败同样失败。
+不访问漏洞库。真正联网扫描由 `mise exec -- govulncheck ./...` 独立执行，不可用或数据库失败同样失败。
 
 ## 修改模板与升级工具
 

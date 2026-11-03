@@ -102,13 +102,13 @@
 - 测试和示例验证必须隔离父进程与子进程的应用 HOME、配置及状态，禁止读写真实用户诊断数据。
   本模板使用 `GO_CLI_STARTER_HOME`，改名后按应用前缀派生；不提交密钥、环境转储、日志或缓存。
 - 编辑期间运行针对性测试。消息目录或应用配置改动分别运行 `mise run i18n:check`、
-  `mise run config:check`；两者也由 lint 和 check 执行。交付前运行 `mise run fmt` 和
-  `mise run check`，并在支持的主机上运行 `mise run test:race`。
+  `mise run config:check`；两者也由 lint 和 check 执行。交付前运行 `mise exec -- golangci-lint fmt --color=never` 和
+  `mise run check`，并在支持的主机上运行 `mise exec -- go test -race ./...`。
 - 修改模板或项目标识时运行 `mise run template:check`。
   新文件包含应用标识时同步更新受管文件清单。
 - 修改工具集成时运行 `mise run mcp:check`，并在受信任的项目会话中确认
   `codex mcp list` 包含 gopls。
-- 修改发布流程时运行 `mise run release:snapshot`，该命令不会发布。
+- 修改发布流程时运行 `mise exec -- goreleaser release --snapshot --clean --parallelism 2`，该命令不会发布。
   无法运行的检查须说明原因，不能声称通过；跨编译不代表 macOS/Windows 原生运行通过。
 - 保留用户已有修改，只格式化授权范围；Git 写入失败先只读检查，禁止借机 reset、clean 或强推。
 

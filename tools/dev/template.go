@@ -65,7 +65,7 @@ func verifyTemplate() error {
 	if err := prepareFixture(dir); err != nil {
 		return err
 	}
-	if err := command(dir, "go", runCommand, "./tools/dev", "fmt-check"); err != nil {
+	if err := command(dir, lintProgram, "fmt", "--diff", "--color=never"); err != nil {
 		return err
 	}
 	// 子进程使用生成应用的前缀，原模板的 HOME 不会被改名后的程序读取。

@@ -16,4 +16,4 @@ jobs:
         with:
           version: 2026.10.21
       - run: mise run setup
-      - run: mise run vuln
+      - run: mise exec -- govulncheck ./...

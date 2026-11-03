@@ -34,10 +34,10 @@ jobs:
           if [ -n "$CONTRACT_BASE" ] && [ "$CONTRACT_BASE" != "0000000000000000000000000000000000000000" ]; then
             mise run contract:check -- --against "$CONTRACT_BASE"
           fi
-      - run: mise run test:fuzz
-      - run: mise run test:bench
-      - run: mise run test:race
-      - run: mise run release:snapshot
+      - run: mise exec -- go test ./internal/app/cli -run=^$ -fuzz=FuzzArgv -fuzztime=5s
+      - run: mise exec -- go test ./internal/app/cli -run=^$ -bench=. -benchmem
+      - run: mise exec -- go test -race ./...
+      - run: mise exec -- goreleaser release --snapshot --clean --parallelism 2
       - run: mise run release:verify
   agent-mcp:
     runs-on: ubuntu-latest
@@ -83,5 +83,5 @@ jobs:
           GO_CLI_STARTER_HOME: ${{ runner.temp }}/template-starter-home
           MYCLI_HOME: ${{ runner.temp }}/template-mycli-home
         run: mise exec -- go test -count=1 ./tools/dev -run '^TestTemplateExecutable(Path|Acceptance)$'
-      - run: mise run test
+      - run: mise exec -- go test ./...
       - run: mise run build

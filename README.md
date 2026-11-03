@@ -216,23 +216,48 @@ CI 的独立 `agent-mcp` job 只准备 gopls 并验证真实连接，无需安�
 
 ## 开发命令
 
+mise 任务保留项目流程、聚合检查和自定义工具：
+
 | 命令 | 用途 |
 | --- | --- |
 | `mise run setup` | 安装固定版本的开发工具，下载模块 |
 | `mise run setup:agent` | 准备开发工具，再安装 gopls |
-| `mise run doctor` | 检查 mise、git 和开发工具版本 |
-| `mise run doctor:agent` | 检查开发与智能体环境，报告预装辅助工具状态 |
-| `mise run fmt` / `fmt:check` | gofmt + goimports；后者只读检查差异 |
-| `mise run test` | 单元与命令测试 |
-| `mise run test:race` | 竞态检测，需要 C 编译器 |
-| `mise run lint` / `rules:check` | 18 项静态检查及真实类型边界 fixture |
+| `mise run doctor` / `doctor:agent` | 检查开发环境 / 智能体环境 |
+| `mise run lint` | 聚合双语消息、应用配置和 18 项静态检查 |
 | `mise run i18n:check` / `config:check` | 校验双语消息目录 / 受管应用配置；均纳入 lint 和 check |
-| `mise run test:fuzz` / `test:bench` | 有界 argv 模糊测试 / 开销测量，无性能门槛 |
+| `mise run rules:check` | 用真实类型边界 fixture 验证静态规则 |
 | `mise run build` | 构建到 bin，注入版本信息 |
 | `mise run check` | 与 CI 相同的完整源码检查 |
 | `mise run template:check` | 在临时副本中验证改名、测试、构建和发布配置 |
-| `mise run release:check` | 验证当前仓库的发布配置和 SCM 信息，需要 remote |
-| `mise run release:snapshot` | 本地构建全部发布压缩包，不发布 |
+| `mise run init --module <模块路径> --name <命令名>` | 初始化模板身份 |
+| `mise run contract:check` / `contract:update` | 检查 / 显式更新机器契约 |
+| `mise run versions:check` | 检查工具、模块、CI 和文档版本一致性 |
+| `mise run mcp:check` | 验证 gopls MCP 的实际连接和诊断 |
+| `mise run release:verify` | 验证发布归档，并隔离安装宿主程序 |
+
+原生工具通过 `mise exec --` 执行，无需 shell 激活；这些命令不另设任务别名：
+
+| 命令 | 用途 |
+| --- | --- |
+| `mise exec -- golangci-lint fmt --color=never` | 使用 gofmt 和 goimports 格式化 |
+| `mise exec -- golangci-lint fmt --diff --color=never` | 只读检查格式；有差异时失败 |
+| `mise exec -- go test ./...` | 单元与命令测试 |
+| `mise exec -- go test -race ./...` | 竞态检测，需要 C 编译器 |
+| `mise exec -- go vet ./...` | Go vet 检查 |
+| `mise exec -- go mod tidy -diff` | 只读检查模块元数据 |
+| `mise exec -- govulncheck ./...` | 联网扫描 Go 漏洞 |
+| `mise exec -- goreleaser check` | 验证发布配置，需要 Git remote |
+| `mise exec -- goreleaser release --snapshot --clean --parallelism 2` | 本地构建全部发布压缩包，不发布 |
+
+Linux CI 另外执行有界模糊测试和开销测量，后者没有性能门槛：
+
+```sh
+mise exec -- go test ./internal/app/cli -run=^$ -fuzz=FuzzArgv -fuzztime=5s
+mise exec -- go test ./internal/app/cli -run=^$ -bench=. -benchmem
+```
+
+`check` 包含上述只读格式、模块、单元测试和 vet 检查，以及表中的聚合检查和构建。
+`lint` 额外聚合双语消息与配置检查；单独运行 `mise exec -- golangci-lint run --allow-serial-runners` 只执行工具自身的静态检查。
 
 目录按入口、内部包、配置、测试和工具分工：
 
@@ -275,7 +300,7 @@ GoReleaser 使用 workflow 的 `GITHUB_TOKEN` 创建 Release，生成 Linux、ma
 
 模板版本与后续合并方式见[模板升级](docs/template-upgrades.md)。
 
-`mise run vuln` 独立访问 Go 漏洞数据库，PR、main 和每日定时执行；发现漏洞、数据库不可达或工具缺失均失败。源码 check 不请求漏洞数据库。
+`mise exec -- govulncheck ./...` 独立访问 Go 漏洞数据库，PR、main 和每日定时执行；发现漏洞、数据库不可达或工具缺失均失败。源码 check 不请求漏洞数据库。
 
 发布包含每个归档的 SPDX JSON 和最终 checksums.txt。下载同一 Release 的资产后先验证校验和，再检查 SPDX 与来源证明：
 
@@ -286,7 +311,7 @@ gh attestation verify <asset> --repo <owner/repo>
 ```
 
 将占位符替换为实际资产与目标仓库。每个 `<archive>.spdx.json` 的 name 对应归档，packages 列出分析到的依赖；它描述最终构建依赖，不等于源码许可证合规结论。
-`mise run release:snapshot` 与 `mise run release:verify` 仅在本地构建和验证，不生成或上传远端证明。
+`mise exec -- goreleaser release --snapshot --clean --parallelism 2` 与 `mise run release:verify` 仅在本地构建和验证，不生成或上传远端证明。
 私有仓库须先确认套餐和组织策略支持 artifact attestations。证明失败会使 release workflow 失败；若资产已发布，重试时使用已发布的原始字节生成证明，不能重新构建或覆盖资产。
 
 维护者从[维护清单](docs/maintenance.md)配置审查、安全报告、依赖更新和托管发布；开发扩展见[开发说明](docs/development.md)，机器接口变更见[兼容性规则](docs/compatibility.md)。

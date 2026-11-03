@@ -33,22 +33,6 @@ run = "go run ./tools/dev doctor"
 description = "检查开发及智能体工作环境，报告预装辅助工具状态"
 run = "mise -E agent exec -- go run ./tools/dev doctor-agent"
 
-[tasks.fmt]
-description = "格式化 Go 文件"
-run = "go run ./tools/dev fmt"
-
-[tasks."fmt:check"]
-description = "检查 Go 格式，不修改文件"
-run = "go run ./tools/dev fmt-check"
-
-[tasks.test]
-description = "运行单元测试和命令测试"
-run = "go test ./..."
-
-[tasks."test:race"]
-description = "运行竞态检测（需要 C 编译器）"
-run = "go test -race ./..."
-
 [tasks."i18n:check"]
 description = "检查集中双语消息目录"
 run = "go run ./tools/dev i18n-check"
@@ -59,24 +43,12 @@ run = "go run ./tools/dev config-check"
 
 [tasks.lint]
 depends = ["i18n:check", "config:check"]
-description = "运行固定版本的静态检查工具"
+description = "检查双语消息、应用配置及固定版本的静态规则"
 run = "golangci-lint run --allow-serial-runners"
-
-[tasks.vet]
-description = "运行 Go vet 检查"
-run = "go vet ./..."
-
-[tasks."mod:check"]
-description = "检查模块元数据，不修改文件"
-run = "go mod tidy -diff"
 
 [tasks.build]
 description = "构建包含版本信息的本地程序"
 run = "go run ./tools/dev build"
-
-[tasks."release:check"]
-description = "验证发布配置"
-run = "goreleaser check"
 
 [tasks."template:check"]
 description = "初始化并验证独立的临时项目"
@@ -84,7 +56,8 @@ run = "go run ./tools/dev template-check"
 
 [tasks.check]
 description = "运行与 CI 相同的源码检查"
-depends = ["fmt:check", "mod:check", "test", "vet", "lint", "build", "template:check", "contract:check", "versions:check", "rules:check"]
+depends = ["lint", "build", "template:check", "contract:check", "versions:check", "rules:check"]
+run = ["golangci-lint fmt --diff --color=never", "go mod tidy -diff", "go test ./...", "go vet ./..."]
 
 [tasks.init]
 description = "重命名原始模板：mise run init --module github.com/acme/mycli --name mycli"
@@ -93,10 +66,6 @@ run = "go run ./tools/init"
 [tasks."mcp:check"]
 description = "初始化 gopls MCP，发现工具并诊断当前工作区"
 run = "go run ./tools/dev mcp-check"
-
-[tasks."release:snapshot"]
-description = "在本地构建全部发布压缩包，不执行发布"
-run = "goreleaser release --snapshot --clean --parallelism 2"
 
 [tasks."contract:check"]
 description = "检查机器契约，不修改快照"
@@ -110,10 +79,6 @@ run = "go run ./tools/dev contract-update"
 description = "检查两层工具声明、模块、CI 和当前文档版本一致性"
 run = "go run ./tools/dev versions-check"
 
-[tasks.vuln]
-description = "联网检查受影响的 Go 漏洞，失败保留原因"
-run = "go run ./tools/dev vuln"
-
 [tasks."release:verify"]
 description = "验证六目标归档、SPDX、SHA-256，并隔离安装宿主归档"
 run = "go run ./tools/dev release-verify"
@@ -121,11 +86,3 @@ run = "go run ./tools/dev release-verify"
 [tasks."rules:check"]
 description = "用真实类型分析验证配置、日志和 Trace 边界"
 run = "go run ./tools/dev rules-check"
-
-[tasks."test:fuzz"]
-description = "对独立 CLI 参数做有界模糊测试"
-run = "go test ./internal/app/cli -run=^$ -fuzz=FuzzArgv -fuzztime=5s"
-
-[tasks."test:bench"]
-description = "测量 CLI 构造与调用开销，不设置性能门槛"
-run = "go test ./internal/app/cli -run=^$ -bench=. -benchmem"
