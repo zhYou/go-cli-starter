@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/zhYou/go-cli-starter/internal/base/paths"
-	"github.com/zhYou/go-cli-starter/internal/dev/contract"
+	"github.com/zhYou/go-cli-starter/tools/internal/contract"
 )
 
 // acceptanceEnv 隔离应用配置和状态，同时清除调用者的应用覆盖，避免验收读取真实用户目录。

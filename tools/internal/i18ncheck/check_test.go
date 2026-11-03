@@ -7,6 +7,7 @@ import (
 	"testing/fstest"
 
 	"github.com/stretchr/testify/require"
+	"github.com/zhYou/go-cli-starter/internal/locales"
 )
 
 func pair(en, zh string) fstest.MapFS {
@@ -14,6 +15,10 @@ func pair(en, zh string) fstest.MapFS {
 		"active.en.toml":    {Data: []byte(en)},
 		"active.zh-CN.toml": {Data: []byte(zh)},
 	}
+}
+
+func TestEmbeddedCatalog(t *testing.T) {
+	require.NoError(t, Check(locales.Catalog()))
 }
 
 func TestCheckAcceptsParameterUnionAcrossPluralForms(t *testing.T) {

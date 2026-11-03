@@ -11,7 +11,7 @@ import (
 
 	"github.com/zhYou/go-cli-starter/internal/app/cli"
 	"github.com/zhYou/go-cli-starter/internal/base/paths"
-	"github.com/zhYou/go-cli-starter/internal/dev/contract"
+	"github.com/zhYou/go-cli-starter/tools/internal/contract"
 )
 
 const contractFile = "test/testdata/contracts/v1.json"

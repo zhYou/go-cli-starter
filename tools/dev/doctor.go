@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	cmdexec "github.com/zhYou/go-cli-starter/internal/tools/command"
+	cmdexec "github.com/zhYou/go-cli-starter/internal/command"
 )
 
 // 开发工具探测统一限制资源，不影响产品命令的默认执行策略。

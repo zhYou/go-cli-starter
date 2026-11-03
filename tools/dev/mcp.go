@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/zhYou/go-cli-starter/internal/dev/scaffold"
+	"github.com/zhYou/go-cli-starter/tools/internal/scaffold"
 )
 
 // checkMCP 验证 Codex 配置中使用的 stdio 命令。

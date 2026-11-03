@@ -59,8 +59,9 @@
 ## 实现约定
 
 - `cmd/<name>` 负责信号和退出；`internal/app/cli` 负责 Cobra、参数、输入输出和退出码；
-  `internal/app` 组合配置、Session 和业务。`internal/base` 不依赖 app、tools、dev 或 Cobra；
-  `internal/tools/command` 管外部进程；`internal/dev` 与根 tools 只服务开发维护。
+  `internal/app` 组合配置、Session 和业务。`internal/base` 不依赖 app、command、tools 或 Cobra；
+  `internal/command` 管运行时外部进程；根 `tools` 只服务开发维护，共享包置于 `tools/internal`。
+  运行时代码及其测试不依赖开发包；开发工具可以复用运行时包。
   领域错误、消息、选项和结果由所属模块定义，不集中到 base 的全局表。
 - 每次调用创建独立命令树，显式注入依赖。构造函数用于默认值、校验、依赖装配或资源建立，
   简单值直接使用字面量。稳定协议、状态和错误码使用语义常量，同值不同义不强行合并。
@@ -87,7 +88,7 @@
   借用 logger 和 IO 不 Sync/Close。借用且共享的 writer 由调用者协调并发访问。
 - Trace 默认 none，file 只写本地诊断 JSON，使用私有 provider，不隐式启用 exporter 或替换全局 provider。
   日志/Trace/诊断故障告警并继续业务；任意永久阻塞的借用 IO 不承诺硬截止。
-- 外部工具使用 `internal/tools/command` 的独立 argv、显式 Dir/Env/IO/Localizer/Logger/Tracer。
+- 外部工具使用 `internal/command` 的独立 argv、显式 Dir/Env/IO/Localizer/Logger/Tracer。
   捕获上限后继续排空；默认每流 1 MiB，批量默认串行并收集全部结果，超时从取得并发名额后开始。
   工具错误不直接打印；入口统一本地化并提交成功结果。
 - 新命令包含有类型选项和结果、前置校验、双语帮助/示例及行为测试，结果 schema 从本次命令树生成，

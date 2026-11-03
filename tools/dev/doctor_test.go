@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	cmdexec "github.com/zhYou/go-cli-starter/internal/tools/command"
+	cmdexec "github.com/zhYou/go-cli-starter/internal/command"
 )
 
 func TestDoctorHelper(t *testing.T) {

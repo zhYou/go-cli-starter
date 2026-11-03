@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
-	"github.com/zhYou/go-cli-starter/internal/dev/scaffold"
+	"github.com/zhYou/go-cli-starter/tools/internal/scaffold"
 	"go.yaml.in/yaml/v3"
 )
 

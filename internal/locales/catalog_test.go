@@ -6,11 +6,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/zhYou/go-cli-starter/internal/base/messages"
-	"github.com/zhYou/go-cli-starter/internal/dev/i18ncheck"
 )
 
 func TestEmbeddedCatalogAndSharedBundle(t *testing.T) {
-	require.NoError(t, i18ncheck.Check(Catalog()))
 	const callers = 24
 	bundles := make([]*messages.Bundle, callers)
 	errors := make([]error, callers)
