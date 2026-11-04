@@ -36,6 +36,8 @@ func TestCheckPackageDocumentation(t *testing.T) {
 		{"inline instead of doc.go", map[string]string{"feature.go": "// Package feature 校验输入。\npackage feature\n"}, "缺少 doc.go"},
 		{"empty", map[string]string{"doc.go": "package feature\n"}, "包说明不能为空"},
 		{"name only", map[string]string{"doc.go": "// Package feature\npackage feature\n"}, "包说明不能为空"},
+		{"punctuation placeholder", map[string]string{"doc.go": "// Package feature\n// .\npackage feature\n"}, "包说明不能为空"},
+		{"symbol placeholder", map[string]string{"doc.go": "// Package feature\n// _ !!!\npackage feature\n"}, "包说明不能为空"},
 		{"detached comment", map[string]string{"doc.go": "// Package feature 校验输入。\n\npackage feature\n"}, "包说明不能为空"},
 		{"different package", map[string]string{
 			"doc.go":     "// Package other 描述另一个包。\npackage other\n",

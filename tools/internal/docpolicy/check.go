@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"unicode"
 )
 
 const documentationFile = "doc.go"
@@ -109,7 +110,8 @@ func checkPackage(directory string, files []sourceFile) []error {
 	if documentation.Doc != nil {
 		description = strings.TrimSpace(documentation.Doc.Text())
 	}
-	if description == "" || description == "Package "+documentation.Name.Name {
+	description = strings.TrimPrefix(description, "Package "+documentation.Name.Name)
+	if !strings.ContainsFunc(description, func(r rune) bool { return unicode.IsLetter(r) || unicode.IsNumber(r) }) {
 		problems = append(problems, fmt.Errorf("%s: 包说明不能为空", path))
 	}
 	if len(documentation.Decls) != 0 {
