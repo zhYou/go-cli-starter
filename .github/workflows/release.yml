@@ -5,7 +5,12 @@ on:
 permissions:
   contents: read
 jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+  security:
+    uses: ./.github/workflows/security.yml
   release:
+    needs: [ci, security]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -24,9 +29,30 @@ jobs:
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           version: 2026.10.21
+      - name: 读取 Go 缓存路径
+        id: go-env
+        shell: bash
+        run: |
+          {
+            printf 'version=%s\n' "$(mise exec -- go env GOVERSION)"
+            printf 'modules=%s\n' "$(mise exec -- go env GOMODCACHE)"
+            printf 'build=%s\n' "$(mise exec -- go env GOCACHE)"
+          } >> "$GITHUB_OUTPUT"
+      - name: 缓存 Go 模块
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.go-env.outputs.modules }}
+          key: gomod-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-env.outputs.version }}-${{ hashFiles('go.mod', 'go.sum') }}
+      - name: 缓存 Go 编译结果
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.go-env.outputs.build }}
+          key: gobuild-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-env.outputs.version }}-${{ github.job }}-${{ hashFiles('go.mod', 'go.sum', 'mise.toml', 'mise.agent.toml') }}-${{ github.sha }}
+          restore-keys: |
+            gobuild-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-env.outputs.version }}-${{ github.job }}-${{ hashFiles('go.mod', 'go.sum', 'mise.toml', 'mise.agent.toml') }}-
+            gobuild-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-env.outputs.version }}-${{ github.job }}-
       - run: mise run setup
-      - run: mise run check
-      - run: goreleaser release --clean --parallelism 2
+      - run: mise exec -- goreleaser release --clean --parallelism 2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: mise run release:verify

@@ -1,32 +1,77 @@
 name: CI
 on:
   pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
+  workflow_call:
 permissions:
   contents: read
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
-  check:
+  source:
     runs-on: ubuntu-latest
     steps:
-      - name: 隔离应用状态目录
+      - &isolate-state
+        name: 隔离应用状态目录
         shell: bash
         env:
           GO_CLI_STARTER_HOME: ${{ runner.temp }}/go-cli-starter-home
         run: |
           printf 'GO_CLI_STARTER_HOME=%s\n' "$GO_CLI_STARTER_HOME" >> "$GITHUB_ENV"
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - &checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      - &mise
+        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           version: 2026.10.21
-      - run: mise run setup
+      - &go-env
+        name: 读取 Go 缓存路径
+        id: go-env
+        shell: bash
+        run: |
+          {
+            printf 'version=%s\n' "$(mise exec -- go env GOVERSION)"
+            printf 'modules=%s\n' "$(mise exec -- go env GOMODCACHE)"
+            printf 'build=%s\n' "$(mise exec -- go env GOCACHE)"
+          } >> "$GITHUB_OUTPUT"
+      - &module-cache
+        name: 缓存 Go 模块
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.go-env.outputs.modules }}
+          key: gomod-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-env.outputs.version }}-${{ hashFiles('go.mod', 'go.sum') }}
+      - &build-cache
+        name: 缓存 Go 编译结果
+        if: ${{ runner.os != 'Windows' }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.go-env.outputs.build }}
+          key: gobuild-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-env.outputs.version }}-${{ github.job }}-${{ hashFiles('go.mod', 'go.sum', 'mise.toml', 'mise.agent.toml') }}-${{ github.sha }}
+          restore-keys: |
+            gobuild-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-env.outputs.version }}-${{ github.job }}-${{ hashFiles('go.mod', 'go.sum', 'mise.toml', 'mise.agent.toml') }}-
+            gobuild-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-env.outputs.version }}-${{ github.job }}-
+      - name: 缓存静态检查结果
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/golangci-lint-cache
+          key: lint-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('mise.toml', 'go.mod', 'go.sum', '.golangci.yml') }}-${{ github.sha }}
+          restore-keys: |
+            lint-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('mise.toml', 'go.mod', 'go.sum', '.golangci.yml') }}-
+      - &setup
+        run: mise run setup
       - name: 原生进程树、取消与资源所有权验收
         env:
           GO_CLI_STARTER_HOME: ${{ runner.temp }}/native-command-home
         run: mise exec -- go test -count=1 -timeout=90s ./internal/command -run 'Test(Windows|OwnedDescendants|RootExits|CleanupDoes|CancellationRetains)'
       - run: mise run check
+        env:
+          GOLANGCI_LINT_CACHE: ${{ runner.temp }}/golangci-lint-cache
       - name: 比较事件基准的机器契约
         env:
           CONTRACT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
@@ -34,24 +79,56 @@ jobs:
           if [ -n "$CONTRACT_BASE" ] && [ "$CONTRACT_BASE" != "0000000000000000000000000000000000000000" ]; then
             mise run contract:check -- --against "$CONTRACT_BASE"
           fi
+  race:
+    runs-on: ubuntu-latest
+    steps:
+      - *isolate-state
+      - *checkout
+      - *mise
+      - *go-env
+      - *module-cache
+      - *build-cache
+      - *setup
+      - run: mise exec -- go test -race ./...
+  fuzz-benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - *isolate-state
+      - *checkout
+      - *mise
+      - *go-env
+      - *module-cache
+      - *build-cache
+      - *setup
       - run: mise exec -- go test ./internal/app/cli -run=^$ -fuzz=FuzzArgv -fuzztime=5s
       - run: mise exec -- go test ./internal/app/cli -run=^$ -bench=. -benchmem
-      - run: mise exec -- go test -race ./...
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - *isolate-state
+      - *checkout
+      - *mise
+      - *go-env
+      - *module-cache
+      - *build-cache
+      - *setup
       - run: mise exec -- goreleaser release --snapshot --clean --parallelism 2
       - run: mise run release:verify
   agent-mcp:
     runs-on: ubuntu-latest
     steps:
-      - name: 隔离应用状态目录
-        shell: bash
-        env:
-          GO_CLI_STARTER_HOME: ${{ runner.temp }}/agent-mcp-home
-        run: |
-          printf 'GO_CLI_STARTER_HOME=%s\n' "$GO_CLI_STARTER_HOME" >> "$GITHUB_ENV"
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - *isolate-state
+      - *checkout
       - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+        env:
+          MISE_ENV: agent
         with:
           version: 2026.10.21
+          cache_key_prefix: mise-agent-v1
+          cache_save_post: "true"
+      - *go-env
+      - *module-cache
+      - *build-cache
       - run: mise run setup:agent
       - run: mise run mcp:check
   platforms:
@@ -61,19 +138,13 @@ jobs:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - name: 隔离应用状态目录
-        shell: bash
-        env:
-          GO_CLI_STARTER_HOME: ${{ runner.temp }}/go-cli-starter-home
-        run: |
-          printf 'GO_CLI_STARTER_HOME=%s\n' "$GO_CLI_STARTER_HOME" >> "$GITHUB_ENV"
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
-        with:
-          version: 2026.10.21
-      - run: mise run setup
+      - *isolate-state
+      - *checkout
+      - *mise
+      - *go-env
+      - *module-cache
+      - *build-cache
+      - *setup
       - name: 原生进程树、取消与资源所有权验收
         env:
           GO_CLI_STARTER_HOME: ${{ runner.temp }}/native-command-home
@@ -85,3 +156,15 @@ jobs:
         run: mise exec -- go test -count=1 ./tools/dev -run '^TestTemplateExecutable(Path|Acceptance)$'
       - run: mise exec -- go test ./...
       - run: mise run build
+  check:
+    if: ${{ always() }}
+    needs: [source, race, fuzz-benchmark, package, agent-mcp, platforms]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 汇总全部 CI 检查
+        shell: bash
+        env:
+          NEEDS_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$NEEDS_RESULTS"
+          jq -e 'length > 0 and all(.[]; .result == "success")' <<< "$NEEDS_RESULTS" > /dev/null

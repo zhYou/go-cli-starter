@@ -12,12 +12,17 @@
 ## 仓库管理员设置
 
 - 首次启用 GitHub Issues 时创建 `backlog` 标签；Issue 表单和智能体查询依赖这个稳定标识，不把待办写回仓库 Markdown。
-- 为 main 设置规则集，要求 PR、审查通过、分支更新及必需检查。按实际 Actions 检查名称启用 `CI / check`、`CI / agent-mcp`、`CI / platforms (macos-latest)`、`CI / platforms (windows-latest)`、`Security / vulnerability`，首次运行后核对名称。
+- 为 main 设置规则集，要求 PR、审查通过、分支更新及必需检查。按实际检查名称启用 `check`、`platforms (macos-latest)`、`platforms (windows-latest)`、`vulnerability`，首次运行后核对名称。`check` 汇总全部 CI 任务，包含独立的 MCP 验收；任务失败、取消或意外跳过时不能通过。
 - 保护发布标签 `v*`，限制创建和修改权限；采用不可变发布资产策略。
 - 按 [SECURITY](../SECURITY.md) 填写私密报告入口并启用对应功能；发布支持版本和响应安排。
 - 安装或授权 Renovate。现有配置覆盖 Go、Actions SHA 和两份 mise 配置，禁用自动合并及预发布更新。维护者审查准确版本声明并完成版本检查，项目不维护 mise 锁文件。
 - 确认 release job 能申请 OIDC 和 attestations 写权限，满足所在 GitHub 套餐、组织与仓库策略。普通 PR 和定时扫描只读，不使用发布凭据。
 - 确认定时安全扫描持续运行，并指定失败通知的接收人；停用或归档仓库前交接维护责任。
+
+CI 与 Security 仅检查目标为 main 的 PR，开发分支之间的 PR 和开发分支普通 push 不执行。
+PR 改目标、标题或描述编辑会重新检查，同一 PR 的新运行取消旧运行。main 更新继续检查，
+每日 Security 继续运行；这些运行与版本 tag 的验证互相隔离。推送 `v*` 标签时，Release
+先复用完整 CI 与 Security，全部成功后才执行发布任务，不必移除 main 的必需检查。
 
 ## 升级和发布
 
@@ -40,6 +45,12 @@ Release 创建后证明失败时，workflow 失败；重试必须针对同一批
 mise、git、gh、Codex、RTK、superpowers 属于预装层，项目不安装或更新；基础检查只要求其中的 mise、git。
 doctor:agent 额外要求 gh、Codex、gopls，RTK 仅报告，superpowers 由会话确认。Serena/Graphify 尚在待办。
 智能体配套不作为基础 CI 前置条件，gopls MCP 在独立 job 验证；平台支持通过原生 CI 和六目标发布构建验证。
+
+CI 将 Linux 源码、race、fuzz/benchmark 和 snapshot/安装验收分组并行，保留 macOS/Windows 原生任务。
+Go 缓存按 OS、架构、Go 版本和依赖摘要区分，编译缓存再区分任务和提交；lint 使用独立缓存，
+gopls 随独立的 agent mise 缓存保存。缓存仅保存依赖与检查工具的可重建数据，不包含应用状态、诊断文件或发布资产。
+Windows 仅缓存 Go 模块；跨运行恢复编译缓存的实测耗时增加，因此编译结果只在当前 runner 内复用。
+排查提速效果时记录冷、热缓存的步骤耗时和命中情况；缓存未命中不能跳过检查。
 
 日志默认 info/file，Trace 默认 none；file Trace 只供本地诊断，不承诺 OTLP 或重放。
 诊断文件属于各次运行，由系统锁与元数据保护；未知内容和活跃运行不清理，总量为软限制。
