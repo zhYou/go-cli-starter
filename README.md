@@ -286,7 +286,17 @@ docs/                      使用和维护说明
 
 ## 发布
 
-GitHub Actions 对 PR 和 main 执行检查。Linux 运行完整检查、race、fuzz 和 benchmark，macOS、Windows 运行原生测试和构建。外部进程的运行保障须以对应平台 CI 为证据，Linux 交叉编译仅证明可构建。发布 workflow 在推送 `v*` 标签时执行。
+GitHub Actions 只对目标为 main 的 PR 和 main 更新执行检查；开发分支普通 push 和开发分支之间的 PR 不执行。
+PR 改目标到 main、标题或描述编辑也会触发检查，同一 PR 的新运行会取消旧运行；main、定时扫描与 tag 检查互不取消。
+Security 保留每日扫描。
+
+Linux 的源码检查、race、fuzz/benchmark、六目标 snapshot 打包与安装验收分组并行执行；
+macOS、Windows 继续运行原生测试和构建，gopls MCP 在独立任务验证。Go 模块、编译结果和 lint 结果使用跨运行缓存，
+缓存未命中时完整执行。`check` 汇总全部 CI 任务，任一失败、取消或跳过都不能通过。
+外部进程的运行保障须以对应平台 CI 为证据，Linux 交叉编译仅证明可构建。
+
+推送 `v*` 标签后，Release 先复用该提交的完整 CI 和 Security；全部成功才生成并发布正式资产，
+随后验收实际发布产物并生成来源证明。普通检查只有读取仓库的权限，发布任务单独申请写入权限。
 
 确认检查和本地 snapshot 通过后，在目标项目创建并推送标签：
 
@@ -301,7 +311,7 @@ GoReleaser 使用 workflow 的 `GITHUB_TOKEN` 创建 Release，生成 Linux、ma
 
 模板版本与后续合并方式见[模板升级](docs/template-upgrades.md)。
 
-`mise exec -- govulncheck ./...` 独立访问 Go 漏洞数据库，PR、main 和每日定时执行；发现漏洞、数据库不可达或工具缺失均失败。源码 check 不请求漏洞数据库。
+`mise exec -- govulncheck ./...` 独立访问 Go 漏洞数据库，在目标为 main 的 PR、main 更新、版本 tag 发布前和每日定时执行；发现漏洞、数据库不可达或工具缺失均失败。源码 check 不请求漏洞数据库。
 
 发布包含每个归档的 SPDX JSON 和最终 checksums.txt。下载同一 Release 的资产后先验证校验和，再检查 SPDX 与来源证明：
 

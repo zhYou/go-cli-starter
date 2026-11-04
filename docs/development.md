@@ -148,6 +148,13 @@ check 不改写源码，但会使用 Go 缓存、临时文件和 bin 产物。
 Linux CI 直接执行五秒 argv 模糊测试，覆盖空值、空格、Unicode、`--` 和取消；
 另执行树构造和 greet 调用的 benchmark，没有性能门槛。具体命令见 README 的开发命令。
 
+CI 在目标为 main 的 PR 和 main 更新时运行；开发分支之间的 PR 与普通 push 不触发。
+源码检查、race、fuzz/benchmark、snapshot 与安装验收分组并行，独立运行 MCP 和 macOS/Windows 原生验收，
+最后由 `check` 汇总结果。任何依赖失败、取消或跳过都会使汇总失败，已有 main 必需检查名称保持不变。
+Go 模块和编译路径从各 runner 的 `go env` 获取，lint 单独缓存；恢复缓存不会跳过验证命令。
+同一 PR 的新运行取消旧运行；非 PR 运行按各自运行 ID 隔离。每日 Security 保留，
+推送 `v*` 标签时 Release 复用同一提交的 CI 与 Security，全部通过后发布。
+
 `doctor` 使用共享执行器，最多四项并行，每项三秒，每流 2 KiB，按固定顺序报告精确版本及
 超时、取消、截断。govulncheck 读取本地 Go 构建信息验证命令、模块来源及版本，再执行 `-h`，
 不访问漏洞库。真正联网扫描由 `mise exec -- govulncheck ./...` 独立执行，不可用或数据库失败同样失败。
