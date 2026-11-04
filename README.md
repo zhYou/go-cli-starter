@@ -292,6 +292,7 @@ Security 保留每日扫描。
 
 Linux 的源码检查、race、fuzz/benchmark、六目标 snapshot 打包与安装验收分组并行执行；
 macOS、Windows 继续运行原生测试和构建，gopls MCP 在独立任务验证。Go 模块、编译结果和 lint 结果使用跨运行缓存，
+Windows 仅缓存 Go 模块，编译结果在当前 runner 内生成；实测恢复跨运行编译缓存后 Windows 全量检查耗时增加。
 缓存未命中时完整执行。`check` 汇总全部 CI 任务，任一失败、取消或跳过都不能通过。
 外部进程的运行保障须以对应平台 CI 为证据，Linux 交叉编译仅证明可构建。
 

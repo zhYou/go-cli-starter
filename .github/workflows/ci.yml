@@ -48,6 +48,7 @@ jobs:
           key: gomod-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-env.outputs.version }}-${{ hashFiles('go.mod', 'go.sum') }}
       - &build-cache
         name: 缓存 Go 编译结果
+        if: ${{ runner.os != 'Windows' }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.go-env.outputs.build }}

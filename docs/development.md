@@ -152,6 +152,7 @@ CI 在目标为 main 的 PR 和 main 更新时运行；开发分支之间的 PR 
 源码检查、race、fuzz/benchmark、snapshot 与安装验收分组并行，独立运行 MCP 和 macOS/Windows 原生验收，
 最后由 `check` 汇总结果。任何依赖失败、取消或跳过都会使汇总失败，已有 main 必需检查名称保持不变。
 Go 模块和编译路径从各 runner 的 `go env` 获取，lint 单独缓存；恢复缓存不会跳过验证命令。
+Windows 仅缓存模块，避免实测跨运行编译缓存恢复后的耗时增加，编译结果只在当前 runner 内复用。
 同一 PR 的新运行取消旧运行；非 PR 运行按各自运行 ID 隔离。每日 Security 保留，
 推送 `v*` 标签时 Release 复用同一提交的 CI 与 Security，全部通过后发布。
 

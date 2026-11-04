@@ -49,6 +49,7 @@ doctor:agent 额外要求 gh、Codex、gopls，RTK 仅报告，superpowers 由�
 CI 将 Linux 源码、race、fuzz/benchmark 和 snapshot/安装验收分组并行，保留 macOS/Windows 原生任务。
 Go 缓存按 OS、架构、Go 版本和依赖摘要区分，编译缓存再区分任务和提交；lint 使用独立缓存，
 gopls 随独立的 agent mise 缓存保存。缓存仅保存依赖与检查工具的可重建数据，不包含应用状态、诊断文件或发布资产。
+Windows 仅缓存 Go 模块；跨运行恢复编译缓存的实测耗时增加，因此编译结果只在当前 runner 内复用。
 排查提速效果时记录冷、热缓存的步骤耗时和命中情况；缓存未命中不能跳过检查。
 
 日志默认 info/file，Trace 默认 none；file Trace 只供本地诊断，不承诺 OTLP 或重放。
