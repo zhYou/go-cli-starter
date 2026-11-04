@@ -1,4 +1,3 @@
-// Package schema 从 Go 类型生成运行时结果结构。
 package schema
 
 import (

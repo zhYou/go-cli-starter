@@ -44,6 +44,7 @@ func TestCommandMoveRecoversHardExitTemporaryFile(t *testing.T) {
 	for _, point := range []string{"apply", "rollback", "same-name"} {
 		t.Run(point, func(t *testing.T) {
 			root := projectFixture(t, TemplateModule, TemplateName)
+			require.NoError(t, os.WriteFile(filepath.Join(root, "cmd", TemplateName, "doc.go"), []byte("// Command "+TemplateName+" 提供入口。\npackage main\n"), 0600))
 			source := "package main\nimport _ \"" + TemplateModule + "/internal/app/cli\"\nconst appName=\"" + TemplateName + "\"\nfunc main(){}\n"
 			require.NoError(t, os.WriteFile(filepath.Join(root, "cmd", TemplateName, "main.go"), []byte(source), 0600))
 			//nolint:gosec // G204：测试只运行当前测试二进制或固定 Git/Go 命令，参数来自临时 fixture。
@@ -64,7 +65,11 @@ func TestCommandMoveRecoversHardExitTemporaryFile(t *testing.T) {
 			require.Equal(t, name, project.Name)
 			entries, err := os.ReadDir(filepath.Join(root, "cmd", name))
 			require.NoError(t, err)
-			require.Len(t, entries, 1)
+			require.Len(t, entries, 2)
+			//nolint:gosec // G304：路径仅来自本次模板测试的临时根目录和固定命令名称。
+			doc, err := os.ReadFile(filepath.Join(root, "cmd", name, "doc.go"))
+			require.NoError(t, err)
+			require.Contains(t, string(doc), name)
 		})
 	}
 }
@@ -84,6 +89,9 @@ func TestCommandMoveTransaction(t *testing.T) {
 	data, err := afero.ReadFile(i.FS, filepath.Join(root, move.To, "main_test.go"))
 	require.NoError(t, err)
 	require.Equal(t, "package main\n", string(data))
+	doc, err := afero.ReadFile(i.FS, filepath.Join(root, move.To, "doc.go"))
+	require.NoError(t, err)
+	require.Contains(t, string(doc), "Command my-cli")
 }
 
 func TestCommandMovePreflightProtectsUserFiles(t *testing.T) {
@@ -136,6 +144,9 @@ func TestCommandMoveRecovery(t *testing.T) {
 			data, err := afero.ReadFile(i.FS, filepath.Join(root, wantDir, "main.go"))
 			require.NoError(t, err)
 			require.Contains(t, string(data), wantName)
+			doc, err := afero.ReadFile(i.FS, filepath.Join(root, wantDir, "doc.go"))
+			require.NoError(t, err)
+			require.Contains(t, string(doc), "Command "+wantName)
 			info, err := i.FS.Stat(filepath.Join(root, wantDir, "main.go"))
 			require.NoError(t, err)
 			require.Equal(t, os.FileMode(0640), info.Mode().Perm())
@@ -146,7 +157,7 @@ func TestCommandMoveRecovery(t *testing.T) {
 }
 
 func TestCommandMoveRecoveryRejectsExternalChanges(t *testing.T) {
-	for _, mode := range []string{"both", "neither", "edited", "unchanged-file", "extra", "conflict", "escape"} {
+	for _, mode := range []string{"both", "neither", "edited", "unchanged-file", "documentation", "missing-documentation", "extra", "conflict", "escape"} {
 		t.Run(mode, func(t *testing.T) {
 			i, root, move := crashCommandMove(t, "after")
 			switch mode {
@@ -158,6 +169,10 @@ func TestCommandMoveRecoveryRejectsExternalChanges(t *testing.T) {
 				require.NoError(t, afero.WriteFile(i.FS, filepath.Join(root, move.To, "main.go"), []byte("人工修改"), 0600))
 			case "unchanged-file":
 				require.NoError(t, afero.WriteFile(i.FS, filepath.Join(root, move.To, "main_test.go"), []byte("人工修改"), 0600))
+			case "documentation":
+				require.NoError(t, afero.WriteFile(i.FS, filepath.Join(root, move.To, "doc.go"), []byte("人工修改"), 0600))
+			case "missing-documentation":
+				require.NoError(t, i.FS.Remove(filepath.Join(root, move.To, "doc.go")))
 			case "extra":
 				require.NoError(t, afero.WriteFile(i.FS, filepath.Join(root, move.To, "extra.txt"), []byte("人工修改"), 0600))
 			case "escape":

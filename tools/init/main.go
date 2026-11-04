@@ -1,4 +1,3 @@
-// Command init 重命名模板的新副本。
 package main
 
 import (

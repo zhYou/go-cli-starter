@@ -25,6 +25,10 @@ func validateMove(move *commandMove, name string) error {
 	return nil
 }
 
+func isCommandFile(name string) bool {
+	return name == mainFile || name == "main_test.go" || name == "doc.go"
+}
+
 func (i *Initializer) commandMembers(root, relative string, temporary ...string) ([]os.FileInfo, error) {
 	dir, err := i.safePath(root, relative)
 	if err != nil {
@@ -40,7 +44,7 @@ func (i *Initializer) commandMembers(root, relative string, temporary ...string)
 	}
 	main := false
 	for _, entry := range entries {
-		if entry.Name() != mainFile && entry.Name() != "main_test.go" && !allowedTemporary[entry.Name()] {
+		if !isCommandFile(entry.Name()) && !allowedTemporary[entry.Name()] {
 			return nil, fmt.Errorf("命令目录包含非受管内容：%s", entry.Name())
 		}
 		file, err := i.safePath(root, path.Join(relative, entry.Name()))
@@ -130,7 +134,7 @@ func (i *Initializer) commandLocation(root string, tx transaction) (string, erro
 	for _, entry := range entries {
 		if expected[entry.Name()] {
 			observed[entry.Name()] = true
-		} else if entry.Name() == mainFile || entry.Name() == "main_test.go" {
+		} else if isCommandFile(entry.Name()) {
 			return "", fmt.Errorf("命令目录出现未记录的文件：%s", entry.Name())
 		}
 	}

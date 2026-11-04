@@ -1,4 +1,3 @@
-// Package session 在应用入口组装日志、Trace 和本地诊断文件的生命周期。
 package session
 
 import (

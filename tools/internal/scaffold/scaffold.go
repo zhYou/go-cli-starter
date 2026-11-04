@@ -1,4 +1,3 @@
-// Package scaffold 重命名模板，不遍历或修改用户文件。
 package scaffold
 
 import (
@@ -23,6 +22,7 @@ const TemplateName = "go-cli-starter"
 // 模板只管理这些文件中的应用标识。
 // 初始化项目时保留本实现及其测试夹具，避免改动初始化基准。
 var managedFiles = []string{
+	"cmd/" + TemplateName + "/doc.go",
 	"internal/app/cli/completion_protocol.go",
 	"internal/app/cli/completion_test.go", "internal/app/cli/doctor.go", "internal/app/cli/doctor_test.go",
 	".github/workflows/ci.yml", ".github/workflows/release.yml",
@@ -39,7 +39,6 @@ var managedFiles = []string{
 	"internal/command/observability.go",
 	"internal/command/observability_test.go",
 	"internal/app/cli/stderr_test.go",
-	"internal/app/session/stderr_test.go",
 	"internal/base/logging/external_event_test.go",
 	"internal/base/telemetry/environment_linux_test.go",
 	"internal/base/diagnostics/process_test.go",
@@ -89,9 +88,6 @@ var managedFiles = []string{
 	"internal/base/logging/logger_test.go",
 	"internal/base/logging/logging_test.go",
 	"internal/base/telemetry/session_test.go",
-	"internal/app/greeting/greeting_catalog_test.go",
-	"internal/app/session/session_catalog_test.go",
-	"internal/command/errors_catalog_test.go",
 	"internal/command/errors_test.go",
 	"internal/command/helpers_test.go",
 	"test/integration/catalog_test.go",

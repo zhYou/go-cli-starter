@@ -1,4 +1,3 @@
-// Package contract 提供开发期机器契约比较和兼容记录检查。
 package contract
 
 import (

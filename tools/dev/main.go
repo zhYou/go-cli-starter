@@ -1,4 +1,3 @@
-// Command dev 提供跨平台的开发任务。
 package main
 
 import (
@@ -13,6 +12,7 @@ import (
 
 	"github.com/zhYou/go-cli-starter/internal/locales"
 	"github.com/zhYou/go-cli-starter/tools/internal/configpolicy"
+	"github.com/zhYou/go-cli-starter/tools/internal/docpolicy"
 	"github.com/zhYou/go-cli-starter/tools/internal/i18ncheck"
 	"github.com/zhYou/go-cli-starter/tools/internal/scaffold"
 )
@@ -54,6 +54,8 @@ func runArgs(args []string) error {
 		return i18ncheck.Check(locales.Catalog())
 	case "config-check":
 		return configpolicy.Check(".")
+	case "doc-check":
+		return docpolicy.Check(".")
 	case "rules-check":
 		return checkRules(context.Background())
 	case "versions-check":

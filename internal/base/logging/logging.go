@@ -1,4 +1,3 @@
-// Package logging 提供每次命令独立的结构化日志，封装 zap 后端。
 package logging
 
 import (

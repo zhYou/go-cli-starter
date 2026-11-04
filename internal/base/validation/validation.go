@@ -1,4 +1,3 @@
-// Package validation 提供实例级的业务校验与中文字段提示。
 package validation
 
 import (

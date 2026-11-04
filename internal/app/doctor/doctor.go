@@ -1,4 +1,3 @@
-// Package doctor 定义可由派生项目扩展的检查入口，模板不执行任何探测。
 package doctor
 
 import "context"

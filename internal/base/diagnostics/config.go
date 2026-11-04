@@ -1,4 +1,3 @@
-// Package diagnostics 管理每次运行的私有诊断文件、轮转和保留策略。
 package diagnostics
 
 // Config 描述日志和本地 Trace 共用的文件策略，0 禁用对应删除限制。

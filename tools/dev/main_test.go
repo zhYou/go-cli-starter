@@ -30,3 +30,14 @@ func TestUnknownTaskUsesChinese(t *testing.T) {
 		t.Fatalf("未知任务错误=%v", err)
 	}
 }
+
+func TestDocCheckTaskReportsDocumentationFailures(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	require.NoError(t, os.WriteFile("feature.go", []byte("package feature\n"), 0600))
+	require.ErrorContains(t, run("doc-check"), "doc.go")
+	require.NoError(t, os.WriteFile("doc.go", []byte("// Package feature 校验输入。\npackage feature\n"), 0600))
+	require.NoError(t, run("doc-check"))
+	require.NoError(t, os.WriteFile("doc.go", []byte("package feature\n"), 0600))
+	require.ErrorContains(t, run("doc-check"), "包说明不能为空")
+}

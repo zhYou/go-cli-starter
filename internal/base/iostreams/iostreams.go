@@ -1,4 +1,3 @@
-// Package iostreams 提供显式输入输出流及不访问进程标准流的默认值。
 package iostreams
 
 import (

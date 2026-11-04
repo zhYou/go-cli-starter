@@ -1,4 +1,3 @@
-// Package cli 构造独立的命令树，管理进程的输入输出约定。
 package cli
 
 import (

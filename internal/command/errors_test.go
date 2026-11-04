@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -127,4 +128,37 @@ func TestCommandUninitializedLocalizerUsesEnglishFallback(t *testing.T) {
 	require.Equal(t, 7, exit.ExitCode())
 	require.Contains(t, sink.String(), "Operation failed [command.started]")
 	require.Contains(t, sink.String(), "Operation failed [command.finished]")
+}
+
+func TestCorruptCatalogProcess(t *testing.T) {
+	if os.Getenv("TEST_CORRUPT_I18N_CATALOG") != "1" {
+		t.Skip("仅由损坏目录子进程执行")
+	}
+	var sink bytes.Buffer
+	logger := logging.New(logging.RunInfo{}, logging.Options{Config: logging.Config{Level: "debug", Output: "stderr"}, Writer: &sink}, func(err error) { t.Error(err) })
+	call, options := helper(t, "exit")
+	options.Logger = logger
+	err := Run(t.Context(), call, options)
+	var exit *exec.ExitError
+	require.True(t, errors.As(err, &exit))
+	require.Equal(t, 7, exit.ExitCode())
+	lines := bytes.Split(bytes.TrimSpace(sink.Bytes()), []byte("\n"))
+	require.Len(t, lines, 2)
+	var start, finish map[string]any
+	require.NoError(t, json.Unmarshal(lines[0], &start))
+	require.NoError(t, json.Unmarshal(lines[1], &finish))
+	require.Equal(t, "Operation failed [command.started]", start["msg"])
+	require.Equal(t, "Operation failed [command.finished]", finish["msg"])
+	require.Equal(t, "failed", finish["outcome"])
+	require.Equal(t, float64(7), finish["exit_code"])
+
+	bundle, err := messages.NewBundle(fstest.MapFS{"active.en.toml": {Data: []byte("[\"command.started\"]\nother = \"Injected start\"\n[\"command.finished\"]\nother = \"Injected finish\"\n")}})
+	require.NoError(t, err)
+	sink.Reset()
+	options.Localizer = bundle.Localizer("en")
+	err = Run(t.Context(), call, options)
+	require.True(t, errors.As(err, &exit))
+	require.Equal(t, 7, exit.ExitCode())
+	require.Contains(t, sink.String(), "Injected start")
+	require.Contains(t, sink.String(), "Injected finish")
 }
