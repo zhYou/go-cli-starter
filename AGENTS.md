@@ -58,6 +58,10 @@
 
 ## 实现约定
 
+- 正式 Go 包的中文说明集中在 `doc.go`，包括 main 和 integration 包；其他实现文件不重复写包说明。
+  `doc.go` 只包含注释及 package 声明，描述包职责、使用和关键约束，不作空占位或存放测试辅助代码。
+  运行 `mise run doc:check` 检查，规则和 IDE 折叠方法见 `docs/development.md`；该检查纳入 lint 和 check。
+
 - `cmd/<name>` 负责信号和退出；`internal/app/cli` 负责 Cobra、参数、输入输出和退出码；
   `internal/app` 组合配置、Session 和业务。`internal/base` 不依赖 app、command、tools 或 Cobra；
   `internal/command` 管运行时外部进程；根 `tools` 只服务开发维护，共享包置于 `tools/internal`。

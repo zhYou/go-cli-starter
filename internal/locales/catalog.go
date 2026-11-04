@@ -1,4 +1,3 @@
-// Package locales 提供应用内置的集中消息目录。
 package locales
 
 import (

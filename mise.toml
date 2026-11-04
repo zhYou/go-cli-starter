@@ -41,9 +41,13 @@ run = "go run ./tools/dev i18n-check"
 description = "检查受管应用配置"
 run = "go run ./tools/dev config-check"
 
+[tasks."doc:check"]
+description = "检查正式 Go 包的 doc.go 与包说明位置"
+run = "go run ./tools/dev doc-check"
+
 [tasks.lint]
-depends = ["i18n:check", "config:check"]
-description = "检查双语消息、应用配置及固定版本的静态规则"
+depends = ["i18n:check", "config:check", "doc:check"]
+description = "检查双语消息、应用配置、包文档及固定版本的静态规则"
 run = "golangci-lint run --allow-serial-runners"
 
 [tasks.build]

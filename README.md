@@ -223,8 +223,9 @@ mise 任务保留项目流程、聚合检查和自定义工具：
 | `mise run setup` | 安装固定版本的开发工具，下载模块 |
 | `mise run setup:agent` | 准备开发工具，再安装 gopls |
 | `mise run doctor` / `doctor:agent` | 检查开发环境 / 智能体环境 |
-| `mise run lint` | 聚合双语消息、应用配置和 18 项静态检查 |
+| `mise run lint` | 聚合双语消息、应用配置、包文档和 18 项静态检查 |
 | `mise run i18n:check` / `config:check` | 校验双语消息目录 / 受管应用配置；均纳入 lint 和 check |
+| `mise run doc:check` | 检查正式 Go 包的 doc.go 与包说明位置；纳入 lint 和 check |
 | `mise run rules:check` | 用真实类型边界 fixture 验证静态规则 |
 | `mise run build` | 构建到 bin，注入版本信息 |
 | `mise run check` | 与 CI 相同的完整源码检查 |
@@ -257,7 +258,7 @@ mise exec -- go test ./internal/app/cli -run=^$ -bench=. -benchmem
 ```
 
 `check` 包含上述只读格式、模块、单元测试和 vet 检查，以及表中的聚合检查和构建。
-`lint` 额外聚合双语消息与配置检查；单独运行 `mise exec -- golangci-lint run --allow-serial-runners` 只执行工具自身的静态检查。
+`lint` 额外聚合双语消息、配置与包文档检查；单独运行 `mise exec -- golangci-lint run --allow-serial-runners` 只执行工具自身的静态检查。
 
 目录按入口、内部包、配置、测试和工具分工：
 
@@ -282,7 +283,7 @@ docs/                      使用和维护说明
 
 `check` 在临时仓库中验证发布配置，无需为内部工具配置 remote。真正发布或运行 `mise exec -- goreleaser check` 前，为目标项目设置自己的 GitHub origin。
 
-新增命令、工具升级和发布步骤见 [开发说明](docs/development.md)，后续工作见[项目待办](https://github.com/zhYou/go-cli-starter/issues?q=is%3Aissue+state%3Aopen+label%3Abacklog)。
+包文档与 IDE 文件折叠配置、新增命令、工具升级和发布步骤见 [开发说明](docs/development.md)，后续工作见[项目待办](https://github.com/zhYou/go-cli-starter/issues?q=is%3Aissue+state%3Aopen+label%3Abacklog)。
 
 ## 发布
 

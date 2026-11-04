@@ -1,4 +1,3 @@
-// Package catalog 校验自维护的 TOML 消息目录。
 package catalog
 
 import (

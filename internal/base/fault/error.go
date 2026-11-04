@@ -1,4 +1,3 @@
-// Package fault 保存可组合的错误定义，不登记应用领域码。
 package fault
 
 import (

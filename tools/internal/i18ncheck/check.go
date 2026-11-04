@@ -1,4 +1,3 @@
-// Package i18ncheck 检查集中消息目录的一致性。
 package i18ncheck
 
 import (

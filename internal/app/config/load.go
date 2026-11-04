@@ -1,4 +1,3 @@
-// Package config 合并模块配置，不向业务暴露配置容器。
 package config
 
 import (

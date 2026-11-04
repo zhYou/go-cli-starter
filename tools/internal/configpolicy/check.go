@@ -1,4 +1,3 @@
-// Package configpolicy 检查仓库中的应用配置。
 package configpolicy
 
 import (

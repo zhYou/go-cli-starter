@@ -1,4 +1,3 @@
-// Package greeting 是独立于 Cobra 的业务逻辑示例，可按需移除。
 package greeting
 
 import (

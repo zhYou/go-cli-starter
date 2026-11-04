@@ -1,4 +1,3 @@
-// Package messages 组合只读目录，创建每次调用独立的语言视图。
 package messages
 
 import (

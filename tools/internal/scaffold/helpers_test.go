@@ -20,7 +20,9 @@ func commandTransactionFixture(t *testing.T) (*Initializer, string, []change, *c
 	source := []byte("package main\nconst appName=\"" + TemplateName + "\"\nfunc main(){}\n")
 	require.NoError(t, afero.WriteFile(i.FS, filepath.Join(root, from, "main.go"), source, 0640))
 	require.NoError(t, afero.WriteFile(i.FS, filepath.Join(root, from, "main_test.go"), []byte("package main\n"), 0600))
-	changes := []change{{filepath.Join(root, "go.mod"), []byte("module example.com/team/repository\n\ngo 1.27.0\n"), 0600}, {filepath.Join(root, from, "main.go"), []byte(strings.ReplaceAll(string(source), TemplateName, "my-cli")), 0640}}
+	doc := []byte("// Command " + TemplateName + " 提供入口。\npackage main\n")
+	require.NoError(t, afero.WriteFile(i.FS, filepath.Join(root, from, "doc.go"), doc, 0600))
+	changes := []change{{filepath.Join(root, from, "doc.go"), []byte(strings.ReplaceAll(string(doc), TemplateName, "my-cli")), 0600}, {filepath.Join(root, "go.mod"), []byte("module example.com/team/repository\n\ngo 1.27.0\n"), 0600}, {filepath.Join(root, from, "main.go"), []byte(strings.ReplaceAll(string(source), TemplateName, "my-cli")), 0640}}
 	return i, root, changes, &commandMove{From: from, To: "cmd/my-cli"}
 }
 

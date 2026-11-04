@@ -1,4 +1,3 @@
-// Package command 提供有类型的外部命令、原始字节捕获和有界批量执行。
 package command
 
 import (

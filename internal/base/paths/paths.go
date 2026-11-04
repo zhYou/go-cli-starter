@@ -1,4 +1,3 @@
-// Package paths 只解析应用私有目录，不创建文件或修改环境。
 package paths
 
 import (

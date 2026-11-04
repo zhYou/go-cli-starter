@@ -49,6 +49,30 @@ base 不依赖 app、command、tools 或 Cobra。领域码及结果由所属模�
 运行时代码与测试不依赖开发包；工具可以复用运行时包。`tools/internal` 的导入范围由 Go 限制在 tools 子树内。
 开发工具用 `scaffold.Inspect` 静态识别唯一入口，不根据模块路径末段猜测命令名。
 
+## 包文档
+
+每个正式 Go 包使用一份 `doc.go` 说明职责、主要使用方式和关键约束，包括 `main` 入口、
+开发工具和 integration 测试包。它首先是包文档，IDE 折叠是可选的附加用途，不创建空占位文件。
+说明按包的实际复杂度编写，不要求固定章节或字数；小包可以简短，多文件包应说明必要的协作边界。
+
+```go
+// Package greeting 提供独立于 Cobra 的问候业务示例，可按需移除。
+//
+// 直接业务调用也会校验输入，使用注入的 Localizer 生成所选语言的消息。
+package greeting
+```
+
+普通包的首句以 `Package <包名>` 开头；`main` 包说明对应命令的行为。
+包说明紧邻 `package` 声明，其他实现文件不重复放包说明。
+`doc.go` 只包含注释与 `package` 声明，不放导入、函数、类型、变量或常量；测试辅助代码保留在测试文件中。
+
+`mise run doc:check` 按目录解析 Go AST，不依赖当前主机的 GOOS/GOARCH，也检查平台专用文件。
+它拒绝缺失或空白的包说明、只有 `Package <包名>` 的占位说明、包名不一致、包说明位置错误，
+以及 `doc.go` 中的实现声明。测试夹具 `testdata`、vendor、隐藏或下划线开头目录、根目录
+bin/dist、生成代码和外部 `*_test` 包不受约束；普通 `*_test.go` 不需各自编写包说明。
+现有 godoclint 继续检查注释格式、重复包说明和导出 API 文档，描述是否准确、有用由代码审查确认。
+该任务纳入 lint 和 check，不会安装工具或修改文件。
+
 ## 实现与检查
 
 1. 查阅设计指南对应场景，用 gopls 查询 Go 符号、引用和诊断，确认工作区是实际 checkout。
@@ -83,14 +107,15 @@ Session 关闭顺序、借用资源和永久阻塞 IO 的边界见设计指南�
 
 ## 测试组织与可靠性
 
-单个源码文件的单元测试尽量放入同名 `*_test.go`；跨文件契约使用清晰的行为名，
+单个源码文件及其小型专项测试尽量放入同名 `*_test.go`；跨文件契约使用清晰的行为名，
 例如 `process_tree_test.go`、`stderr_test.go`。无需为常量文件创建空测试，也不为文件名对应拆分生产源码。
 多处使用的 fixture 放在所属包的 `helpers_test.go`，平台专用 helper 保留 `_windows_test.go` 等后缀。
 单处使用的测试类型就近保留；真实配置加载与注入 stub 的 fixture 各自保持原有边界。
 `fuzz_test.go` 维护 fuzz 入口和 seeds，`benchmark_test.go` 维护 benchmark，普通行为测试按实现归位。
 
 集中消息目录损坏场景由 `test/integration/catalog_test.go` 使用 Go overlay 运行 greeting、Session 和
-command 三个包的 `TestCorruptCatalogProcess`。完整测试会执行该集成入口；单独运行所属包时，
+command 三个包的 `TestCorruptCatalogProcess`，worker 分别位于同名的 greeting、session 和 errors 测试文件。
+完整测试会执行该集成入口；单独运行所属包时，
 这些 worker 会明确跳过。可在隔离应用目录下单独验收：
 
 ```sh
@@ -106,9 +131,69 @@ GO_CLI_STARTER_HOME="$test_home" mise exec -- go test ./test/integration -run '^
 检查成功、失败和取消时同时核对状态、退出码及错误链；根进程成功退出而后代持有管道的场景，
 明确验证 `exec.ErrWaitDelay` 的既有边界。事件顺序断言先确认事件存在，无状态场景同时核对预期退出码。
 
+## IDE 与文件折叠
+
+文件折叠只改变项目树的显示，不移动文件、不改变 Go 包边界或测试发现。
+同名测试继续跟随实现，例如 `greet_test.go` 折叠在 `greet.go` 下；辅助文件、fuzz、benchmark
+及无歧义的独立行为测试可以折叠在描述本包的 `doc.go` 下。设置保留在个人 IDE 配置中。
+
+```text
+cli/
+  doc.go
+    benchmark_test.go
+    completion_test.go
+    fuzz_test.go
+    helpers_test.go
+  greet.go
+    greet_test.go
+  session_test.go
+```
+
+### VS Code
+
+执行命令面板中的 **Preferences: Open User Settings (JSON)**，将下面的设置合并到已有配置，
+保留原有嵌套规则。`expand: false` 让文件组默认折叠：
+
+```json
+{
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.expand": false,
+  "explorer.fileNesting.patterns": {
+    "*.go": "${capture}_test.go",
+    "doc.go": "helpers_test.go, helpers_windows_test.go, fuzz_test.go, benchmark_test.go, command_embedding_test.go, completion_test.go, stderr_test.go, process_tree_test.go, retention_race_linux_test.go, environment_linux_test.go, external_event_test.go"
+  }
+}
+```
+
+配置方法和变量含义见 [VS Code 文件嵌套说明](https://code.visualstudio.com/docs/editing/getting-started/userinterface#_file-nesting)。
+VS Code 在文件组折叠时会将复制、移动或删除操作应用于整组；只操作单个文件前先展开分组。
+
+### GoLand
+
+1. 打开 **Project** 窗口的菜单，选择 **Appearance → File Nesting…**。
+2. 勾选 **Show files with the same names as nested**。
+3. 在父后缀 `.go` 的子后缀中追加 `_test.go`，保留已有条目。
+4. 新增一行，父后缀填写完整文件名 `doc.go`，子后缀填写下面的列表，不加 `*`：
+
+```text
+helpers_test.go; helpers_windows_test.go; fuzz_test.go; benchmark_test.go; command_embedding_test.go; completion_test.go; stderr_test.go; process_tree_test.go; retention_race_linux_test.go; environment_linux_test.go; external_event_test.go
+```
+
+GoLand 使用分号分隔子后缀，完整文件名也可以作为后缀匹配；配置后收起 `doc.go` 节点。
+它的内置规则按后缀匹配，需要逐项登记，不支持用 `*_test.go` 通配全部测试。
+配置入口见 [GoLand 文件嵌套说明](https://www.jetbrains.com/help/go/file-nesting-dialog.html)。
+
+### 新增规则与歧义文件
+
+`session_test.go`、`process_test.go` 和 `catalog_test.go` 在部分包中有同名实现，在其他包中
+则是独立行为测试，因此不加入通用的 `doc.go` 收纳清单，保持正常显示。
+新增独立测试时先检查仓库内是否已有同名源码配对，再向两款 IDE 的清单追加文件名，
+避免同一测试同时挂在实现文件和 `doc.go` 下。不为折叠统一添加 `zzz` 前缀，也不合并不同测试包
+或不同平台构建约束的文件。验证时确认同名测试归属正确，展开后文件仍可打开；本机实际显示需手动验收。
+
 ## 静态规则与开发探测
 
-`mise run lint` 先检查双语消息和应用配置，再启用以下 18 项，生产导出 API 需中文 GoDoc；测试仅豁免 GoDoc，其他边界仍生效：
+`mise run lint` 先检查双语消息、应用配置和包文档，再启用以下 18 项，生产导出 API 需中文 GoDoc；测试仅豁免 GoDoc，其他边界仍生效：
 
 ```text
 errcheck govet ineffassign staticcheck unused bodyclose errorlint gosec godoclint
