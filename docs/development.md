@@ -113,7 +113,11 @@ Session 关闭顺序、借用资源和永久阻塞 IO 的边界见设计指南�
 单处使用的测试类型就近保留；真实配置加载与注入 stub 的 fixture 各自保持原有边界。
 `fuzz_test.go` 维护 fuzz 入口和 seeds，`benchmark_test.go` 维护 benchmark，普通行为测试按实现归位。
 
-集中消息目录损坏场景由 `test/integration/catalog_test.go` 使用 Go overlay 运行 greeting、Session 和
+通过真实子进程验证程序契约的集成测试集中在 `test/integration/integration_test.go`，
+共享 helper 放在同包的 `helpers_test.go`。集成测试随 `go test ./...` 默认执行，也可用
+`go test ./test/integration` 单独运行；目录和文件名是本项目约定，Go 没有专用的集成测试命名规则。
+
+集中消息目录损坏场景由 `test/integration/integration_test.go` 使用 Go overlay 运行 greeting、Session 和
 command 三个包的 `TestCorruptCatalogProcess`，worker 分别位于同名的 greeting、session 和 errors 测试文件。
 完整测试会执行该集成入口；单独运行所属包时，
 这些 worker 会明确跳过。可在隔离应用目录下单独验收：
@@ -144,9 +148,14 @@ cli/
     completion_test.go
     fuzz_test.go
     helpers_test.go
+  cli.go
+    cli_test.go
   greet.go
     greet_test.go
-  session_test.go
+integration/
+  doc.go
+    helpers_test.go
+    integration_test.go
 ```
 
 ### VS Code
@@ -160,7 +169,7 @@ cli/
   "explorer.fileNesting.expand": false,
   "explorer.fileNesting.patterns": {
     "*.go": "${capture}_test.go",
-    "doc.go": "helpers_test.go, helpers_windows_test.go, fuzz_test.go, benchmark_test.go, command_embedding_test.go, completion_test.go, stderr_test.go, process_tree_test.go, retention_race_linux_test.go, environment_linux_test.go, external_event_test.go"
+    "doc.go": "helpers_test.go, helpers_windows_test.go, fuzz_test.go, benchmark_test.go, integration_test.go, command_embedding_test.go, completion_test.go, stderr_test.go, process_tree_test.go, retention_race_linux_test.go, environment_linux_test.go, external_event_test.go"
   }
 }
 ```
@@ -176,17 +185,15 @@ VS Code 在文件组折叠时会将复制、移动或删除操作应用于整组
 4. 新增一行，父后缀填写完整文件名 `doc.go`，子后缀填写下面的列表，不加 `*`：
 
 ```text
-helpers_test.go; helpers_windows_test.go; fuzz_test.go; benchmark_test.go; command_embedding_test.go; completion_test.go; stderr_test.go; process_tree_test.go; retention_race_linux_test.go; environment_linux_test.go; external_event_test.go
+helpers_test.go; helpers_windows_test.go; fuzz_test.go; benchmark_test.go; integration_test.go; command_embedding_test.go; completion_test.go; stderr_test.go; process_tree_test.go; retention_race_linux_test.go; environment_linux_test.go; external_event_test.go
 ```
 
 GoLand 使用分号分隔子后缀，完整文件名也可以作为后缀匹配；配置后收起 `doc.go` 节点。
 它的内置规则按后缀匹配，需要逐项登记，不支持用 `*_test.go` 通配全部测试。
 配置入口见 [GoLand 文件嵌套说明](https://www.jetbrains.com/help/go/file-nesting-dialog.html)。
 
-### 新增规则与歧义文件
+### 新增折叠规则
 
-`session_test.go`、`process_test.go` 和 `catalog_test.go` 在部分包中有同名实现，在其他包中
-则是独立行为测试，因此不加入通用的 `doc.go` 收纳清单，保持正常显示。
 新增独立测试时先检查仓库内是否已有同名源码配对，再向两款 IDE 的清单追加文件名，
 避免同一测试同时挂在实现文件和 `doc.go` 下。不为折叠统一添加 `zzz` 前缀，也不合并不同测试包
 或不同平台构建约束的文件。验证时确认同名测试归属正确，展开后文件仍可打开；本机实际显示需手动验收。

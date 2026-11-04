@@ -41,9 +41,8 @@ var managedFiles = []string{
 	"internal/app/cli/stderr_test.go",
 	"internal/base/logging/external_event_test.go",
 	"internal/base/telemetry/environment_linux_test.go",
-	"internal/base/diagnostics/process_test.go",
+	"internal/base/diagnostics/retention_test.go",
 	"internal/app/cli/cli_test.go",
-	"internal/app/cli/session_test.go",
 	"internal/app/session/session.go",
 	"internal/app/session/session_test.go",
 	"internal/base/diagnostics/errors.go",
@@ -57,7 +56,7 @@ var managedFiles = []string{
 
 	moduleFile, "cmd/" + TemplateName + "/main.go", "cmd/" + TemplateName + "/main_test.go", "internal/app/cli/cli.go",
 	"internal/app/cli/errors.go",
-	"test/integration/process_test.go",
+	"test/integration/integration_test.go",
 	"test/integration/testdata/process/language.txtar",
 	"test/integration/testdata/process/configuration.txtar", "test/integration/testdata/process/discovery.txtar",
 	"test/integration/testdata/process/usage.txtar",
@@ -90,7 +89,6 @@ var managedFiles = []string{
 	"internal/base/telemetry/session_test.go",
 	"internal/command/errors_test.go",
 	"internal/command/helpers_test.go",
-	"test/integration/catalog_test.go",
 	"test/integration/helpers_test.go",
 }
 
