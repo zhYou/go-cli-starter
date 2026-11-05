@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -16,6 +17,23 @@ import (
 )
 
 func TestTemplateLintUsesCopiedTaskAndPropagatesFailure(t *testing.T) {
+	suffix := ""
+	if runtime.GOOS == windowsPlatform {
+		suffix = executableSuffix
+	}
+	globalConfig := filepath.Join(t.TempDir(), "config.toml")
+	require.NoError(t, os.WriteFile(globalConfig, nil, 0600))
+	t.Setenv("MISE_GLOBAL_CONFIG_FILE", globalConfig)
+	projectRoot, err := filepath.Abs(filepath.Join("..", ".."))
+	require.NoError(t, err)
+	goCommand := exec.Command("mise", "which", "go")
+	goCommand.Env = append(os.Environ(), "MISE_TRUSTED_CONFIG_PATHS="+projectRoot)
+	var goErrors strings.Builder
+	goCommand.Stderr = &goErrors
+	goPath, err := goCommand.Output()
+	require.NoError(t, err, "%s", goErrors.String())
+	goExecutable := strings.TrimSpace(string(goPath))
+	probeName := "lint-probe" + suffix
 	t.Setenv("MISE_TRUSTED_CONFIG_PATHS", t.TempDir())
 	parentTrust := os.Getenv("MISE_TRUSTED_CONFIG_PATHS")
 	for _, code := range []int{0, 7} {
@@ -23,7 +41,8 @@ func TestTemplateLintUsesCopiedTaskAndPropagatesFailure(t *testing.T) {
 			dir := t.TempDir()
 			report := filepath.Join(dir, "lint-report")
 			t.Setenv("LINT_FIXTURE_REPORT", report)
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "mise.toml"), []byte("[settings]\nauto_install = false\nexec_auto_install = false\ntask.run_auto_install = false\n[tasks.lint]\nrun = \"go run ./probe.go\"\n"), 0600))
+			config := fmt.Sprintf("[settings]\nauto_install = false\nexec_auto_install = false\ntask.run_auto_install = false\n[tasks.lint]\nrun = %q\n", filepath.FromSlash("./"+probeName))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "mise.toml"), []byte(config), 0600))
 			source := fmt.Sprintf(`package main
 import "os"
 func main() {
@@ -31,8 +50,14 @@ func main() {
  os.Exit(%d)
 }
 `, code)
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "probe.go"), []byte(source), 0600))
-			err := checkTemplateLint(dir, "lintfixture")
+			probeSource := filepath.Join(dir, "probe.go")
+			require.NoError(t, os.WriteFile(probeSource, []byte(source), 0600))
+			// 先用项目 mise 解析的 Go 预编译，避免临时任务混用宿主 Go 与继承的 GOROOT。
+			//nolint:gosec // G204：Go 路径由项目 mise 解析，源码和产物均位于测试临时目录。
+			cmd := exec.Command(goExecutable, "build", "-o", filepath.Join(dir, probeName), probeSource)
+			output, err := cmd.CombinedOutput()
+			require.NoError(t, err, "%s", output)
+			err = checkTemplateLint(dir, "lintfixture")
 			if code == 0 {
 				require.NoError(t, err)
 			} else {
