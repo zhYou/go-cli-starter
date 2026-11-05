@@ -1,6 +1,9 @@
 # 维护清单
 
-本文列出需要在目标仓库落实的设置。文件已提供不代表平台功能已启用；后续待办状态以带 `backlog` 标签的 GitHub Issues 为准；当前已授权任务无需先创建 Issue，实施与审查进展由 PR 记录。
+本文列出需要在目标仓库落实的设置。文件已提供不代表平台功能已启用。
+[项目待办](backlog.md)只记录维护者在探索项目时明确要求记下的想法，不自动收录讨论中的建议、发现的问题或当前实施任务。
+记录不代表已决定实施，也不构成实施授权；开始和交付时同步已有条目的状态、更新日期与关联 PR。
+当前已授权任务无需补建待办，实施与审查进展由 PR 记录。
 
 ## 责任与审查
 
@@ -11,7 +14,6 @@
 
 ## 仓库管理员设置
 
-- 首次启用 GitHub Issues 时创建 `backlog` 标签；Issue 表单和智能体查询依赖这个稳定标识，不把待办写回仓库 Markdown。
 - 为 main 设置规则集，要求 PR、审查通过、分支更新及必需检查。按实际检查名称启用 `check`、`platforms (macos-latest)`、`platforms (windows-latest)`、`vulnerability`，首次运行后核对名称。`check` 汇总全部 CI 任务，包含独立的 MCP 验收；任务失败、取消或意外跳过时不能通过。
 - 保护发布标签 `v*`，限制创建和修改权限；采用不可变发布资产策略。
 - 按 [SECURITY](../SECURITY.md) 填写私密报告入口并启用对应功能；发布支持版本和响应安排。
@@ -44,7 +46,7 @@ Release 创建后证明失败时，workflow 失败；重试必须针对同一批
 普通 check 不安装、升级或修复环境。README、mise.toml、Go 和 CI 保持一致；不提交个人模型、凭据、权限或插件配置。
 mise、git、gh、Codex、RTK、superpowers 由用户维护，项目不安装或更新。
 统一 doctor 要求 mise 最低版本、git 和六个项目工具准确版本，包括 gopls；
-gh、Codex、RTK 仅报告状态，缺失或探测失败不影响检查结果，superpowers 由实际会话确认。Serena/Graphify 尚在待办。
+gh、Codex、RTK 仅报告状态，缺失或探测失败不影响检查结果，superpowers 由实际会话确认。
 CI 无需安装 Codex、RTK 或 superpowers；gopls MCP 在独立 job 复用统一 setup 验证。
 平台支持通过原生 CI 和六目标发布构建验证。
 

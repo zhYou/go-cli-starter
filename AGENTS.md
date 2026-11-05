@@ -20,14 +20,14 @@
   项目关闭 mise 锁文件机制，保留准确版本和 go.sum。
 - 修改行为或删除设计时，同步审查相关文档、帮助、示例与 agent 规则。删除失效说明与重复描述，更新仍有效的使用、约束和维护方法；正式文档记录当前已实现行为，历史差异仅保留在必要的迁移说明中，不为维持旧文档而保留无用配置或兼容入口。
 - superpowers 设计和实施计划只写入本地忽略目录 `docs/superpowers/`，不提交。
-- 当前会话中已明确要求实施的任务，按已确认范围推进，无需先创建 Issue 或添加 `backlog` 标签。
-  规划或开始前运行 `gh issue list --state open --label backlog`，用于查重和获取上下文，
-  不要求当前任务必须对应某个 Issue。
-- 尚未安排实施的后续工作统一记录在带 `backlog` 标签的 [GitHub Issues](https://github.com/zhYou/go-cli-starter/issues?q=is%3Aissue+state%3Aopen+label%3Abacklog)，
-  不另建仓库 backlog 文件。新增待办先确认范围；Issue 编号是唯一待办 ID，背景、范围和验收标准以正文为准。
-- 待办 Issue 本身不代表实施授权。任务已有对应 Issue 时，PR 关联它；完整解决时使用关闭关联，
-  部分解决时仅引用。没有对应 Issue 时直接交付 PR，无需补建 Issue。
-  GitHub 状态和时间戳取代手工维护的状态、日期。
+- 当前会话中已明确要求实施的任务，按已确认范围推进，无需先新增待办条目。
+  规划或开始前阅读 [项目待办](docs/backlog.md)，用于查重和获取上下文。
+- 维护者在探索项目时想到的想法，仅在其明确要求记录时添加到 `docs/backlog.md`。
+  讨论中的建议、发现的问题和当前实施任务均不自动加入。新增待办先确认范围；
+  `BL-xxx` 是唯一待办 ID，背景、范围和验收标准以条目正文为准。
+- 记录不代表已决定实施，也不构成实施授权。任务已有对应条目时，PR 引用其 ID；开始和交付时
+  同步条目状态、更新日期和关联 PR。已完成条目从待办移除，历史通过 Git 追溯。
+  没有对应条目时直接交付 PR，无需补建待办。
 
 ## 隔离开发与交付
 
@@ -61,7 +61,7 @@
 
 - 正式 Go 包的中文说明集中在 `doc.go`，包括 main 和 integration 包；其他实现文件不重复写包说明。
   `doc.go` 只包含注释及 package 声明，描述包职责、使用和关键约束，不作空占位或存放测试辅助代码。
-  运行 `mise run doc:check` 检查，规则和 IDE 折叠方法见 `docs/development.md`；该检查纳入 lint 和 check。
+  运行 `mise run lint:doc` 检查，规则和 IDE 折叠方法见 `docs/development.md`；该检查纳入 lint 和 check。
 
 - 修改行为或删除设计时，同步审查相关测试和夹具。删除失效假设与重复覆盖，迁移仍有效的行为断言，保留有价值的故障回归；不为维持旧测试而保留无用配置或兼容分支。
 - 普通测试优先放入所属实现同名的 `*_test.go`，跨文件行为先判断实际归属，合适时归并。
@@ -119,8 +119,8 @@
   最终验证以命令行检查结果为准，不用配置成功、启动成功或 mock 代替真实验收。
 - 测试和示例验证必须隔离父进程与子进程的应用 HOME、配置及状态，禁止读写真实用户诊断数据。
   本模板使用 `GO_CLI_STARTER_HOME`，改名后按应用前缀派生；不提交密钥、环境转储、日志或缓存。
-- 编辑期间运行针对性测试。消息目录或应用配置改动分别运行 `mise run i18n:check`、
-  `mise run config:check`；两者也由 lint 和 check 执行。交付前运行 `mise exec -- golangci-lint fmt --color=never` 和
+- 编辑期间运行针对性测试。消息目录或应用配置改动分别运行 `mise run lint:i18n`、
+  `mise run lint:config`；两者也由 lint 和 check 执行。交付前运行 `mise exec -- golangci-lint fmt --color=never` 和
   `mise run check`，并在支持的主机上运行 `mise exec -- go test -race ./...`。
 - 修改模板或项目标识时运行 `mise run template:check`。
   新文件包含应用标识时同步更新受管文件清单。

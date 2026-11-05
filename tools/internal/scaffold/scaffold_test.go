@@ -64,7 +64,7 @@ func TestInitializeRejectsGoVersionNamesBeforeWriting(t *testing.T) {
 
 func TestInitializeAcceptanceIdentityWhitelist(t *testing.T) {
 	root := projectFixture(t, TemplateModule, TemplateName)
-	for _, name := range []string{"tools/dev/acceptance.go", "tools/dev/release_install.go"} {
+	for _, name := range []string{"tools/internal/acceptance/acceptance.go", "tools/release/release_install.go"} {
 		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(root, name)), 0700))
 		content := "package main\nimport _ \"" + TemplateModule + "/internal/base/paths\"\n"
 		require.NoError(t, os.WriteFile(filepath.Join(root, name), []byte(content), 0600))
@@ -73,7 +73,7 @@ func TestInitializeAcceptanceIdentityWhitelist(t *testing.T) {
 	require.NoError(t, os.WriteFile(unknown, []byte("name = \""+TemplateName+"\""), 0600))
 	_, err := Initialize(root, "example.com/team/mycli", "mycli")
 	require.NoError(t, err)
-	for _, name := range []string{"tools/dev/acceptance.go", "tools/dev/release_install.go"} {
+	for _, name := range []string{"tools/internal/acceptance/acceptance.go", "tools/release/release_install.go"} {
 		//nolint:gosec // G304：仅读取本测试的临时 fixture。
 		data, err := os.ReadFile(filepath.Join(root, name))
 		require.NoError(t, err)

@@ -147,7 +147,7 @@ jobs:
         env:
           GO_CLI_STARTER_HOME: ${{ runner.temp }}/template-starter-home
           MYCLI_HOME: ${{ runner.temp }}/template-mycli-home
-        run: mise exec -- go test -count=1 ./tools/dev -run '^TestTemplateExecutable(Path|Acceptance)$'
+        run: mise exec -- go test -count=1 ./tools/template -run '^TestTemplateExecutable(Path|Acceptance)$'
       - run: mise exec -- go test ./...
       - run: mise run build
   check:

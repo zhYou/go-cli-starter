@@ -13,7 +13,7 @@
 ```sh
 mise trust
 mise run setup
-mise run init --module github.com/you/mycli --name mycli
+mise run template:init --module github.com/you/mycli --name mycli
 mise run check
 ```
 
@@ -203,28 +203,29 @@ RTK 和 superpowers 使用用户目录中的安装。模板不复制全局技能
 缺失、执行失败、超时或输出截断均仅报告，superpowers 是否加载以实际会话技能列表为准。
 基础检查无需 gh、Codex、RTK 或 superpowers；CI 的独立 `agent-mcp` job 复用统一 setup，验证真实 MCP 连接。
 
-当前仅支持 Codex。Claude Code 和 OpenCode 支持见[项目待办](https://github.com/zhYou/go-cli-starter/issues?q=is%3Aissue+state%3Aopen+label%3Abacklog)；TUI 和 CLI 自身的 MCP 服务暂不在范围内。
+当前仅支持 Codex。Claude Code 和 OpenCode 支持见[项目待办](docs/backlog.md)；TUI 和 CLI 自身的 MCP 服务暂不在范围内。
 
 隔离 worktree、分支命名、提交署名和 PR 交付规则见 [协作约定](AGENTS.md#隔离开发与交付)。
 
 ## 开发命令
 
-mise 任务保留项目流程、聚合检查和自定义工具：
+mise 负责流程依赖，Go 工具按领域实现检查和验收。`lint` 检查当前源码、资源和版本声明，
+`check` 在此基础上完成测试、构建、契约与模板验收：
 
 | 命令 | 用途 |
 | --- | --- |
 | `mise run setup` | 安装六个固定版本的项目工具，下载模块 |
 | `mise run doctor` | 检查项目环境，报告用户工具状态 |
-| `mise run lint` | 聚合双语消息、应用配置、包文档和 18 项静态检查 |
-| `mise run i18n:check` / `config:check` | 校验双语消息目录 / 受管应用配置；均纳入 lint 和 check |
-| `mise run doc:check` | 检查正式 Go 包的 doc.go 与包说明位置；纳入 lint 和 check |
-| `mise run rules:check` | 用真实类型边界 fixture 验证静态规则 |
+| `mise run lint` | 只读检查格式、双语消息、应用配置、包文档、版本声明和 18 项静态规则 |
+| `mise run lint:i18n` / `lint:config` | 校验双语消息目录 / 受管应用配置；均纳入 lint 和 check |
+| `mise run lint:doc` | 检查正式 Go 包的 doc.go 与包说明位置；纳入 lint 和 check |
+| `mise run lint:test` | 用真实 fixture 测试静态规则自身；仅纳入 check |
 | `mise run build` | 构建到 bin，注入版本信息 |
-| `mise run check` | 与 CI 相同的完整源码检查 |
-| `mise run template:check` | 在临时副本中验证改名、测试、构建和发布配置 |
-| `mise run init --module <模块路径> --name <命令名>` | 初始化模板身份 |
+| `mise run check` | 完整源码检查，含测试、构建、契约和模板验收 |
+| `mise run template:check` | 在临时副本中验证改名、lint、测试、构建、安装和发布配置 |
+| `mise run template:init --module <模块路径> --name <命令名>` | 初始化模板身份 |
 | `mise run contract:check` / `contract:update` | 检查 / 显式更新机器契约 |
-| `mise run versions:check` | 检查工具、模块、CI 和文档版本一致性 |
+| `mise run lint:versions` | 检查工具、模块、CI 和文档版本一致性 |
 | `mise run mcp:check` | 验证 gopls MCP 的实际连接和诊断 |
 | `mise run release:verify` | 验证发布归档，并隔离安装宿主程序 |
 
@@ -249,8 +250,11 @@ mise exec -- go test ./internal/app/cli -run=^$ -fuzz=FuzzArgv -fuzztime=5s
 mise exec -- go test ./internal/app/cli -run=^$ -bench=. -benchmem
 ```
 
-`check` 包含上述只读格式、模块、单元测试和 vet 检查，以及表中的聚合检查和构建。
-`lint` 额外聚合双语消息、配置与包文档检查；单独运行 `mise exec -- golangci-lint run --allow-serial-runners` 只执行工具自身的静态检查。
+`lint` 聚合 `lint:i18n`、`lint:config`、`lint:doc`、`lint:versions`、只读格式检查和 golangci-lint。
+`lint:test` 在临时模块中测试违规与合规规则，不检查当前项目的业务正确性。
+`check` 聚合 lint、lint:test、build、contract:check 和 template:check，再检查模块元数据、运行测试和 vet。
+MCP、发布归档与安装、安全扫描和其他平台原生验收独立执行；`mise run check` 不等于全部 CI 作业。
+单独运行 `mise exec -- golangci-lint run --allow-serial-runners` 只执行工具自身的静态检查。
 
 目录按入口、内部包、配置、测试和工具分工：
 
@@ -263,9 +267,14 @@ internal/command/           运行时外部命令与有界并行
 configs/config.example.toml 配置示例
 test/integration/           真实进程测试与脚本
 test/testdata/contracts/    机器契约基线
-tools/dev/                 开发与发布验收入口
-tools/init/                模板初始化入口
-tools/internal/            模板、契约及配置和语言检查的工具共享包
+tools/doctor/              环境探测，不安装或修复工具
+tools/build/               本地构建
+tools/lint/                资源、包文档、版本声明检查及规则自测
+tools/contract/            机器契约捕获、Git 比较与快照更新
+tools/template/            模板初始化和隔离副本验收
+tools/mcp/                 真实 gopls MCP 验收
+tools/release/             发布归档和宿主安装验收
+tools/internal/            模板事务、契约比较、版本探测和二进制验收等共享能力
 docs/                      使用和维护说明
 ```
 
@@ -275,7 +284,7 @@ docs/                      使用和维护说明
 
 `check` 在临时仓库中验证发布配置，无需为内部工具配置 remote。真正发布或运行 `mise exec -- goreleaser check` 前，为目标项目设置自己的 GitHub origin。
 
-包文档与 IDE 文件折叠配置、新增命令、工具升级和发布步骤见 [开发说明](docs/development.md)，后续工作见[项目待办](https://github.com/zhYou/go-cli-starter/issues?q=is%3Aissue+state%3Aopen+label%3Abacklog)。
+包文档与 IDE 文件折叠配置、新增命令、工具升级和发布步骤见 [开发说明](docs/development.md)，探索时明确要求记录的想法见[项目待办](docs/backlog.md)。
 
 ## 发布
 
