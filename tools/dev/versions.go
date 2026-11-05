@@ -16,41 +16,26 @@ import (
 	"golang.org/x/mod/semver"
 )
 
-// VersionSet 保存所选工具层的固定版本和 mise 最低版本。
+// VersionSet 保存项目统一工具清单的固定版本和 mise 最低版本。
 type VersionSet struct {
 	MiseMinimum string
 	Tools       map[string]string
 }
 
-func loadVersions(root string, agent bool) (VersionSet, error) {
-	files := []string{miseConfig}
-	if agent {
-		files = append(files, "mise.agent.toml")
+func loadVersions(root string) (VersionSet, error) {
+	//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
+	data, err := os.ReadFile(filepath.Join(root, miseConfig))
+	if err != nil {
+		return VersionSet{}, err
 	}
-	v := VersionSet{Tools: make(map[string]string)}
-	for _, name := range files {
-		//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
-		data, err := os.ReadFile(filepath.Join(root, name))
-		if err != nil {
-			return v, err
-		}
-		var cfg struct {
-			Minimum string            `toml:"min_version"`
-			Tools   map[string]string `toml:"tools"`
-		}
-		if err := toml.Unmarshal(data, &cfg); err != nil {
-			return v, err
-		}
-		if name == miseConfig {
-			v.MiseMinimum = cfg.Minimum
-		}
-		for key, version := range cfg.Tools {
-			if _, exists := v.Tools[key]; exists {
-				return v, fmt.Errorf("工具 %s 在多个层级重复声明", key)
-			}
-			v.Tools[key] = version
-		}
+	var cfg struct {
+		Minimum string            `toml:"min_version"`
+		Tools   map[string]string `toml:"tools"`
 	}
+	if err := toml.Unmarshal(data, &cfg); err != nil {
+		return VersionSet{}, err
+	}
+	v := VersionSet{MiseMinimum: cfg.Minimum, Tools: cfg.Tools}
 	if !regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`).MatchString(v.MiseMinimum) {
 		return v, fmt.Errorf("mise 最低版本必须精确固定")
 	}
@@ -100,16 +85,12 @@ func matchToolVersion(key, output, want string) error {
 		return nil
 	}
 	if len(match) != 2 || match[1] != want {
-		setup := "setup"
-		if key == goplsTool {
-			setup = "setup:agent"
-		}
-		return fmt.Errorf("%s 与固定版本 %s 不符，请运行 mise run %s", spec.Name, want, setup)
+		return fmt.Errorf("%s 与固定版本 %s 不符，请运行 mise run setup", spec.Name, want)
 	}
 	return nil
 }
 func checkVersions(root string) error {
-	versions, err := loadVersions(root, true)
+	versions, err := loadVersions(root)
 	if err != nil {
 		return err
 	}

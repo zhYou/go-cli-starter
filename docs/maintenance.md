@@ -15,7 +15,7 @@
 - 为 main 设置规则集，要求 PR、审查通过、分支更新及必需检查。按实际检查名称启用 `check`、`platforms (macos-latest)`、`platforms (windows-latest)`、`vulnerability`，首次运行后核对名称。`check` 汇总全部 CI 任务，包含独立的 MCP 验收；任务失败、取消或意外跳过时不能通过。
 - 保护发布标签 `v*`，限制创建和修改权限；采用不可变发布资产策略。
 - 按 [SECURITY](../SECURITY.md) 填写私密报告入口并启用对应功能；发布支持版本和响应安排。
-- 安装或授权 Renovate。现有配置覆盖 Go、Actions SHA 和两份 mise 配置，禁用自动合并及预发布更新。维护者审查准确版本声明并完成版本检查，项目不维护 mise 锁文件。
+- 安装或授权 Renovate。现有配置覆盖 Go、Actions SHA 和`mise.toml`，禁用自动合并及预发布更新。维护者审查准确版本声明并完成版本检查，项目不维护 mise 锁文件。
 - 确认 release job 能申请 OIDC 和 attestations 写权限，满足所在 GitHub 套餐、组织与仓库策略。普通 PR 和定时扫描只读，不使用发布凭据。
 - 确认定时安全扫描持续运行，并指定失败通知的接收人；停用或归档仓库前交接维护责任。
 
@@ -27,7 +27,7 @@ PR 改目标、标题或描述编辑会重新检查，同一 PR 的新运行取�
 ## 升级和发布
 
 源码检查见[开发说明](development.md)，模板迁移见[模板升级](template-upgrades.md)，接口政策见[兼容性规则](compatibility.md)。
-工具升级同步当前版本表、两份 mise 配置、Go 声明和 CI；历史变更通过 Git 追溯。
+工具升级同步当前版本表、`mise.toml`、Go 声明和 CI；历史变更通过 Git 追溯。
 
 发布前按[开发说明的发布与交付步骤](development.md#发布与交付)完成源码检查、竞态与漏洞扫描、
 本地 snapshot 和发布验收。检查六目标归档、各自 SPDX 与最终摘要。
@@ -40,15 +40,17 @@ Release 创建后证明失败时，workflow 失败；重试必须针对同一批
 
 ## 环境、诊断与验收证据
 
-首次使用及工具版本或 Go 模块变更后显式 setup，再 doctor；智能体环境使用 setup:agent 和 doctor:agent。
-普通 check 不安装、升级或修复环境。README、两份 mise 版本声明、Go 和 CI 保持一致；不提交个人模型、凭据、权限或插件配置。
-mise、git、gh、Codex、RTK、superpowers 属于预装层，项目不安装或更新；基础检查只要求其中的 mise、git。
-doctor:agent 额外要求 gh、Codex、gopls，RTK 仅报告，superpowers 由会话确认。Serena/Graphify 尚在待办。
-智能体配套不作为基础 CI 前置条件，gopls MCP 在独立 job 验证；平台支持通过原生 CI 和六目标发布构建验证。
+首次使用及工具版本或 Go 模块变更后显式 setup，再 doctor。
+普通 check 不安装、升级或修复环境。README、mise.toml、Go 和 CI 保持一致；不提交个人模型、凭据、权限或插件配置。
+mise、git、gh、Codex、RTK、superpowers 由用户维护，项目不安装或更新。
+统一 doctor 要求 mise 最低版本、git 和六个项目工具准确版本，包括 gopls；
+gh、Codex、RTK 仅报告状态，缺失或探测失败不影响检查结果，superpowers 由实际会话确认。Serena/Graphify 尚在待办。
+CI 无需安装 Codex、RTK 或 superpowers；gopls MCP 在独立 job 复用统一 setup 验证。
+平台支持通过原生 CI 和六目标发布构建验证。
 
 CI 将 Linux 源码、race、fuzz/benchmark 和 snapshot/安装验收分组并行，保留 macOS/Windows 原生任务。
-Go 缓存按 OS、架构、Go 版本和依赖摘要区分，编译缓存再区分任务和提交；lint 使用独立缓存，
-gopls 随独立的 agent mise 缓存保存。缓存仅保存依赖与检查工具的可重建数据，不包含应用状态、诊断文件或发布资产。
+Go 缓存按 OS、架构、Go 版本和依赖摘要区分，编译缓存再区分任务、提交与 go.mod/go.sum/mise.toml 摘要；
+lint 使用独立缓存，六个项目工具复用统一 mise 缓存。缓存仅保存依赖与检查工具的可重建数据，不包含应用状态、诊断文件或发布资产。
 Windows 仅缓存 Go 模块；跨运行恢复编译缓存的实测耗时增加，因此编译结果只在当前 runner 内复用。
 排查提速效果时记录冷、热缓存的步骤耗时和命中情况；缓存未命中不能跳过检查。
 

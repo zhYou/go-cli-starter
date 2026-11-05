@@ -1,8 +1,8 @@
 # 在 Codex 中信任此仓库后加载项目配置。
-# 先运行 `mise run setup:agent` 准备依赖，再从仓库启动 Codex。
+# 先运行 `mise run setup` 准备依赖，再从仓库启动 Codex。
 [mcp_servers.gopls]
 command = "mise"
-args = ["-E", "agent", "exec", "--", "gopls", "mcp"]
+args = ["exec", "--", "gopls", "mcp"]
 startup_timeout_sec = 60
 tool_timeout_sec = 120
 required = false

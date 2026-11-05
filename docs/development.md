@@ -16,15 +16,14 @@
 调整换行规则时，确认工作区只有本次修改，再执行 `git add --renormalize .`，审查差异后提交。
 
 首次使用及工具版本或 Go 模块变更后显式运行 `mise run setup`，然后运行 `mise run doctor`。
-setup 只按显式清单安装开发工具并下载模块。智能体开发使用 `setup:agent`，它先完成 setup，
-再安装智能体辅助工具。普通任务与 exec 的自动安装均关闭，
+setup 只按显式清单安装六个项目工具并下载模块。普通任务与 exec 的自动安装均关闭，
 `GOTOOLCHAIN=local` 禁止 Go 隐式下载工具链。缺工具应报错，检查不能兼任安装、升级或修复。
-预装层包括 mise、git、gh、Codex、RTK、superpowers，由用户维护；模型、认证、权限和插件偏好不进入仓库。
-开发层由 `mise.toml` 声明 Go、golangci-lint、GoReleaser、govulncheck、Syft；
-智能体辅助层由 `mise.agent.toml` 声明 gopls，显式选择 agent 环境才加载。
-doctor 检查 mise 最低版本、git 和开发层准确版本；doctor:agent 额外要求 gh、Codex、gopls 可用，
-RTK 仅报告状态，superpowers 以实际会话技能列表为准。gh、Codex、RTK 只检查可运行性，不检查认证或固定版本。
-基础检查无需智能体配套；CI 的独立 agent-mcp job 运行 setup:agent 和 mcp:check，无需这些预装智能体工具。
+mise、git、gh、Codex、RTK、superpowers 由用户维护；模型、认证、权限和插件偏好不进入仓库。
+`mise.toml` 统一声明 Go、golangci-lint、GoReleaser、govulncheck、Syft 和 gopls。
+doctor 检查 mise 最低版本、git 和全部项目工具准确版本；gh、Codex、RTK 仅报告状态，
+缺失、执行失败、超时或输出截断均不影响检查结果，不检查认证或固定版本。
+superpowers 以实际会话技能列表为准。基础检查无需这些用户级智能体工具；
+CI 的独立 agent-mcp job 复用统一 setup，再运行 mcp:check。
 
 项目设置 `lockfile = false`，不维护 mise 锁文件。准确版本仍由 TOML 声明，安装时由后端解析下载来源并执行其校验，
 不再预先保存六平台工具下载 URL 和 SHA-256。Go 模块继续使用 go.sum；运行时系统锁与此无关，不可删除。
@@ -76,7 +75,7 @@ bin/dist、生成代码和外部 `*_test` 包不受约束；普通 `*_test.go` �
 ## 实现与检查
 
 1. 查阅设计指南对应场景，用 gopls 查询 Go 符号、引用和诊断，确认工作区是实际 checkout。
-   先通过 `mise -E agent exec -- gopls mcp -instructions` 阅读说明。普通操作按需使用等价 CLI，不机械调用工具填清单。
+   先通过 `mise exec -- gopls mcp -instructions` 阅读说明。普通操作按需使用等价 CLI，不机械调用工具填清单。
 2. 参照 greet 分离有类型业务选项、结果及 Validate。CLI 的 Args、必填及组合校验在读取配置和创建资源前完成，
    业务入口也调用同一校验。新命令补双语帮助、示例和结果注册，不新增交互输入。
 3. 新配置同步模块 Config、defaults、环境映射、TOML、校验和测试，并使用统一加载入口。
@@ -269,7 +268,8 @@ Linux CI 直接执行五秒 argv 模糊测试，覆盖空值、空格、Unicode�
 CI 在目标为 main 的 PR 和 main 更新时运行；开发分支之间的 PR 与普通 push 不触发。
 源码检查、race、fuzz/benchmark、snapshot 与安装验收分组并行，独立运行 MCP 和 macOS/Windows 原生验收，
 最后由 `check` 汇总结果。任何依赖失败、取消或跳过都会使汇总失败，已有 main 必需检查名称保持不变。
-Go 模块和编译路径从各 runner 的 `go env` 获取，lint 单独缓存；恢复缓存不会跳过验证命令。
+Go 模块和编译路径从各 runner 的 `go env` 获取，编译缓存键包含 go.mod、go.sum 和 mise.toml 的摘要；
+项目工具复用统一 mise 缓存，lint 单独缓存。恢复缓存不会跳过验证命令。
 Windows 仅缓存模块，避免实测跨运行编译缓存恢复后的耗时增加，编译结果只在当前 runner 内复用。
 同一 PR 的新运行取消旧运行；非 PR 运行按各自运行 ID 隔离。每日 Security 保留，
 推送 `v*` 标签时 Release 复用同一提交的 CI 与 Security，全部通过后发布。
@@ -287,21 +287,19 @@ Windows 仅缓存模块，避免实测跨运行编译缓存恢复后的耗时增
 旧项目迁移与事务恢复见[模板升级](template-upgrades.md)，初始化不承担升级。
 
 升级选择官方最新 LTS 补丁，无 LTS 则最新稳定版，排除预发布；先查 Go、gopls、golangci-lint 兼容性。
-同步 mise.toml、mise.agent.toml、Go 声明、doctor 预期、README 受检工具表及 CI 引导，再执行：
+同步 mise.toml、Go 声明、doctor 预期、README 受检工具表及 CI 引导，再执行：
 
 ```sh
 mise run setup
 mise run doctor
-mise run setup:agent
-mise run doctor:agent
 mise run versions:check
 ```
 
-随后按受影响范围运行 check、race、mcp:check 与 snapshot/verify。提交两份准确版本声明，
+随后按受影响范围运行 check、race、mcp:check 与 snapshot/verify。提交统一的准确版本声明，
 通过原生 CI 和六目标发布构建验证平台支持；gopls 等 Go 后端从固定模块版本在宿主平台编译。
 README 的 tool-versions 标记与工具显示标签由 versions:check 解析，修改表格时保留它们。
-Renovate 由管理员启用，覆盖两份 mise 配置；权限不足时人工更新版本声明并完成检查，不放宽检查。
-预装工具通过各自渠道维护，项目 setup 不安装或更新它们。
+Renovate 由管理员启用，覆盖 mise.toml；权限不足时人工更新版本声明并完成检查，不放宽检查。
+用户工具通过各自渠道维护，项目 setup 不安装或更新它们。
 
 ## 安装发布程序
 

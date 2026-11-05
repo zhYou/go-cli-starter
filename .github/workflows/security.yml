@@ -39,9 +39,9 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.go-env.outputs.build }}
-          key: gobuild-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-env.outputs.version }}-${{ github.job }}-${{ hashFiles('go.mod', 'go.sum', 'mise.toml', 'mise.agent.toml') }}-${{ github.sha }}
+          key: gobuild-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-env.outputs.version }}-${{ github.job }}-${{ hashFiles('go.mod', 'go.sum', 'mise.toml') }}-${{ github.sha }}
           restore-keys: |
-            gobuild-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-env.outputs.version }}-${{ github.job }}-${{ hashFiles('go.mod', 'go.sum', 'mise.toml', 'mise.agent.toml') }}-
+            gobuild-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-env.outputs.version }}-${{ github.job }}-${{ hashFiles('go.mod', 'go.sum', 'mise.toml') }}-
             gobuild-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-env.outputs.version }}-${{ github.job }}-
       - run: mise run setup
       - run: mise exec -- govulncheck ./...

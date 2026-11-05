@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -151,15 +152,22 @@ func doctorToolFixture(t *testing.T) string {
 	dir := t.TempDir()
 	source := filepath.Join(dir, "main.go")
 	require.NoError(t, os.WriteFile(source, []byte(`package main
-import ("fmt"; "os"; "path/filepath"; "strings")
+import ("fmt"; "os"; "path/filepath"; "strings"; "time")
 func main() {
     name := strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe")
     arg := "--version"
     if name == "gopls" { arg = "version" }
     if len(os.Args) != 2 || os.Args[1] != arg { os.Exit(2) }
+    if name == os.Getenv("DOCTOR_FAULT_TOOL") {
+        switch os.Getenv("DOCTOR_FAULT") {
+        case "failure": fmt.Fprintln(os.Stderr, "fixture failed"); os.Exit(1)
+        case "timeout": time.Sleep(30 * time.Second)
+        case "truncated": fmt.Println(strings.Repeat("x", 4096)); return
+        }
+    }
     switch name {
     case "mise": fmt.Println(os.Getenv("DOCTOR_MISE_VERSION"))
-    case "gopls": fmt.Println("golang.org/x/tools/gopls v0.24.0")
+    case "gopls": fmt.Println("golang.org/x/tools/gopls v" + os.Getenv("DOCTOR_GOPLS_VERSION"))
     default: fmt.Println(name + " fixture")
     }
 }
@@ -174,14 +182,13 @@ func main() {
 	return binary
 }
 
-func doctorLayerFixture(t *testing.T, binary, missing string) {
+func doctorEnvironmentFixture(t *testing.T, binary, missing string) *os.File {
 	t.Helper()
 	root := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(root, "mise.toml"), []byte("min_version = \"2026.10.21\"\n[tools]\n"), 0600))
-	require.NoError(t, os.WriteFile(filepath.Join(root, "mise.agent.toml"), []byte("[tools]\n\"go:golang.org/x/tools/gopls\" = \"0.24.0\"\n"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "mise.toml"), []byte("min_version = \"2026.10.21\"\n[tools]\n\"go:golang.org/x/tools/gopls\" = \"0.24.0\"\n"), 0600))
 	bin := t.TempDir()
-	for _, name := range []string{"mise", "git", "gh", "codex", "gopls"} {
-		if name == missing || missing == "agent" && name != "mise" && name != "git" {
+	for _, name := range []string{"mise", "git", "gh", "codex", "rtk", "gopls"} {
+		if name == missing {
 			continue
 		}
 		if runtime.GOOS == windowsPlatform {
@@ -191,33 +198,75 @@ func doctorLayerFixture(t *testing.T, binary, missing string) {
 	}
 	t.Setenv("PATH", bin)
 	t.Setenv("DOCTOR_MISE_VERSION", "2026.10.25 linux-x64")
+	t.Setenv("DOCTOR_GOPLS_VERSION", "0.24.0")
 	t.Setenv("GO_CLI_STARTER_HOME", t.TempDir())
 	t.Chdir(root)
+	out, err := os.CreateTemp(t.TempDir(), "doctor-output")
+	require.NoError(t, err)
+	original := os.Stdout
+	os.Stdout = out
+	t.Cleanup(func() { os.Stdout = original; _ = out.Close() })
+	return out
 }
 
-func TestDoctorLayerRequirements(t *testing.T) {
+func TestDoctorRequiredTools(t *testing.T) {
 	binary := doctorToolFixture(t)
-	t.Run("base-without-agent", func(t *testing.T) {
-		doctorLayerFixture(t, binary, "agent")
-		require.NoError(t, doctor(false))
+	t.Run("available", func(t *testing.T) {
+		doctorEnvironmentFixture(t, binary, "")
+		require.NoError(t, doctor())
 	})
-	t.Run("agent-without-optional-rtk", func(t *testing.T) {
-		doctorLayerFixture(t, binary, "")
-		require.NoError(t, doctor(true))
-	})
-	for _, name := range []string{"gh", "codex", "gopls"} {
-		t.Run("agent-without-"+name, func(t *testing.T) {
-			doctorLayerFixture(t, binary, name)
-			require.ErrorContains(t, doctor(true), name)
+	for _, name := range []string{"mise", "git", "gopls"} {
+		t.Run("missing-"+name, func(t *testing.T) {
+			doctorEnvironmentFixture(t, binary, name)
+			require.ErrorContains(t, doctor(), name)
 		})
 	}
+	t.Run("gopls-mismatch", func(t *testing.T) {
+		doctorEnvironmentFixture(t, binary, "")
+		t.Setenv("DOCTOR_GOPLS_VERSION", "0.24.1")
+		require.ErrorContains(t, doctor(), "gopls")
+	})
+	t.Run("gopls-failure", func(t *testing.T) {
+		doctorEnvironmentFixture(t, binary, "")
+		t.Setenv("DOCTOR_FAULT_TOOL", "gopls")
+		t.Setenv("DOCTOR_FAULT", "failure")
+		require.ErrorContains(t, doctor(), "gopls")
+	})
 	t.Run("mise-below-minimum", func(t *testing.T) {
-		doctorLayerFixture(t, binary, "agent")
+		doctorEnvironmentFixture(t, binary, "")
 		t.Setenv("DOCTOR_MISE_VERSION", "2026.10.20 linux-x64")
-		require.ErrorContains(t, doctor(false), "mise")
+		require.ErrorContains(t, doctor(), "mise")
 	})
 }
 
-func TestGoplsVersionMismatchSuggestsAgentSetup(t *testing.T) {
-	require.ErrorContains(t, matchToolVersion("go:golang.org/x/tools/gopls", "golang.org/x/tools/gopls v0.24.1", "0.24.0"), "mise run setup:agent")
+func TestDoctorUserToolsOnlyReport(t *testing.T) {
+	binary := doctorToolFixture(t)
+	for _, name := range []string{"gh", "codex", "rtk"} {
+		for _, fault := range []struct{ mode, detail string }{
+			{"available", "fixture"}, {"missing", "不可用"}, {"failure", "不可用"}, {"timeout", "超时"}, {"truncated", "截断"},
+		} {
+			t.Run(name+"/"+fault.mode, func(t *testing.T) {
+				missing := ""
+				if fault.mode == "missing" {
+					missing = name
+				}
+				out := doctorEnvironmentFixture(t, binary, missing)
+				t.Setenv("DOCTOR_FAULT_TOOL", name)
+				t.Setenv("DOCTOR_FAULT", fault.mode)
+				require.NoError(t, doctor())
+				_, err := out.Seek(0, 0)
+				require.NoError(t, err)
+				data, err := io.ReadAll(out)
+				require.NoError(t, err)
+				require.Contains(t, string(data), name)
+				require.Contains(t, string(data), fault.detail)
+			})
+		}
+	}
+}
+
+func TestGoplsVersionMismatchSuggestsSetup(t *testing.T) {
+	err := matchToolVersion("go:golang.org/x/tools/gopls", "golang.org/x/tools/gopls v0.24.1", "0.24.0")
+	require.ErrorContains(t, err, "mise run setup")
+	require.NotContains(t, err.Error(), ":agent")
 }

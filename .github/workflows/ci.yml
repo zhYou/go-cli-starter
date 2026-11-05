@@ -52,9 +52,9 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.go-env.outputs.build }}
-          key: gobuild-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-env.outputs.version }}-${{ github.job }}-${{ hashFiles('go.mod', 'go.sum', 'mise.toml', 'mise.agent.toml') }}-${{ github.sha }}
+          key: gobuild-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-env.outputs.version }}-${{ github.job }}-${{ hashFiles('go.mod', 'go.sum', 'mise.toml') }}-${{ github.sha }}
           restore-keys: |
-            gobuild-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-env.outputs.version }}-${{ github.job }}-${{ hashFiles('go.mod', 'go.sum', 'mise.toml', 'mise.agent.toml') }}-
+            gobuild-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-env.outputs.version }}-${{ github.job }}-${{ hashFiles('go.mod', 'go.sum', 'mise.toml') }}-
             gobuild-${{ runner.os }}-${{ runner.arch }}-${{ steps.go-env.outputs.version }}-${{ github.job }}-
       - name: 缓存静态检查结果
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -119,17 +119,11 @@ jobs:
     steps:
       - *isolate-state
       - *checkout
-      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
-        env:
-          MISE_ENV: agent
-        with:
-          version: 2026.10.21
-          cache_key_prefix: mise-agent-v1
-          cache_save_post: "true"
+      - *mise
       - *go-env
       - *module-cache
       - *build-cache
-      - run: mise run setup:agent
+      - *setup
       - run: mise run mcp:check
   platforms:
     strategy:

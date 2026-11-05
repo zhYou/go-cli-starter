@@ -11,6 +11,7 @@ GOTOOLCHAIN = "local"
 
 [tools]
 go = "1.27.3"
+"go:golang.org/x/tools/gopls" = "0.24.0"
 "go:golang.org/x/vuln/cmd/govulncheck" = "1.9.0"
 golangci-lint = "2.15.0"
 goreleaser = "2.19.0"
@@ -18,20 +19,11 @@ syft = "1.55.0"
 
 [tasks.setup]
 description = "安装固定版本的开发工具并下载 Go 依赖"
-run = ["mise install go golangci-lint goreleaser go:golang.org/x/vuln/cmd/govulncheck syft", "go mod download"]
-
-[tasks."setup:agent"]
-description = "准备开发工具并安装固定版本的智能体辅助工具"
-depends = ["setup"]
-run = "mise -E agent install go:golang.org/x/tools/gopls"
+run = ["mise install go golangci-lint goreleaser go:golang.org/x/vuln/cmd/govulncheck syft go:golang.org/x/tools/gopls", "go mod download"]
 
 [tasks.doctor]
-description = "检查预装基础工具及开发工具的固定版本"
+description = "检查项目工具固定版本，报告用户工具状态"
 run = "go run ./tools/dev doctor"
-
-[tasks."doctor:agent"]
-description = "检查开发及智能体工作环境，报告预装辅助工具状态"
-run = "mise -E agent exec -- go run ./tools/dev doctor-agent"
 
 [tasks."i18n:check"]
 description = "检查集中双语消息目录"
@@ -80,7 +72,7 @@ description = "显式更新机器契约快照，须另写兼容变更记录"
 run = "go run ./tools/dev contract-update"
 
 [tasks."versions:check"]
-description = "检查两层工具声明、模块、CI 和当前文档版本一致性"
+description = "检查统一工具声明、模块、CI 和当前文档版本一致性"
 run = "go run ./tools/dev versions-check"
 
 [tasks."release:verify"]

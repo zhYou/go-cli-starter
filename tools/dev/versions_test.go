@@ -33,7 +33,7 @@ func TestGovulncheckBuildInfoExact(t *testing.T) {
 func versionFixture(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
-	for _, name := range []string{"mise.toml", "mise.agent.toml", "go.mod", "README.md", "AGENTS.md", ".github/workflows/ci.yml", ".github/workflows/release.yml"} {
+	for _, name := range []string{"mise.toml", "go.mod", "README.md", "AGENTS.md", ".github/workflows/ci.yml", ".github/workflows/release.yml"} {
 		dest := filepath.Join(root, name)
 		//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
 		require.NoError(t, os.MkdirAll(filepath.Dir(dest), 0755))
@@ -49,19 +49,36 @@ func TestVersionsWithoutLock(t *testing.T) {
 	require.NoError(t, checkVersions(root))
 }
 
-func TestVersionsRejectNonExactAgentVersion(t *testing.T) {
-	for _, version := range []string{"latest", "0.24", "0.24.0-rc.1"} {
+func TestVersionsLoadUnifiedTools(t *testing.T) {
+	root := versionFixture(t)
+	versions, err := loadVersions(root)
+	require.NoError(t, err)
+	require.Equal(t, map[string]string{
+		"go": "1.27.3", "golangci-lint": "2.15.0", "goreleaser": "2.19.0",
+		"go:golang.org/x/vuln/cmd/govulncheck": "1.9.0", "syft": "1.55.0",
+		"go:golang.org/x/tools/gopls": "0.24.0",
+	}, versions.Tools)
+	require.NoError(t, checkVersions(root))
+}
+
+func TestVersionsRejectNonExactToolVersion(t *testing.T) {
+	for _, version := range []string{"latest", "0.24", "0.24.0-rc.1", "0.24.0+patched"} {
 		t.Run(version, func(t *testing.T) {
 			root := versionFixture(t)
-			require.NoError(t, os.WriteFile(filepath.Join(root, "mise.agent.toml"), []byte("[tools]\n\"go:golang.org/x/tools/gopls\" = \""+version+"\"\n"), 0600))
+			require.NoError(t, os.WriteFile(filepath.Join(root, "mise.toml"), []byte("min_version = \"2026.10.21\"\n[tools]\n\"go:golang.org/x/tools/gopls\" = \""+version+"\"\n"), 0600))
 			require.ErrorContains(t, checkVersions(root), "必须固定稳定的精确版本")
 		})
 	}
 }
 
-func TestVersionsRejectAgentDocumentationMismatch(t *testing.T) {
+func TestVersionsRejectGoplsDocumentationMismatch(t *testing.T) {
 	root := versionFixture(t)
-	require.NoError(t, os.WriteFile(filepath.Join(root, "mise.agent.toml"), []byte("[tools]\n\"go:golang.org/x/tools/gopls\" = \"0.24.1\"\n"), 0600))
+	path := filepath.Join(root, "README.md")
+	//nolint:gosec // G304：只读取当前测试临时目录内的文档 fixture。
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	//nolint:gosec // G703：只修改当前测试临时目录内的文档 fixture。
+	require.NoError(t, os.WriteFile(path, []byte(strings.Replace(string(data), "| gopls | 0.24.0 |", "| gopls | 0.24.1 |", 1)), 0600))
 	require.ErrorContains(t, checkVersions(root), "README 工具 gopls")
 }
 
