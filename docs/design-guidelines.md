@@ -9,7 +9,7 @@
 `internal/app/cli` 处理参数和呈现，应用模块定义自己的选项、结果和错误码，消息集中维护在
 `internal/locales/`；`internal/app/session` 组合运行资源。这样业务可直接调用并校验输入，无需导入 Cobra。
 公共机制在 `internal/base`，不得反向依赖 app、command、tools 或 Cobra；运行时外部进程在
-`internal/command`。开发维护入口在根 `tools`，模板、快照及配置和语言检查的共享实现放入
+`internal/command`。开发维护入口在根 `tools`，按环境、构建、lint、契约、模板、MCP 和发布划分领域；实际共享的实现放入
 `tools/internal`。运行时代码及其测试不导入开发包，工具可以复用运行时包；Go 的 internal 导入规则约束工具共享包的使用范围。
 
 例如问候逻辑位于 `internal/app/greeting`，结果 schema 的生成机制位于 `internal/base/schema`，
@@ -102,7 +102,7 @@ mapstructure 使用 `ErrorUnused=true`、`WeaklyTypedInput=false`、精确名称
 兼容 `GO_CLI_STARTER_LOG_LEVEL` 在新 `GO_CLI_STARTER_LOGGING_LEVEL` 之后应用，flag 最后应用。
 空环境变量视为未设置。非法显式文件立即报错，默认文件缺失可继续；不自动迁移 YAML。
 自行维护的应用配置使用 TOML，新增配置放在 `configs/` 并经统一入口加载。其他应用配置路径
-须先登记到 `tools/internal/configpolicy`；工具配置以及 JSON 业务、测试和契约数据可保持原格式。
+须先登记到 `tools/lint/config.go`；工具配置以及 JSON 业务、测试和契约数据可保持原格式。
 检查范围和例外见[开发说明](development.md#静态规则与开发探测)。
 
 validator 实例可复用；项目在使用前完成自定义规则注册，之后只校验。
@@ -154,7 +154,7 @@ if err != nil {
 
 加载失败、缺译、模板错误或缺少参数会返回错误；Format 失败时返回空字符串，不使用部分渲染文本。
 Text/Render 仅用于安全诊断兜底，不能凭非空字符串判断渲染成功；诊断故障不吞掉原始业务错误。
-`mise run i18n:check` 检查双语目录、模板和参数，细则见[开发说明](development.md#静态规则与开发探测)。
+`mise run lint:i18n` 检查双语目录、模板和参数，细则见[开发说明](development.md#静态规则与开发探测)。
 项目暂不支持运行时翻译覆盖或 `[i18n]` 配置。CLI 按 `--lang` > `<PREFIX>_LANG` > en 选语言，
 zh-CN 是中文、zh 是别名，不从 OS 区域推断。稳定命令、选项、JSON 字段、错误码和状态枚举不翻译；
 第三方错误叶子保留原文。Help、version、completion、schema 在坏配置下仍可运行，不创建诊断目录。

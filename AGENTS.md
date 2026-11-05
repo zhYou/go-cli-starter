@@ -61,7 +61,7 @@
 
 - 正式 Go 包的中文说明集中在 `doc.go`，包括 main 和 integration 包；其他实现文件不重复写包说明。
   `doc.go` 只包含注释及 package 声明，描述包职责、使用和关键约束，不作空占位或存放测试辅助代码。
-  运行 `mise run doc:check` 检查，规则和 IDE 折叠方法见 `docs/development.md`；该检查纳入 lint 和 check。
+  运行 `mise run lint:doc` 检查，规则和 IDE 折叠方法见 `docs/development.md`；该检查纳入 lint 和 check。
 
 - 修改行为或删除设计时，同步审查相关测试和夹具。删除失效假设与重复覆盖，迁移仍有效的行为断言，保留有价值的故障回归；不为维持旧测试而保留无用配置或兼容分支。
 - 普通测试优先放入所属实现同名的 `*_test.go`，跨文件行为先判断实际归属，合适时归并。
@@ -119,8 +119,8 @@
   最终验证以命令行检查结果为准，不用配置成功、启动成功或 mock 代替真实验收。
 - 测试和示例验证必须隔离父进程与子进程的应用 HOME、配置及状态，禁止读写真实用户诊断数据。
   本模板使用 `GO_CLI_STARTER_HOME`，改名后按应用前缀派生；不提交密钥、环境转储、日志或缓存。
-- 编辑期间运行针对性测试。消息目录或应用配置改动分别运行 `mise run i18n:check`、
-  `mise run config:check`；两者也由 lint 和 check 执行。交付前运行 `mise exec -- golangci-lint fmt --color=never` 和
+- 编辑期间运行针对性测试。消息目录或应用配置改动分别运行 `mise run lint:i18n`、
+  `mise run lint:config`；两者也由 lint 和 check 执行。交付前运行 `mise exec -- golangci-lint fmt --color=never` 和
   `mise run check`，并在支持的主机上运行 `mise exec -- go test -race ./...`。
 - 修改模板或项目标识时运行 `mise run template:check`。
   新文件包含应用标识时同步更新受管文件清单。

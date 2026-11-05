@@ -42,7 +42,7 @@
 3. 自行维护的应用配置使用受管 TOML 并经统一入口加载；工具配置、JSON 数据及协议/契约保留原格式。
    新配置登记方式和检查边界见[开发说明](development.md#静态规则与开发探测)。暂不添加运行时
    翻译覆盖或 `[i18n]` 配置。
-4. 运行 `mise run i18n:check`、`mise run config:check` 及常规交付检查；检查显式中文和默认英文。
+4. 运行 `mise run lint:i18n`、`mise run lint:config` 及常规交付检查；检查显式中文和默认英文。
    参阅[兼容记录](compatibility/changes/2026-11-02-i18n-config.json)，按需更新调用方及部署环境。
 
 ## 迁移到 0.3.0
@@ -98,5 +98,27 @@ gopls MCP 改用 `mise exec -- gopls mcp`，不再选择 agent 环境。
 同步 Codex 项目配置、开发工具入口、CI 缓存键、README 工具表和协作约定；工具版本保持原值。
 统一 setup 按显式清单安装六个项目工具；doctor 要求 gopls 与其他项目工具固定版本一致，
 gh、Codex、RTK 仅报告状态，缺失或探测失败不影响结果，superpowers 仍由实际会话确认。
-产品 CLI 的 doctor 与机器契约不变。迁移后执行 versions:check、check、race、mcp:check 和 snapshot/verify，
+产品 CLI 的 doctor 与机器契约不变。迁移后执行 lint:versions、check、race、mcp:check 和 snapshot/verify，
 并核对原生 CI 结果；不改用户级工具、凭据或个人配置。
+
+
+## 按领域整理开发任务
+
+本次调整保留模板版本 0.3.0，不改变产品 CLI、机器字段或退出码。先完成旧初始化事务，再合并代码与受管文件清单。
+
+| 原任务 | 当前任务 |
+| --- | --- |
+| `i18n:check` | `lint:i18n` |
+| `config:check` | `lint:config` |
+| `doc:check` | `lint:doc` |
+| `versions:check` | `lint:versions` |
+| `rules:check` | `lint:test` |
+| `init` | `template:init` |
+
+旧任务不保留别名，调用脚本应使用当前名称。移除 `tools/dev` 总入口与 `tools/init`，替换为各领域入口；
+配置、包文档与消息检查归入 `tools/lint`，初始化与副本验收归入 `tools/template`。
+同步自定义 CI 的工具测试路径、受管文件清单及新增包的 doc.go；共享工具能力仅放在 `tools/internal`。
+
+只读格式和版本声明检查归入 lint；check 继续包含规则自测、契约、构建与模板验收。
+模板副本复用 lint，仍分别验证当前源码和初始化后的生成项目。MCP、发布、安全与平台作业继续独立。
+验证命令为 check、race、mcp:check 和 snapshot/release:verify；不运行 template:init 覆盖已有业务。

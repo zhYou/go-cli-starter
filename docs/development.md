@@ -40,13 +40,29 @@ CI 的独立 agent-mcp job 复用统一 setup，再运行 mcp:check。
 | `internal/base` | fault、messages、paths、validation、IO、logging、telemetry、diagnostics、结果 schema |
 | `internal/locales` | 集中双语 TOML 消息目录与共享 Bundle |
 | `internal/command` | 独立 argv、进程所有权、捕获和有界批量执行 |
-| `tools/dev/`、`tools/init/` | 开发与发布验收入口、模板初始化入口 |
-| `tools/internal/` | 工具私有共享实现：模板、契约快照、配置与语言检查 |
+| `tools/doctor/`、`tools/build/` | 环境探测、本地构建 |
+| `tools/lint/` | 消息、配置、包文档、版本声明检查和规则自测 |
+| `tools/contract/`、`tools/template/` | 契约维护、模板初始化与隔离副本验收 |
+| `tools/mcp/`、`tools/release/` | MCP 连接、发布归档与宿主安装验收 |
+| `tools/internal/` | 工具私有共享实现：模板事务、契约比较、工具版本、二进制验收、进程调用与 fixture |
 | `configs/`、`test/integration/`、`test/testdata/contracts/` | 配置示例、真实进程脚本、共享契约基线 |
 
 base 不依赖 app、command、tools 或 Cobra。领域码及结果由所属模块定义，文案集中维护；新目录按实际职责增加。
 运行时代码与测试不依赖开发包；工具可以复用运行时包。`tools/internal` 的导入范围由 Go 限制在 tools 子树内。
 开发工具用 `scaffold.Inspect` 静态识别唯一入口，不根据模块路径末段猜测命令名。
+
+mise 聚合完整流程，领域 Go 入口只承接自己的能力：`tools/lint` 接收 i18n/config/doc/versions/test，
+`tools/contract` 接收 check/update，`tools/template` 接收 init/check；其他领域入口不接受位置参数。
+初始化的 `--module`、`--name` 和契约检查的 `--against` 保持原用途。参数不足、未知或多余时立即失败。
+
+`tools/internal/toolchain` 共享准确版本读取与探测规格，供 doctor 和版本声明检查使用；
+`tools/internal/acceptance` 共享真实二进制的身份、双语帮助/schema 与配置优先级验收，供模板和发布使用。
+scaffold 保留事务初始化与安全路径检查，contract 保留被验收复用的契约归一化与差异比较；
+toolrun 和 fixture 分别共享进程调用与临时文件/Git fixture 操作。新增工具先确定领域，单处使用的实现就近保留。
+
+`template:check` 在临时副本内调用同一 `mise run lint`，不维护第二份静态检查清单，也不递归调用 check。
+本次子进程通过 `MISE_TRUSTED_CONFIG_PATHS` 只信任副本目录，并使用生成应用前缀隔离 HOME；
+不写入用户的持久信任配置。源项目和生成项目分别接受检查，验证对象不同。
 
 ## 包文档
 
@@ -65,7 +81,7 @@ package greeting
 包说明紧邻 `package` 声明，其他实现文件不重复放包说明。
 `doc.go` 只包含注释与 `package` 声明，不放导入、函数、类型、变量或常量；测试辅助代码保留在测试文件中。
 
-`mise run doc:check` 按目录解析 Go AST，不依赖当前主机的 GOOS/GOARCH，也检查平台专用文件。
+`mise run lint:doc` 按目录解析 Go AST，不依赖当前主机的 GOOS/GOARCH，也检查平台专用文件。
 它拒绝缺失或空白的包说明、只有包名前缀与标点的占位说明、包名不一致、包说明位置错误，
 以及 `doc.go` 中的实现声明。测试夹具 `testdata`、vendor、隐藏或下划线开头目录、根目录
 bin/dist、生成代码和外部 `*_test` 包不受约束；普通 `*_test.go` 不需各自编写包说明。
@@ -79,7 +95,7 @@ bin/dist、生成代码和外部 `*_test` 包不受约束；普通 `*_test.go` �
 2. 参照 greet 分离有类型业务选项、结果及 Validate。CLI 的 Args、必填及组合校验在读取配置和创建资源前完成，
    业务入口也调用同一校验。新命令补双语帮助、示例和结果注册，不新增交互输入。
 3. 新配置同步模块 Config、defaults、环境映射、TOML、校验和测试，并使用统一加载入口。
-   双语消息在同次修改中维护，分别运行 `mise run config:check` 和 `mise run i18n:check`。
+   双语消息在同次修改中维护，分别运行 `mise run lint:config` 和 `mise run lint:i18n`。
    仅 Changed 的 flag 覆盖，禁止逐键 koanf getter；缺译、系统原因和结构化 fault 的规则见指南。
 4. 为行为变化运行针对性测试，观察真实结果，修改后检查 gopls 诊断。保留用户已有修改，格式化限于授权范围。
 5. 交付前运行 `mise exec -- golangci-lint fmt --color=never`、`mise run check`，支持的宿主运行 `mise exec -- go test -race ./...`。
@@ -225,7 +241,7 @@ GoLand 使用分号分隔子后缀，完整文件名也可以作为后缀匹配�
 
 ## 静态规则与开发探测
 
-`mise run lint` 先检查双语消息、应用配置和包文档，再启用以下 18 项，生产导出 API 需中文 GoDoc；测试仅豁免 GoDoc，其他边界仍生效：
+`mise run lint` 检查双语消息、应用配置、包文档和版本声明，再检查格式并启用以下 18 项，生产导出 API 需中文 GoDoc；测试仅豁免 GoDoc，其他边界仍生效：
 
 ```text
 errcheck govet ineffassign staticcheck unused bodyclose errorlint gosec godoclint
@@ -235,9 +251,9 @@ contextcheck nilnesserr durationcheck nolintlint thelper usetesting goconst depg
 局部 nolint 指明检查器并用中文解释。稳定协议和状态使用语义常量，同值不同义可各自命名。
 koanf 只可在精确的 `internal/app/config/load.go` 导入，且仅整体解码；禁用 typed/Must getter、
 Get、Raw、All 等绕过结构体的入口。zap 只在 base/logging，OTel SDK/exporter 只在 base/telemetry。
-`mise run rules:check` 在临时模块运行真实类型分析，验证违规与合规 fixture，并纳入 check。
+`mise run lint:test` 在临时模块运行真实类型分析，验证违规与合规 fixture；它测试规则自身，只纳入 check，不作为普通 lint 的依赖。
 
-`mise run i18n:check` 检查 `internal/locales/active.en.toml` 与 `active.zh-CN.toml`：
+`mise run lint:i18n` 检查 `internal/locales/active.en.toml` 与 `active.zh-CN.toml`：
 目录非空，消息 ID 不重复，字段与消息内容有效，模板语法正确；两种语言的 ID 和模板参数集合一致，
 复数形式的参数按并集比较。每条消息必须有 other，允许 description 和 zero、one、two、few、many。
 检查器支持直接字段、根别名、括号、`if`/`with`/`range`、被调用的非递归命名模板，以及根对象上
@@ -247,15 +263,15 @@ Get、Raw、All 等绕过结构体的入口。zap 只在 base/logging，OTel SDK
 确定的变量。子对象上的动态键
 不会引入额外的根参数。新增或修改消息时同时维护两种语言，稳定 ID 不随语言改变。
 
-`mise run config:check` 递归检查 `configs/` 应用配置、`internal/locales/` 语言资源，以及根目录
+`mise run lint:config` 递归检查 `configs/` 应用配置、`internal/locales/` 语言资源，以及根目录
 明确登记的 `config.toml`、`config.example.toml` 和同名 JSON/YAML 变体。`configs/config.example.toml`
 必须存在；`configs/` 仅接受 TOML，`internal/locales/` 接受 TOML 和 Go 文件。两处直接子目录
 `testdata/` 只放测试 fixture，检查会跳过；其他受管文件必须是普通文件，不接受符号链接。扩展名
 不区分大小写。应用 TOML 禁用环境变量覆盖并经 `config.Load` 校验语法、未知键、类型和值域；
-语言 TOML 检查语法，消息语义由 i18n:check 检查。
+语言 TOML 检查语法，消息语义由 lint:i18n 检查。
 
 新增应用配置放入 `configs/` 并通过 `internal/app/config/load.go` 统一加载；确需其他路径时先登记到
-`tools/internal/configpolicy`。mise、`.codex`、CI、golangci 等工具配置沿用工具自身格式，其他位置的
+`tools/lint/config.go`。mise、`.codex`、CI、golangci 等工具配置沿用工具自身格式，其他位置的
 业务 JSON、测试数据和协议/契约数据不纳入扫描。两项检查由 lint 调用并纳入 check；它们不会自动安装
 工具或修复文件。
 
@@ -292,12 +308,12 @@ Windows 仅缓存模块，避免实测跨运行编译缓存恢复后的耗时增
 ```sh
 mise run setup
 mise run doctor
-mise run versions:check
+mise run lint:versions
 ```
 
 随后按受影响范围运行 check、race、mcp:check 与 snapshot/verify。提交统一的准确版本声明，
 通过原生 CI 和六目标发布构建验证平台支持；gopls 等 Go 后端从固定模块版本在宿主平台编译。
-README 的 tool-versions 标记与工具显示标签由 versions:check 解析，修改表格时保留它们。
+README 的 tool-versions 标记与工具显示标签由 lint:versions 解析，修改表格时保留它们。
 Renovate 由管理员启用，覆盖 mise.toml；权限不足时人工更新版本声明并完成检查，不放宽检查。
 用户工具通过各自渠道维护，项目 setup 不安装或更新它们。
 
