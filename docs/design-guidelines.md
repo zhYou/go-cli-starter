@@ -274,7 +274,6 @@ CommandContext 默认取消单个进程，并不承诺清理整棵树；errgroup
 gh、Codex、RTK 仅报告状态，缺失或探测失败不影响开发 doctor 的结果；superpowers 由实际会话确认。
 统一工具声明、固定工具表、18 lint、2 formatter 与规则 fixture 的运行入口见
 [开发说明](development.md)；平台运行证据、发布摘要与托管设置见[维护清单](maintenance.md)。
-Serena 和 Graphify 尚未集成，范围仅在带 `backlog` 标签的 GitHub Issues，不能作为开发前置依赖。
 
 ## 扩展 doctor
 
