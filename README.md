@@ -284,7 +284,7 @@ docs/                      使用和维护说明
 
 `check` 在临时仓库中验证发布配置，无需为内部工具配置 remote。真正发布或运行 `mise exec -- goreleaser check` 前，为目标项目设置自己的 GitHub origin。
 
-包文档与 IDE 文件折叠配置、新增命令、工具升级和发布步骤见 [开发说明](docs/development.md)，后续工作见[项目待办](docs/backlog.md)。
+包文档与 IDE 文件折叠配置、新增命令、工具升级和发布步骤见 [开发说明](docs/development.md)，探索时明确要求记录的想法见[项目待办](docs/backlog.md)。
 
 ## 发布
 
