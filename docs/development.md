@@ -107,11 +107,19 @@ Session 关闭顺序、借用资源和永久阻塞 IO 的边界见设计指南�
 
 ## 测试组织与可靠性
 
-单个源码文件及其小型专项测试尽量放入同名 `*_test.go`；跨文件契约使用清晰的行为名，
-例如 `process_tree_test.go`、`stderr_test.go`。无需为常量文件创建空测试，也不为文件名对应拆分生产源码。
-多处使用的 fixture 放在所属包的 `helpers_test.go`，平台专用 helper 保留 `_windows_test.go` 等后缀。
-单处使用的测试类型就近保留；真实配置加载与注入 stub 的 fixture 各自保持原有边界。
-`fuzz_test.go` 维护 fuzz 入口和 seeds，`benchmark_test.go` 维护 benchmark，普通行为测试按实现归位。
+普通测试优先放入所属实现同名的 `*_test.go`；跨文件行为先判断实际归属，合适时归并。
+外部测试包使用 `<实现名>_external_test.go`，保留 `package xxx_test`，不为折叠改成内部测试包。
+有明确实现归属的集成测试可以使用 `<实现名>_integration_test.go`；普通跨文件测试不因命名改称集成测试。
+无需为常量文件创建空测试，也不为文件名对应拆分生产源码。
+
+平台后缀使用 `linux`、`darwin`、`windows`，紧邻 `_test.go`，例如 `foo_external_linux_test.go`；
+`macos` 不是 Go 自动识别的 GOOS 后缀。合并前核对职责、包名与有效平台覆盖，可以统一到本项目
+支持的三个系统，例如 `process_test.go` 使用 `//go:build linux || darwin || windows`；不机械合并导致覆盖遗漏。
+
+多处使用的 fixture 放在所属包的 `helpers_test.go`，平台专用 helper 使用 `helpers_linux_test.go`、
+`helpers_darwin_test.go`、`helpers_windows_test.go`。单处使用的测试类型就近保留；
+真实配置加载与注入 stub 的 fixture 各自保持原有边界。
+`fuzz_test.go` 维护包级 fuzz 入口和 seeds，`benchmark_test.go` 维护包级 benchmark，普通行为测试按实现归位。
 
 通过真实子进程验证程序契约的集成测试集中在 `test/integration/integration_test.go`，
 共享 helper 放在同包的 `helpers_test.go`。集成测试随 `go test ./...` 默认执行，也可用
@@ -138,20 +146,31 @@ GO_CLI_STARTER_HOME="$test_home" mise exec -- go test ./test/integration -run '^
 ## IDE 与文件折叠
 
 文件折叠只改变项目树的显示，不移动文件、不改变 Go 包边界或测试发现。
-同名测试继续跟随实现，例如 `greet_test.go` 折叠在 `greet.go` 下；辅助文件、fuzz、benchmark
-及无歧义的独立行为测试可以折叠在描述本包的 `doc.go` 下。设置保留在个人 IDE 配置中。
+同名、平台、外部包及有明确实现归属的集成测试跟随实现；共享辅助文件、包级 fuzz、benchmark
+和独立集成测试包的入口折叠在描述本包的 `doc.go` 下。设置保留在个人 IDE 配置中。
 
 ```text
 cli/
   doc.go
     benchmark_test.go
-    completion_test.go
     fuzz_test.go
     helpers_test.go
   cli.go
     cli_test.go
-  greet.go
-    greet_test.go
+  completion_protocol.go
+    completion_protocol_test.go
+  discovery.go
+    discovery_test.go
+logging/
+  logger.go
+    logger_test.go
+    logger_external_test.go
+command/
+  doc.go
+    helpers_test.go
+    helpers_windows_test.go
+  process.go
+    process_test.go
 integration/
   doc.go
     helpers_test.go
@@ -168,8 +187,8 @@ integration/
   "explorer.fileNesting.enabled": true,
   "explorer.fileNesting.expand": false,
   "explorer.fileNesting.patterns": {
-    "*.go": "${capture}_test.go",
-    "doc.go": "helpers_test.go, helpers_windows_test.go, fuzz_test.go, benchmark_test.go, integration_test.go, command_embedding_test.go, completion_test.go, stderr_test.go, process_tree_test.go, retention_race_linux_test.go, environment_linux_test.go, external_event_test.go"
+    "*.go": "${capture}_test.go, ${capture}_linux_test.go, ${capture}_darwin_test.go, ${capture}_windows_test.go, ${capture}_external_test.go, ${capture}_external_linux_test.go, ${capture}_external_darwin_test.go, ${capture}_external_windows_test.go, ${capture}_integration_test.go, ${capture}_integration_linux_test.go, ${capture}_integration_darwin_test.go, ${capture}_integration_windows_test.go",
+    "doc.go": "helpers_test.go, helpers_linux_test.go, helpers_darwin_test.go, helpers_windows_test.go, fuzz_test.go, benchmark_test.go, integration_test.go"
   }
 }
 ```
@@ -181,11 +200,16 @@ VS Code 在文件组折叠时会将复制、移动或删除操作应用于整组
 
 1. 打开 **Project** 窗口的菜单，选择 **Appearance → File Nesting…**。
 2. 勾选 **Show files with the same names as nested**。
-3. 在父后缀 `.go` 的子后缀中追加 `_test.go`，保留已有条目。
+3. 在父后缀 `.go` 的子后缀中追加下面的列表，保留已有条目：
+
+```text
+_test.go; _linux_test.go; _darwin_test.go; _windows_test.go; _external_test.go; _external_linux_test.go; _external_darwin_test.go; _external_windows_test.go; _integration_test.go; _integration_linux_test.go; _integration_darwin_test.go; _integration_windows_test.go
+```
+
 4. 新增一行，父后缀填写完整文件名 `doc.go`，子后缀填写下面的列表，不加 `*`：
 
 ```text
-helpers_test.go; helpers_windows_test.go; fuzz_test.go; benchmark_test.go; integration_test.go; command_embedding_test.go; completion_test.go; stderr_test.go; process_tree_test.go; retention_race_linux_test.go; environment_linux_test.go; external_event_test.go
+helpers_test.go; helpers_linux_test.go; helpers_darwin_test.go; helpers_windows_test.go; fuzz_test.go; benchmark_test.go; integration_test.go
 ```
 
 GoLand 使用分号分隔子后缀，完整文件名也可以作为后缀匹配；配置后收起 `doc.go` 节点。
@@ -194,9 +218,11 @@ GoLand 使用分号分隔子后缀，完整文件名也可以作为后缀匹配�
 
 ### 新增折叠规则
 
-新增独立测试时先检查仓库内是否已有同名源码配对，再向两款 IDE 的清单追加文件名，
-避免同一测试同时挂在实现文件和 `doc.go` 下。不为折叠统一添加 `zzz` 前缀，也不合并不同测试包
-或不同平台构建约束的文件。验证时确认同名测试归属正确，展开后文件仍可打开；本机实际显示需手动验收。
+新增测试先按实际归属选择同名、外部包、集成、平台或共享辅助文件名，优先复用上述通用规则。
+必须独立命名的行为测试才向两款 IDE 的清单追加文件名，避免同一测试同时挂在实现文件和 `doc.go` 下。
+不为折叠统一添加 `zzz` 前缀、创建占位实现或额外生产文件，也不合并不同测试包。
+平台构建约束不同的文件先核对有效覆盖，再决定是否合并。文件调整时同步检查文档、两款 IDE 清单和
+模板受管文件清单。验证时确认测试归属正确，展开后文件仍可打开；本机实际显示需维护者手动验收。
 
 ## 静态规则与开发探测
 

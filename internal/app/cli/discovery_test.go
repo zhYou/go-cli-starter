@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -57,4 +59,79 @@ func TestCompletionArityUsesPluralCatalog(t *testing.T) {
 	require.Empty(t, out)
 	require.Contains(t, stderr, "received 2 arguments")
 	require.NotContains(t, stderr, "Operation failed")
+}
+
+func TestCompletionCandidatesAndQuietProtocol(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		want []string
+	}{
+		{"language", []string{"__complete", "--lang", ""}, []string{"en\n", "zh-CN\n", "zh\n", ":4\n"}},
+		{"level", []string{"__complete", "--log-level", ""}, []string{"debug\n", "info\n", "warn\n", "error\n", ":4\n"}},
+		{"help", []string{"__complete", "help", ""}, []string{"completion\t", "greet\t", "version\t", ":4\n"}},
+		{"nested", []string{"__complete", "help", "completion", ""}, []string{"bash\t", "zsh\t", "fish\t", "powershell\t", ":4\n"}},
+		{"partial", []string{"__complete", "--lang", "e", "--log-level", ""}, []string{"debug\n", ":4\n"}},
+		{"partial-equals", []string{"__complete", "--lang=e", "--log-level", ""}, []string{"debug\n", ":4\n"}},
+		{"no-description", []string{"__completeNoDesc", "help", "completion", ""}, []string{"bash\n", "powershell\n", ":4\n"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			code, out, stderr := invoke(t, tc.args...)
+			require.Zero(t, code, stderr)
+			require.Empty(t, stderr)
+			for _, want := range tc.want {
+				require.Contains(t, out, want)
+			}
+			if tc.name == "no-description" {
+				require.NotContains(t, out, "\t")
+			}
+		})
+	}
+}
+
+func TestShellSubcommandsHaveHelpSchemaAndScripts(t *testing.T) {
+	for _, shell := range []string{"bash", "zsh", "fish", "powershell"} {
+		t.Run(shell, func(t *testing.T) {
+			for _, args := range [][]string{{"help", "completion", shell}, {"completion", shell, "--help"}} {
+				code, out, stderr := invoke(t, args...)
+				require.Zero(t, code, stderr)
+				require.Empty(t, stderr)
+				require.Contains(t, out, "testcli completion "+shell)
+				require.Contains(t, out, "Examples:")
+			}
+			code, out, stderr := invoke(t, "schema", "completion", shell)
+			require.Zero(t, code, stderr)
+			var doc struct {
+				Commands []commandSchema `json:"commands"`
+			}
+			require.NoError(t, json.Unmarshal([]byte(out), &doc))
+			require.Len(t, doc.Commands, 1)
+			require.Equal(t, "testcli completion "+shell, doc.Commands[0].Path)
+			code, out, stderr = invoke(t, "completion", shell)
+			require.Zero(t, code, stderr)
+			require.Empty(t, stderr)
+			require.Contains(t, out, "testcli")
+			legacyCode, legacyOut, legacyErr := invoke(t, "completion", "--", shell)
+			require.Zero(t, legacyCode, legacyErr)
+			require.Empty(t, legacyErr)
+			require.Equal(t, out, legacyOut)
+
+			code, out, stderr = invoke(t, "completion", shell, "extra")
+			require.Equal(t, 2, code)
+			require.Empty(t, out)
+			require.NotEmpty(t, stderr)
+		})
+	}
+}
+
+func TestCompletionNeverLoadsConfigurationOrCreatesState(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "absent")
+	for _, args := range [][]string{{"completion", "bash"}, {"help", "completion", "bash"}, {"__complete", "help", ""}, {"__complete", "--lang=e", "--log-level", ""}} {
+		var out, stderr bytes.Buffer
+		code := Run(context.Background(), append([]string{"--config", filepath.Join(home, "missing.toml")}, args...), Options{Name: "sample", Out: &out, ErrOut: &stderr, LookupEnv: func(key string) (string, bool) { return home, key == "SAMPLE_HOME" }})
+		require.Zero(t, code, stderr.String())
+		require.Empty(t, stderr.String())
+		_, err := os.Stat(home)
+		require.ErrorIs(t, err, os.ErrNotExist)
+	}
 }

@@ -246,3 +246,52 @@ func TestLanguageSelectionMatchesTargetFlagMetadata(t *testing.T) {
 		})
 	}
 }
+
+func TestCompletionLanguageFallbackAndOrdinaryValidation(t *testing.T) {
+	for _, tc := range []struct {
+		env  string
+		args []string
+		want string
+	}{
+		{"invalid", []string{"__complete", ""}, "version\tShow"},
+		{"zh-CN", []string{"__complete", "--lang=e", ""}, "version\t显示"},
+		{"en", []string{"__complete", "--lang", "zh", "--log-level", ""}, "info\n"},
+		{"en", []string{"__complete", "--lang", "zh", ""}, "version\t显示"},
+	} {
+		var out, stderr bytes.Buffer
+		code := Run(context.Background(), tc.args, Options{Name: "sample", Out: &out, ErrOut: &stderr, LookupEnv: func(key string) (string, bool) { return tc.env, key == "SAMPLE_LANG" }})
+		require.Zero(t, code, stderr.String())
+		require.Empty(t, stderr.String())
+		require.Contains(t, out.String(), tc.want)
+	}
+	for _, args := range [][]string{{"--lang=e", "version"}, {"--config", "__complete", "--lang=e", "version"}, {"greet", "--name", "__complete", "--lang=e"}, {"--", "__complete", "--lang=e"}} {
+		code, out, stderr := invoke(t, args...)
+		require.Equal(t, 2, code)
+		require.Empty(t, out)
+		require.NotEmpty(t, stderr)
+	}
+}
+
+func TestConcurrentCompletionLanguageIsolation(t *testing.T) {
+	var wg sync.WaitGroup
+	for range 8 {
+		for _, lang := range []string{"en", "zh-CN"} {
+			wg.Go(func() {
+				var out, stderr bytes.Buffer
+				code := Run(context.Background(), []string{"__complete", "--lang", lang, ""}, Options{Name: "sample", Out: &out, ErrOut: &stderr, LookupEnv: func(string) (string, bool) { return "", false }})
+				if code != 0 || stderr.Len() != 0 {
+					t.Errorf("%s: code=%d stderr=%s", lang, code, stderr.String())
+					return
+				}
+				want := "version\tShow"
+				if lang == "zh-CN" {
+					want = "version\t显示"
+				}
+				if !strings.Contains(out.String(), want) {
+					t.Errorf("%s: %s", lang, out.String())
+				}
+			})
+		}
+	}
+	wg.Wait()
+}

@@ -62,6 +62,17 @@
   `doc.go` 只包含注释及 package 声明，描述包职责、使用和关键约束，不作空占位或存放测试辅助代码。
   运行 `mise run doc:check` 检查，规则和 IDE 折叠方法见 `docs/development.md`；该检查纳入 lint 和 check。
 
+- 普通测试优先放入所属实现同名的 `*_test.go`，跨文件行为先判断实际归属，合适时归并。
+  外部测试使用 `<实现名>_external_test.go` 并保留 `package xxx_test`；有明确实现归属的集成测试可用
+  `<实现名>_integration_test.go`，独立集成测试包保留 `integration_test.go`。普通跨文件测试不因命名改称集成测试。
+- 平台后缀使用 Go 识别的 `linux`、`darwin`、`windows`，紧邻 `_test.go`，例如
+  `foo_external_linux_test.go`；不使用 `macos`。合并前核对职责、包名及有效平台覆盖，
+  允许统一到本项目支持的三个系统，但不得机械合并导致覆盖遗漏。
+- 多处共享的测试辅助代码、包级 fuzz、benchmark 分别放在 `helpers_test.go`、`fuzz_test.go`、
+  `benchmark_test.go`；平台 helper 保留平台后缀，单处使用的辅助代码随测试保留。
+  必须独立命名的行为测试同步登记 IDE 折叠清单，不创建占位实现或额外生产文件满足折叠。
+  文件调整时同步检查正式文档、两款 IDE 清单和模板受管文件清单；通用折叠后缀见
+  [开发说明](docs/development.md#ide-与文件折叠)。
 - `cmd/<name>` 负责信号和退出；`internal/app/cli` 负责 Cobra、参数、输入输出和退出码；
   `internal/app` 组合配置、Session 和业务。`internal/base` 不依赖 app、command、tools 或 Cobra；
   `internal/command` 管运行时外部进程；根 `tools` 只服务开发维护，共享包置于 `tools/internal`。
