@@ -137,3 +137,21 @@ func TestDefaultHelpAndVersionFlagsAreLocalized(t *testing.T) {
 		require.Contains(t, out, tc.version)
 	}
 }
+
+func TestAllCommandsHaveLocalizedExamplesWithInvocationName(t *testing.T) {
+	for _, lang := range []string{"en", "zh-CN"} {
+		for _, path := range [][]string{{}, {"help"}, {"version"}, {"schema"}, {"completion"}, {"greet"}} {
+			args := append([]string{"--lang", lang}, path...)
+			args = append(args, "--help")
+			code, out, stderr := invoke(t, args...)
+			require.Zero(t, code, stderr)
+			require.Empty(t, stderr)
+			heading := "Examples:"
+			if lang == "zh-CN" {
+				heading = "示例："
+			}
+			require.Contains(t, out, heading)
+			require.Contains(t, out, "testcli ")
+		}
+	}
+}
