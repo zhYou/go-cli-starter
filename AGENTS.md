@@ -7,16 +7,17 @@
 - 默认使用中文交流，文档和注释使用中文；CLI 的帮助、日志和错误默认英文，并提供中文。
   命令名、选项名、环境变量、JSON 字段、枚举值和协议标识保持原样。
 - 在仓库根目录通过 mise 执行命令。先运行 `mise run setup`，再运行
-  `mise run doctor`。首次使用及工具版本或 Go 模块变更后运行 setup；智能体开发运行
-  `mise run setup:agent` 和 `mise run doctor:agent`。日常检查不得隐式安装、升级或修复环境。
+  `mise run doctor`。首次使用及工具版本或 Go 模块变更后运行 setup。日常检查不得隐式安装、升级或修复环境。
   需要 Git 和 mise 2026.10.21 或更新版本。
 - 复用用户级 RTK 和 superpowers，遵循其已安装的说明，不在项目中复制安装，
   不写入个人路径。
 - 当前只支持 Codex。个人模型、凭据、权限和插件偏好保留在用户配置中。
-- 预装层为 mise、git、gh、Codex、RTK、superpowers，项目不安装或更新。开发层由
-  mise.toml 管理，智能体辅助层由 mise.agent.toml 管理，目前只有 gopls。
-  基础检查不要求智能体配套；doctor:agent 要求 gh、Codex、gopls，RTK 仅报告，
-  superpowers 由实际会话确认。项目关闭 mise 锁文件机制，保留准确版本和 go.sum。
+- mise、git、gh、Codex、RTK、superpowers 由用户维护，项目不安装或更新。六个项目工具
+  Go、golangci-lint、GoReleaser、govulncheck、Syft、gopls 统一由 mise.toml 管理，
+  通过 setup 安装、doctor 检查。doctor 要求 mise 最低版本、git 及六个项目工具的准确版本；
+  gh、Codex、RTK 仅报告状态，缺失、执行失败、超时或输出截断均不让 doctor 失败，
+  不检查认证或固定版本。superpowers 由实际会话确认。基础检查无需这些用户级智能体工具。
+  项目关闭 mise 锁文件机制，保留准确版本和 go.sum。
 - 仓库文档记录当前能力、约束、使用和维护方法。superpowers 设计和实施计划只写入
   本地忽略目录 `docs/superpowers/`，不提交；交付时将已实现行为同步到正式文档。
 - 当前会话中已明确要求实施的任务，按已确认范围推进，无需先创建 Issue 或添加 `backlog` 标签。
@@ -112,7 +113,7 @@
 ## Go 工具与验证
 
 - 使用 gopls MCP 查询 Go 符号、引用和诊断。通过
-  `mise -E agent exec -- gopls mcp -instructions` 阅读说明，发现工作区、检查受影响符号，
+  `mise exec -- gopls mcp -instructions` 阅读说明，发现工作区、检查受影响符号，
   修改后检查诊断。确认查询绑定实际 checkout；等价普通操作按需使用 CLI，同一 checkout 串行修改。
   最终验证以命令行检查结果为准，不用配置成功、启动成功或 mock 代替真实验收。
 - 测试和示例验证必须隔离父进程与子进程的应用 HOME、配置及状态，禁止读写真实用户诊断数据。
@@ -132,9 +133,9 @@
 
 - 使用官方最新 LTS；没有 LTS 的工具使用最新稳定版。
   排除 alpha、beta、RC 和 nightly，核验后锁定具体版本。
-- 升级时保持 mise.toml、mise.agent.toml、Go 模块与工具链声明、doctor 预期版本、
+- 升级时保持 mise.toml、Go 模块与工具链声明、doctor 预期版本、
   CI 引导版本和文档版本一致。
-- 两层工具均固定准确版本，不生成或提交 mise 锁文件。平台支持通过 Linux、macOS、Windows
+- 六个项目工具均固定准确版本，不生成或提交 mise 锁文件。平台支持通过 Linux、macOS、Windows
   原生 CI 和 amd64/arm64 发布构建验证。
   基础检查必须能在未安装 Codex、RTK 或 superpowers 时运行。
 - 行为变更同步更新测试、帮助和文档。除非明确决定变更，否则保持机器字段和退出码兼容。

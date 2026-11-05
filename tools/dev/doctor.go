@@ -25,6 +25,7 @@ type doctorProbe struct {
 	key, want   string
 	spec        toolSpec
 	preparation error
+	optional    bool
 }
 
 func runDoctorProbes(ctx context.Context, calls []cmdexec.Invocation) []cmdexec.Result {
@@ -51,6 +52,16 @@ func doctorProbeError(name string, result cmdexec.Result) error {
 func reportDoctorProbes(out io.Writer, probes []doctorProbe, results []cmdexec.Result) error {
 	var problems []error
 	for i, probe := range probes {
+		if probe.optional {
+			detail := strings.TrimSpace(string(results[i].Stdout) + "\n" + string(results[i].Stderr))
+			if err := doctorProbeError(probe.spec.Name, results[i]); err != nil {
+				detail = err.Error()
+			}
+			if _, err := fmt.Fprintf(out, "用户工具：%s：%s\n", probe.spec.Name, detail); err != nil {
+				problems = append(problems, err)
+			}
+			continue
+		}
 		if probe.preparation != nil {
 			problems = append(problems, probe.preparation)
 			continue
@@ -75,8 +86,8 @@ func reportDoctorProbes(out io.Writer, probes []doctorProbe, results []cmdexec.R
 	}
 	return errors.Join(problems...)
 }
-func doctor(agent bool) error {
-	versions, err := loadVersions(".", agent)
+func doctor() error {
+	versions, err := loadVersions(".")
 	if err != nil {
 		return err
 	}
@@ -85,11 +96,6 @@ func doctor(agent bool) error {
 		return err
 	}
 	probes := []doctorProbe{{key: miseProgram, want: versions.MiseMinimum, spec: miseSpec}, {spec: toolSpec{Name: gitProgram, Args: []string{versionFlag}}}}
-	if agent {
-		for _, name := range []string{"gh", "codex"} {
-			probes = append(probes, doctorProbe{spec: toolSpec{Name: name, Args: []string{versionFlag}}})
-		}
-	}
 	for _, key := range sortedTools(versions) {
 		spec, err := versionTool(key)
 		if err != nil {
@@ -113,6 +119,9 @@ func doctor(agent bool) error {
 		}
 		probes = append(probes, probe)
 	}
+	for _, name := range []string{"gh", "codex", "rtk"} {
+		probes = append(probes, doctorProbe{spec: toolSpec{Name: name, Args: []string{versionFlag}}, optional: true})
+	}
 	calls := make([]cmdexec.Invocation, len(probes))
 	for i, probe := range probes {
 		calls[i] = cmdexec.Invocation{Program: probe.spec.Name, Args: probe.spec.Args}
@@ -125,17 +134,7 @@ func doctor(agent bool) error {
 		}
 	}
 	err = reportDoctorProbes(os.Stdout, probes, results)
-	if agent {
-		optional := cmdexec.Invocation{Program: "rtk", Args: []string{versionFlag}}
-		for _, result := range runDoctorProbes(context.Background(), []cmdexec.Invocation{optional}) {
-			if problem := doctorProbeError(optional.Program, result); problem != nil {
-				fmt.Printf("可选工具：%v\n", problem)
-			} else {
-				fmt.Printf("用户工具：%s：%s\n", optional.Program, result.Stdout)
-			}
-		}
-		fmt.Println("用户工具：superpowers，请确认用户级技能在 Codex 中可用，项目不限定安装路径。")
-		fmt.Println("运行 mise run mcp:check 检查 gopls 的实际连接。")
-	}
+	fmt.Println("用户工具：superpowers，请确认用户级技能在 Codex 中可用，项目不限定安装路径。")
+	fmt.Println("运行 mise run mcp:check 检查 gopls 的实际连接。")
 	return err
 }

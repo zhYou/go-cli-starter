@@ -74,7 +74,7 @@
    schema_version 仍为 1，12 项机器快照差异为各命令 lang 与 info 默认值；
    TOML、日志落盘和路径另有手工迁移。应用 v0.1.0→v0.2.0 是兼容决策，本次不创建发布标签。
    模板来源记录和初始化事务格式不因分层迁移升级，不运行 init 覆盖业务。
-7. 暂存移动及新增文件，显式 setup/doctor 后运行 fmt、check、race；涉及 MCP 时先 setup:agent，再运行 mcp:check。
+7. 暂存移动及新增文件，显式 setup/doctor 后运行 fmt、check、race；涉及 MCP 时运行 mcp:check。
    提交最终源码后重新 snapshot 与 release:verify，核对六归档、TOML、SPDX、最终摘要及宿主安装。
    macOS/Windows 运行行为以对应原生 CI 为准。记录采用的模板版本与提交，保留来源历史和个人配置外置。
 
@@ -89,3 +89,14 @@
 合并 app/doctor、Dependencies.Doctor 和结果 schema；空入口返回空数组并成功，不新增开发工具依赖。
 真实检查由派生项目补充。已完成报告按 RequiredAvailable 决定 0/1，执行或渲染失败沿用空 stdout。
 同步受管清单与改名验收，保留模板版本 0.3.0，不通过 init 覆盖已有业务。
+
+## 统一项目工具入口
+
+将旧 `mise.agent.toml` 中的固定版本 gopls 声明移入 `mise.toml`，删除旧配置及专用任务。
+将 `setup:agent`、`doctor:agent` 替换为统一的 `mise run setup`、`mise run doctor`，
+gopls MCP 改用 `mise exec -- gopls mcp`，不再选择 agent 环境。
+同步 Codex 项目配置、开发工具入口、CI 缓存键、README 工具表和协作约定；工具版本保持原值。
+统一 setup 按显式清单安装六个项目工具；doctor 要求 gopls 与其他项目工具固定版本一致，
+gh、Codex、RTK 仅报告状态，缺失或探测失败不影响结果，superpowers 仍由实际会话确认。
+产品 CLI 的 doctor 与机器契约不变。迁移后执行 versions:check、check、race、mcp:check 和 snapshot/verify，
+并核对原生 CI 结果；不改用户级工具、凭据或个人配置。

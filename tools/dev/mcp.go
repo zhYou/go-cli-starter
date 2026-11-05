@@ -17,7 +17,7 @@ import (
 func checkMCP() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, miseProgram, "-E", "agent", "exec", "--", goplsProgram, "mcp")
+	cmd := exec.CommandContext(ctx, miseProgram, "exec", "--", goplsProgram, "mcp")
 	cmd.Stderr = os.Stderr
 	in, err := cmd.StdinPipe()
 	if err != nil {

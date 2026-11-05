@@ -65,9 +65,7 @@ func runArgs(args []string) error {
 	case taskBuild:
 		return build()
 	case "doctor":
-		return doctor(false)
-	case "doctor-agent":
-		return doctor(true)
+		return doctor()
 	case "template-check":
 		return verifyTemplate()
 	case "mcp-check":
