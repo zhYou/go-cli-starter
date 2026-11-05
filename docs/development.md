@@ -8,8 +8,9 @@
 修改默认在独立 worktree 中进行，基线、分支命名、已有修改保护、署名和 PR 交付遵循
 [协作约定](../AGENTS.md#隔离开发与交付)。同一 checkout 串行修改。
 正式文档记录当前能力；superpowers 设计和计划保留在本地忽略目录 `docs/superpowers/`，不提交。
-当前已授权任务无需先建 Issue；已有对应 Issue 时由 PR 关联，完整解决时才使用关闭关联。
-尚未安排的后续需求只记带 `backlog` 标签的 GitHub Issues；待办不是实施授权，Issue 编号是唯一待办 ID。
+规划或开始前查阅[项目待办](backlog.md)，后续需求统一记入该文件；待办不是实施授权，
+`BL-xxx` 是唯一待办 ID。当前已授权任务无需补建条目；已有条目时在 PR 中引用其 ID，
+并在开始和交付时同步状态、更新日期与关联 PR。已完成条目移除，历史通过 Git 追溯。
 
 仓库文本文件统一使用 LF。`.editorconfig` 约束编辑器保存，`.gitattributes` 通过
 `text=auto eol=lf` 约束 Git 提交和检出，包括 Windows；二进制文件由 Git 自动识别。
