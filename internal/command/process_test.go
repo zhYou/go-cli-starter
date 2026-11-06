@@ -121,8 +121,11 @@ func TestCleanupDoesNotKillSibling(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		cancel()
-		if err := process.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
-			t.Error(err)
+		// Wait 已完成时 Windows 会释放句柄；此时不再重复终止进程。
+		if process.ProcessState == nil {
+			if err := process.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+				t.Error(err)
+			}
 		}
 		//nolint:errcheck // 主测试断言进程结果；早退收尾可能产生主动终止错误，仍必须等待进程退出。
 		_ = process.Wait()

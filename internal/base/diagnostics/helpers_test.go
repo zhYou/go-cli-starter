@@ -34,8 +34,11 @@ func startDiagnosticProcess(t *testing.T, child *exec.Cmd) func() error {
 		return waitErr
 	}
 	t.Cleanup(func() {
-		if err := child.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
-			t.Error(err)
+		// Wait 已完成时 Windows 会释放句柄；此时不再重复终止进程。
+		if child.ProcessState == nil {
+			if err := child.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+				t.Error(err)
+			}
 		}
 		//nolint:errcheck // 主测试断言进程结果；早退收尾可能产生主动终止错误，仍必须等待进程退出。
 		_ = wait()
