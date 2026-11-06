@@ -133,7 +133,9 @@ func (s *Session) Go(work func(context.Context)) bool {
 	if s.finishing || work == nil {
 		return false
 	}
-	s.work.Go(func() { work(s.ctx) })
+	s.work.Go(func() {
+		work(s.ctx)
+	})
 	return true
 }
 
@@ -180,7 +182,9 @@ func reporter(def fault.Definition, warn func(error)) func(error) {
 	var once sync.Once
 	return func(err error) {
 		if err != nil && warn != nil {
-			once.Do(func() { warn(def.Wrap(err)) })
+			once.Do(func() {
+				warn(def.Wrap(err))
+			})
 		}
 	}
 }

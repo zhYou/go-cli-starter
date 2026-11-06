@@ -34,10 +34,15 @@ func TestLanguageOverrideDoesNotRenderUnselectedMetadata(t *testing.T) {
 	} {
 		t.Run(tc.selected, func(t *testing.T) {
 			bundle := catalogFixture(t, tc.missing, "cli.greet", "")
-			loader := func() (*messages.Bundle, error) { return bundle, nil }
+			loader := func() (*messages.Bundle, error) {
+				return bundle, nil
+			}
 			var out, stderr bytes.Buffer
 			code := run(context.Background(), []string{"--lang", tc.missing, "--lang", tc.selected, "greet", "--help"}, Options{
-				Out: &out, ErrOut: &stderr, Language: tc.missing, LookupEnv: noFixtureEnv,
+				Out:       &out,
+				ErrOut:    &stderr,
+				Language:  tc.missing,
+				LookupEnv: noFixtureEnv,
 			}, loader)
 			require.Zero(t, code, stderr.String())
 			require.Contains(t, out.String(), tc.want)
@@ -91,10 +96,23 @@ func TestLanguageScanRespectsFlagValuesAndSeparator(t *testing.T) {
 func TestRequiredAndGroupsBeforeConfiguration(t *testing.T) {
 	for _, group := range []bool{false, true} {
 		count := 0
-		root := metadataRoot(Options{Out: &bytes.Buffer{}, ErrOut: &bytes.Buffer{}, Dependencies: &Dependencies{
-			LoadConfig: func(config.Options) (config.Config, error) { count++; return config.Config{}, nil },
-		}})
-		cmd := &cobra.Command{Use: "extra", RunE: func(*cobra.Command, []string) error { count++; return nil }}
+		root := metadataRoot(Options{
+			Out:    &bytes.Buffer{},
+			ErrOut: &bytes.Buffer{},
+			Dependencies: &Dependencies{
+				LoadConfig: func(config.Options) (config.Config, error) {
+					count++
+					return config.Config{}, nil
+				},
+			},
+		})
+		cmd := &cobra.Command{
+			Use: "extra",
+			RunE: func(*cobra.Command, []string) error {
+				count++
+				return nil
+			},
+		}
 		cmd.Flags().String("a", "", "a")
 		cmd.Flags().String("b", "", "b")
 		if group {
@@ -125,7 +143,16 @@ func TestLanguagePrecedenceAndIsolation(t *testing.T) {
 				args = append(args, "--lang", "zh")
 				want = "你好，Ada！"
 			}
-			code := Run(context.Background(), args, Options{Name: "sample", ConfigDir: t.TempDir(), Directories: &paths.Directories{State: t.TempDir()}, Out: &out, ErrOut: &stderr, LookupEnv: func(k string) (string, bool) { return lang, k == "SAMPLE_LANG" }})
+			code := Run(context.Background(), args, Options{
+				Name:        "sample",
+				ConfigDir:   t.TempDir(),
+				Directories: &paths.Directories{State: t.TempDir()},
+				Out:         &out,
+				ErrOut:      &stderr,
+				LookupEnv: func(k string) (string, bool) {
+					return lang, k == "SAMPLE_LANG"
+				},
+			})
 			require.Zero(t, code, stderr.String())
 			require.Contains(t, out.String(), want)
 		})
@@ -160,7 +187,10 @@ func TestMetadataLanguageScanForNewFlags(t *testing.T) {
 
 func TestInvalidExplicitValuesNeverLoadConfig(t *testing.T) {
 	count := 0
-	deps := Dependencies{LoadConfig: func(config.Options) (config.Config, error) { count++; return config.Defaults(), nil }}
+	deps := Dependencies{LoadConfig: func(config.Options) (config.Config, error) {
+		count++
+		return config.Defaults(), nil
+	}}
 	var out, stderr bytes.Buffer
 	code := Run(context.Background(), []string{"greet", "--name", "Ada", "--log-level", "noisy"}, Options{Dependencies: &deps, Out: &out, ErrOut: &stderr})
 	require.Equal(t, 2, code)
@@ -171,12 +201,12 @@ func TestInvalidExplicitValuesNeverLoadConfig(t *testing.T) {
 func TestNoneLoggingAndEnglishDiagnostics(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.toml")
-	require.NoError(t, os.WriteFile(configPath, []byte("[logging]\nlevel = \"debug\"\noutput = \"none\"\n"), 0600))
+	require.NoError(t, os.WriteFile(configPath, []byte("[logging]\nlevel = \"debug\"\noutput = \"none\"\n"), 0o600))
 	code, out, stderr := invoke(t, "greet", "--name", "Ada", "--lang=en", "--config", configPath)
 	require.Zero(t, code)
 	require.Contains(t, out, "Hello, Ada!")
 	require.Empty(t, stderr)
-	require.NoError(t, os.WriteFile(configPath, []byte("[logging]\noutput = \"stdout\"\n"), 0600))
+	require.NoError(t, os.WriteFile(configPath, []byte("[logging]\noutput = \"stdout\"\n"), 0o600))
 	code, out, stderr = invoke(t, "greet", "--name", "Ada", "--lang=en", "--config", configPath)
 	require.Equal(t, 1, code)
 	require.Empty(t, out)
@@ -231,7 +261,15 @@ func TestLanguageSelectionMatchesTargetFlagMetadata(t *testing.T) {
 			var source string
 			var toggle bool
 			var positional []string
-			cmd := &cobra.Command{Use: "extra", Annotations: map[string]string{"skip-config": "true"}, Args: cobra.ArbitraryArgs, RunE: func(_ *cobra.Command, args []string) error { positional = args; return nil }}
+			cmd := &cobra.Command{
+				Use:         "extra",
+				Annotations: map[string]string{"skip-config": "true"},
+				Args:        cobra.ArbitraryArgs,
+				RunE: func(_ *cobra.Command, args []string) error {
+					positional = args
+					return nil
+				},
+			}
 			cmd.Flags().StringVarP(&source, "source", "s", "", "来源")
 			cmd.Flags().BoolVarP(&toggle, "toggle", "b", false, "切换")
 			root.AddCommand(cmd)
@@ -259,7 +297,14 @@ func TestCompletionLanguageFallbackAndOrdinaryValidation(t *testing.T) {
 		{"en", []string{"__complete", "--lang", "zh", ""}, "version\t显示"},
 	} {
 		var out, stderr bytes.Buffer
-		code := Run(context.Background(), tc.args, Options{Name: "sample", Out: &out, ErrOut: &stderr, LookupEnv: func(key string) (string, bool) { return tc.env, key == "SAMPLE_LANG" }})
+		code := Run(context.Background(), tc.args, Options{
+			Name:   "sample",
+			Out:    &out,
+			ErrOut: &stderr,
+			LookupEnv: func(key string) (string, bool) {
+				return tc.env, key == "SAMPLE_LANG"
+			},
+		})
 		require.Zero(t, code, stderr.String())
 		require.Empty(t, stderr.String())
 		require.Contains(t, out.String(), tc.want)
@@ -278,7 +323,14 @@ func TestConcurrentCompletionLanguageIsolation(t *testing.T) {
 		for _, lang := range []string{"en", "zh-CN"} {
 			wg.Go(func() {
 				var out, stderr bytes.Buffer
-				code := Run(context.Background(), []string{"__complete", "--lang", lang, ""}, Options{Name: "sample", Out: &out, ErrOut: &stderr, LookupEnv: func(string) (string, bool) { return "", false }})
+				code := Run(context.Background(), []string{"__complete", "--lang", lang, ""}, Options{
+					Name:   "sample",
+					Out:    &out,
+					ErrOut: &stderr,
+					LookupEnv: func(string) (string, bool) {
+						return "", false
+					},
+				})
 				if code != 0 || stderr.Len() != 0 {
 					t.Errorf("%s: code=%d stderr=%s", lang, code, stderr.String())
 					return

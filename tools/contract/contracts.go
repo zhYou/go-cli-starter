@@ -21,11 +21,30 @@ func captureContract(ctx context.Context) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = os.RemoveAll(dir) }()
+	defer func() {
+		_ = os.RemoveAll(dir)
+	}()
 	results := map[string]any{}
-	for key, args := range map[string][]string{schemaCommand: {schemaCommand}, greetCommand: {greetCommand, nameFlag, "Codex", jsonFlag}, versionCommand: {versionCommand, jsonFlag}, doctorCommand: {doctorCommand, jsonFlag}} {
+	for key, args := range map[string][]string{
+		schemaCommand:  {schemaCommand},
+		greetCommand:   {greetCommand, nameFlag, "Codex", jsonFlag},
+		versionCommand: {versionCommand, jsonFlag},
+		doctorCommand:  {doctorCommand, jsonFlag},
+	} {
 		var out, errOut bytes.Buffer
-		code := cli.Run(ctx, args, cli.Options{Name: "contract-cli", Version: "1.0.0", Commit: "abc", Date: "2000-01-01", Out: &out, ErrOut: &errOut, ConfigDir: dir, Directories: &paths.Directories{State: filepath.Join(dir, "state")}, LookupEnv: func(string) (string, bool) { return "", false }})
+		code := cli.Run(ctx, args, cli.Options{
+			Name:        "contract-cli",
+			Version:     "1.0.0",
+			Commit:      "abc",
+			Date:        "2000-01-01",
+			Out:         &out,
+			ErrOut:      &errOut,
+			ConfigDir:   dir,
+			Directories: &paths.Directories{State: filepath.Join(dir, "state")},
+			LookupEnv: func(string) (string, bool) {
+				return "", false
+			},
+		})
 		if code != 0 {
 			return nil, fmt.Errorf("捕获 %s 失败：%s", key, &errOut)
 		}
@@ -48,6 +67,7 @@ func captureContract(ctx context.Context) ([]byte, error) {
 	}
 	return contract.Normalize(data)
 }
+
 func shape(value any) any {
 	switch v := value.(type) {
 	case map[string]any:
@@ -68,6 +88,7 @@ func shape(value any) any {
 		return "null"
 	}
 }
+
 func validateContract(base, snapshot, actual []byte, records []contract.Record, initial bool) error {
 	changes, err := contract.Diff(snapshot, actual)
 	if err != nil {
@@ -82,6 +103,7 @@ func validateContract(base, snapshot, actual []byte, records []contract.Record, 
 	}
 	return contract.ValidateRecords(changes, records, initial)
 }
+
 func readRecords(against string) ([]contract.Record, error) {
 	paths, err := filepath.Glob("docs/compatibility/changes/*.json")
 	if err != nil {
@@ -111,6 +133,7 @@ func readRecords(against string) ([]contract.Record, error) {
 	}
 	return records, nil
 }
+
 func checkContract(ctx context.Context, against string) error {
 	actual, err := captureContract(ctx)
 	if err != nil {
@@ -135,15 +158,16 @@ func checkContract(ctx context.Context, against string) error {
 	}
 	return validateContract(base, snapshot, actual, records, initial)
 }
+
 func updateContract(ctx context.Context) error {
 	data, err := captureContract(ctx)
 	if err != nil {
 		return err
 	}
 	//nolint:gosec // G301：这是公开构建产物或机器契约文件的既定权限，不包含凭据。
-	if err := os.MkdirAll(filepath.Dir(contractFile), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(contractFile), 0o755); err != nil {
 		return err
 	}
 	//nolint:gosec // G306：这是公开构建产物或机器契约文件的既定权限，不包含凭据。
-	return os.WriteFile(contractFile, append(data, '\n'), 0644)
+	return os.WriteFile(contractFile, append(data, '\n'), 0o644)
 }

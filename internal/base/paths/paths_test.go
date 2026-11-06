@@ -20,34 +20,57 @@ func TestPlatformDirectories(t *testing.T) {
 		{"linux", map[string]string{"TOOL_HOME": "/isolated"}, Directories{"/isolated", "/isolated/data", "/isolated/state", "/isolated/cache"}},
 	} {
 		t.Run(tc.os, func(t *testing.T) {
-			dirs, err := Resolve(Options{AppName: "tool", GOOS: tc.os, LookupEnv: func(k string) (string, bool) { v, ok := tc.env[k]; return v, ok }})
+			dirs, err := Resolve(Options{
+				AppName: "tool",
+				GOOS:    tc.os,
+				LookupEnv: func(k string) (string, bool) {
+					v, ok := tc.env[k]
+					return v, ok
+				},
+			})
 			require.NoError(t, err)
 			require.Equal(t, tc.want, dirs)
 		})
 	}
 }
+
 func TestInvalidHomeAndMissingHome(t *testing.T) {
 	for _, env := range []map[string]string{{"TOOL_HOME": "relative"}, {"HOME": "relative"}, {}} {
-		_, err := Resolve(Options{AppName: "tool", GOOS: "linux", LookupEnv: func(k string) (string, bool) { v, ok := env[k]; return v, ok }})
+		_, err := Resolve(Options{
+			AppName: "tool",
+			GOOS:    "linux",
+			LookupEnv: func(k string) (string, bool) {
+				v, ok := env[k]
+				return v, ok
+			},
+		})
 		require.Error(t, err)
 	}
 }
 
 func TestWindowsUNCAndAbsentEnvironment(t *testing.T) {
-	dirs, err := Resolve(Options{AppName: "tool", GOOS: "windows", LookupEnv: func(k string) (string, bool) {
-		if k == "TOOL_HOME" {
-			return `\\server\share\tool`, true
-		}
-		return "ignored", false
-	}})
+	dirs, err := Resolve(Options{
+		AppName: "tool",
+		GOOS:    "windows",
+		LookupEnv: func(k string) (string, bool) {
+			if k == "TOOL_HOME" {
+				return `\\server\share\tool`, true
+			}
+			return "ignored", false
+		},
+	})
 	require.NoError(t, err)
 	require.Equal(t, `\\server\share\tool`, dirs.Config)
-	dirs, err = Resolve(Options{AppName: "tool", GOOS: "linux", LookupEnv: func(k string) (string, bool) {
-		if k == "HOME" {
-			return "/home/u", true
-		}
-		return "ignored", false
-	}})
+	dirs, err = Resolve(Options{
+		AppName: "tool",
+		GOOS:    "linux",
+		LookupEnv: func(k string) (string, bool) {
+			if k == "HOME" {
+				return "/home/u", true
+			}
+			return "ignored", false
+		},
+	})
 	require.NoError(t, err)
 	require.Equal(t, "/home/u/.config/tool", dirs.Config)
 }

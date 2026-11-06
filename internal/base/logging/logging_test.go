@@ -11,13 +11,23 @@ import (
 
 type failedSink struct{}
 
-func (failedSink) Write([]byte) (int, error) { return 0, errors.New("fixture write failure") }
+func (failedSink) Write([]byte) (int, error) {
+	return 0, errors.New("fixture write failure")
+}
 
-func (failedSink) Sync() error { return errors.New("fixture sync failure") }
+func (failedSink) Sync() error {
+	return errors.New("fixture sync failure")
+}
 
 func TestWriterFailuresReachReporterAndSyncCaller(t *testing.T) {
 	warnings := 0
-	logger := New(RunInfo{}, Options{Config: Defaults(), Writer: failedSink{}, RunID: "fixture"}, func(error) { warnings++ })
+	logger := New(RunInfo{}, Options{
+		Config: Defaults(),
+		Writer: failedSink{},
+		RunID:  "fixture",
+	}, func(error) {
+		warnings++
+	})
 	logger.Infow("cannot write")
 	require.Error(t, logger.Sync())
 	require.Positive(t, warnings)
@@ -28,13 +38,20 @@ type countedSink struct {
 	syncs int
 }
 
-func (s *countedSink) Sync() error { s.syncs++; return nil }
+func (s *countedSink) Sync() error {
+	s.syncs++
+	return nil
+}
 
 func TestNewWritesBoundFieldsAndPreservesWriterSync(t *testing.T) {
 	sink := &countedSink{}
 	logger := New(RunInfo{Component: "go-cli-starter", Command: "doctor", Version: "fixture"}, Options{
-		Config: Defaults(), Writer: sink, RunID: "fixture-run",
-	}, func(err error) { t.Error(err) })
+		Config: Defaults(),
+		Writer: sink,
+		RunID:  "fixture-run",
+	}, func(err error) {
+		t.Error(err)
+	})
 	logger.Infow("fixture", "tool", "git")
 	require.NoError(t, logger.Sync())
 	require.Equal(t, 1, sink.syncs)
@@ -49,7 +66,9 @@ func TestNewWritesBoundFieldsAndPreservesWriterSync(t *testing.T) {
 
 func TestNewWithoutWriterReturnsUsableFallback(t *testing.T) {
 	warnings := 0
-	logger := New(RunInfo{}, Options{Config: Defaults(), RunID: "fixture"}, func(error) { warnings++ })
+	logger := New(RunInfo{}, Options{Config: Defaults(), RunID: "fixture"}, func(error) {
+		warnings++
+	})
 	logger.Infow("discarded")
 	require.NoError(t, logger.Sync())
 	require.Equal(t, 1, warnings)

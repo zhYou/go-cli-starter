@@ -96,8 +96,10 @@ var managedFiles = []string{
 	"tools/release/release_install_test.go",
 }
 
-var validName = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
-var validModule = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._~/-]*$`)
+var (
+	validName   = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+	validModule = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._~/-]*$`)
+)
 
 type change struct {
 	path string
@@ -108,6 +110,11 @@ type change struct {
 // Initialize 修改原始模板的标识；标识已匹配时不做修改。
 func Initialize(root, module, name string) ([]string, error) {
 	return (&Initializer{}).Initialize(context.Background(), root, module, name)
+}
+
+// Identity 读取模块路径和可执行文件名，不执行项目代码。
+func Identity(root string) (string, string, error) {
+	return (&Initializer{FS: afero.NewOsFs()}).identity(root)
 }
 
 // Initialize 以事务方式重命名模板，并返回变更文件列表。
@@ -150,7 +157,9 @@ func (original *Initializer) Initialize(ctx context.Context, root, module, name 
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = unlock() }()
+	defer func() {
+		_ = unlock()
+	}()
 	if err := i.recover(root, module, name); err != nil {
 		return nil, err
 	}
@@ -215,10 +224,6 @@ func (original *Initializer) Initialize(ctx context.Context, root, module, name 
 	return i.apply(ctx, root, module, name, changes, move)
 }
 
-// Identity 读取模块路径和可执行文件名，不执行项目代码。
-func Identity(root string) (string, string, error) {
-	return (&Initializer{FS: afero.NewOsFs()}).identity(root)
-}
 func (i *Initializer) identity(root string) (string, string, error) {
 	project, err := i.inspect(root)
 	return project.Module, project.Name, err

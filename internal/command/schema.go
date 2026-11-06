@@ -41,16 +41,24 @@ func (s Spec[P]) Build(input P) (Invocation, error) {
 // Literal 固定一段参数；复制输入以免调用方改动定义。
 func Literal[P any](values ...string) Arg[P] {
 	fixed := append([]string(nil), values...)
-	return func(P) []string { return append([]string(nil), fixed...) }
+	return func(P) []string {
+		return append([]string(nil), fixed...)
+	}
 }
 
 // Value 插入一个参数，空字符串也保留。
 func Value[P any](get func(P) string) Arg[P] {
-	return func(input P) []string { return []string{get(input)} }
+	return func(input P) []string {
+		return []string{get(input)}
+	}
 }
 
 // Values 插入一组参数；Build 将内容复制到本次调用。
-func Values[P any](get func(P) []string) Arg[P] { return func(input P) []string { return get(input) } }
+func Values[P any](get func(P) []string) Arg[P] {
+	return func(input P) []string {
+		return get(input)
+	}
+}
 
 // When 仅在条件满足时插入整个参数片段。
 func When[P any](include func(P) bool, parts ...Arg[P]) Arg[P] {

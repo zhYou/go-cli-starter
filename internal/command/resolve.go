@@ -61,7 +61,10 @@ func resolve(program, dir string, env []string) (string, error) {
 
 // 按调用环境展开显式路径及 PATH 候选，避免标准库读取父进程 PATHEXT。
 func resolveWindowsExecutable(program string, env []string) (string, error) {
-	exists := func(path string) bool { info, err := os.Stat(path); return err == nil && !info.IsDir() }
+	exists := func(path string) bool {
+		info, err := os.Stat(path)
+		return err == nil && !info.IsDir()
+	}
 	if filepath.Ext(program) != "" && exists(program) {
 		return program, nil
 	}

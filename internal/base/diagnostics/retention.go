@@ -37,16 +37,20 @@ func cleanup(base string, config Config, remove func(*os.Root, string) error) er
 	if err != nil {
 		return err
 	}
-	defer func() { _ = root.Close() }()
+	defer func() {
+		_ = root.Close()
+	}()
 	if info, err := root.Lstat(maintenanceName); err == nil && !info.Mode().IsRegular() {
 		return invalidmaintenancelock.New()
 	}
-	maintenance := flock.New(filepath.Join(base, maintenanceName), flock.SetPermissions(0600))
+	maintenance := flock.New(filepath.Join(base, maintenanceName), flock.SetPermissions(0o600))
 	locked, err := maintenance.TryLock()
 	if err != nil {
 		return err
 	}
-	defer func() { _ = maintenance.Close() }()
+	defer func() {
+		_ = maintenance.Close()
+	}()
 	if !locked {
 		return nil
 	}
@@ -67,7 +71,9 @@ func cleanup(base string, config Config, remove func(*os.Root, string) error) er
 		total += c.size
 		candidates = append(candidates, c)
 	}
-	sort.Slice(candidates, func(i, j int) bool { return candidates[i].last.Before(candidates[j].last) })
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].last.Before(candidates[j].last)
+	})
 	cutoff := time.Now().Add(-time.Duration(config.RetentionDays) * 24 * time.Hour)
 	for _, c := range candidates {
 		expired := config.RetentionDays > 0 && c.last.Before(cutoff)
@@ -85,8 +91,12 @@ func cleanup(base string, config Config, remove func(*os.Root, string) error) er
 	}
 	return nil
 }
+
 func inspect(root *os.Root, name string) (candidate, error) {
-	c := candidate{name: name, files: map[string]os.FileInfo{}}
+	c := candidate{
+		name:  name,
+		files: map[string]os.FileInfo{},
+	}
 	info, err := root.Lstat(name)
 	if err != nil {
 		return c, err
@@ -99,7 +109,9 @@ func inspect(root *os.Root, name string) (candidate, error) {
 	if err != nil {
 		return c, err
 	}
-	defer func() { _ = child.Close() }()
+	defer func() {
+		_ = child.Close()
+	}()
 	entries, err := readEntries(child)
 	if err != nil {
 		return c, err
@@ -138,6 +150,7 @@ func inspect(root *os.Root, name string) (candidate, error) {
 	}
 	return c, nil
 }
+
 func removeCandidate(root *os.Root, base string, c candidate, remove func(*os.Root, string) error) (bool, error) {
 	leaseInfo, err := root.Lstat(filepath.Join(c.name, leaseName))
 	if err != nil || !leaseInfo.Mode().IsRegular() {
@@ -148,7 +161,9 @@ func removeCandidate(root *os.Root, base string, c candidate, remove func(*os.Ro
 	if err != nil {
 		return false, nil
 	}
-	defer func() { _ = lease.Close() }()
+	defer func() {
+		_ = lease.Close()
+	}()
 	if !locked {
 		return false, nil
 	}

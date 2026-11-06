@@ -50,7 +50,9 @@ func validateReleaseSnapshot(dist string) (*releaseSnapshot, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = file.Close() }()
+	defer func() {
+		_ = file.Close()
+	}()
 	checksums := map[string]string{}
 	scanner := bufio.NewScanner(file)
 	linePattern := regexp.MustCompile(`^([0-9a-f]{64}) [ *]([^\r\n]+)$`)
@@ -131,6 +133,7 @@ func validateReleaseSnapshot(dist string) (*releaseSnapshot, error) {
 	}
 	return &releaseSnapshot{version: version, checksums: checksums}, nil
 }
+
 func validateSPDX(path, archive string) error {
 	//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
 	data, err := os.ReadFile(path)

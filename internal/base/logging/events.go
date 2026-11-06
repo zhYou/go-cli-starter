@@ -32,6 +32,22 @@ type CommandResult struct {
 	Err      error
 }
 
+type commandResultEncoder CommandResult
+
+// ToolCall 保存外部工具调用结果，不包含参数、环境或输出内容。
+type ToolCall struct {
+	Message                  string
+	Operation, Tool, Outcome string
+	ExitCode                 int
+	Duration                 time.Duration
+	Err                      error
+}
+
+// Started 记录命令已完成配置与日志初始化。
+func (l *Logger) Started() {
+	l.Infow(eventCommandStarted)
+}
+
 // Emit 以固定的命令结束事件写入顶层字段。
 func (e CommandResult) Emit(logger *Logger) {
 	if e.ExitCode != 0 || e.Err != nil {
@@ -41,7 +57,12 @@ func (e CommandResult) Emit(logger *Logger) {
 	logger.sugar.Infow(e.message(), zap.Inline(commandResultEncoder(e)))
 }
 
-type commandResultEncoder CommandResult
+func (e CommandResult) message() string {
+	if e.Message != "" {
+		return e.Message
+	}
+	return eventCommandFinished
+}
 
 // MarshalLogObject 显式编码结果及错误，避免反射改变时长和错误格式。
 func (e commandResultEncoder) MarshalLogObject(enc zapcore.ObjectEncoder) error {
@@ -52,18 +73,6 @@ func (e commandResultEncoder) MarshalLogObject(enc zapcore.ObjectEncoder) error 
 	enc.AddInt(fieldExitCode, e.ExitCode)
 	enc.AddDuration(fieldDuration, e.Duration)
 	return nil
-}
-
-// Started 记录命令已完成配置与日志初始化。
-func (l *Logger) Started() { l.Infow(eventCommandStarted) }
-
-// ToolCall 保存外部工具调用结果，不包含参数、环境或输出内容。
-type ToolCall struct {
-	Message                  string
-	Operation, Tool, Outcome string
-	ExitCode                 int
-	Duration                 time.Duration
-	Err                      error
 }
 
 // Emit 记录工具结束事件，不包含原始参数和输出。
@@ -77,13 +86,6 @@ func (e ToolCall) Emit(l *Logger) {
 	} else {
 		l.sugar.Infow(e.message(), fields...)
 	}
-}
-
-func (e CommandResult) message() string {
-	if e.Message != "" {
-		return e.Message
-	}
-	return eventCommandFinished
 }
 
 func (e ToolCall) message() string {

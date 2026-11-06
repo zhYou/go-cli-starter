@@ -38,7 +38,17 @@ func releaseFixtureMode(t *testing.T, selected, mode string) string {
 			ext = ".zip"
 		}
 		name := fmt.Sprintf("%s_0.1.0_%s%s", appName, target, ext)
-		doc := map[string]any{"spdxVersion": "SPDX-2.3", "SPDXID": "SPDXRef-DOCUMENT", "name": name, "documentNamespace": "https://example.com/" + name, "creationInfo": map[string]any{"creators": []string{"Tool: syft"}, "created": "2026-10-29T00:00:00Z"}, "packages": []any{map[string]any{"SPDXID": "SPDXRef-root", "name": name}}}
+		doc := map[string]any{
+			"spdxVersion":       "SPDX-2.3",
+			"SPDXID":            "SPDXRef-DOCUMENT",
+			"name":              name,
+			"documentNamespace": "https://example.com/" + name,
+			"creationInfo": map[string]any{
+				"creators": []string{"Tool: syft"},
+				"created":  "2026-10-29T00:00:00Z",
+			},
+			"packages": []any{map[string]any{"SPDXID": "SPDXRef-root", "name": name}},
+		}
 		sbom, err := json.Marshal(doc)
 		require.NoError(t, err)
 		binary := appName
@@ -52,20 +62,21 @@ func releaseFixtureMode(t *testing.T, selected, mode string) string {
 		}
 		archive := releaseArchiveBytes(t, windows, binary, archiveMode)
 		for file, data := range map[string][]byte{name: archive, name + ".spdx.json": sbom} {
-			require.NoError(t, os.WriteFile(filepath.Join(dir, file), data, 0600))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, file), data, 0o600))
 			sum := sha256.Sum256(data)
 			fmt.Fprintf(&sums, "%s  %s\n", hex.EncodeToString(sum[:]), file)
 		}
 	}
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "checksums.txt"), []byte(sums.String()), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "checksums.txt"), []byte(sums.String()), 0o600))
 	return dir
 }
+
 func releaseArchiveBytes(t *testing.T, windows bool, binary, mode string) []byte {
 	t.Helper()
 	if mode == "corrupt" {
 		return []byte("损坏归档")
 	}
-	members := []archiveMember{{binary, []byte("测试二进制"), 0755}, {"README.md", []byte("说明"), 0644}, {"config.example.toml", []byte("[logging]\nlevel = \"info\"\n"), 0644}}
+	members := []archiveMember{{binary, []byte("测试二进制"), 0o755}, {"README.md", []byte("说明"), 0o644}, {"config.example.toml", []byte("[logging]\nlevel = \"info\"\n"), 0o644}}
 	switch mode {
 	case "binary":
 		members = members[1:]
@@ -80,13 +91,13 @@ func releaseArchiveBytes(t *testing.T, windows bool, binary, mode string) []byte
 	case "duplicate":
 		members = append(members, members[2])
 	case "symlink":
-		members[2].mode = os.ModeSymlink | 0644
+		members[2].mode = os.ModeSymlink | 0o644
 	case "dot-alias":
-		members = append(members, archiveMember{"./config.example.toml", nil, 0644})
+		members = append(members, archiveMember{"./config.example.toml", nil, 0o644})
 	case "parent-alias":
-		members = append(members, archiveMember{"sub/../config.example.toml", nil, 0644})
+		members = append(members, archiveMember{"sub/../config.example.toml", nil, 0o644})
 	case "windows-alias":
-		members = append(members, archiveMember{`.\config.example.toml`, nil, 0644})
+		members = append(members, archiveMember{`.\config.example.toml`, nil, 0o644})
 	}
 	var out bytes.Buffer
 	if windows {

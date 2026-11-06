@@ -43,7 +43,9 @@ func Verify(executable, dir, name, example, version, commit string) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = os.RemoveAll(home) }()
+	defer func() {
+		_ = os.RemoveAll(home)
+	}()
 	env := Env(name, home)
 	run := func(extra []string, args ...string) ([]byte, []byte, error) {
 		return Output(dir, append(append([]string{}, env...), extra...), executable, args...)
@@ -128,7 +130,7 @@ func Verify(executable, dir, name, example, version, commit string) error {
 	}
 	// 默认配置路径同样通过应用 HOME 隔离；用 stderr 日志观察真实覆盖结果。
 	config := filepath.Join(home, "config.toml")
-	if err := os.WriteFile(config, []byte("[logging]\nlevel = \"debug\"\noutput = \"stderr\"\n"), 0600); err != nil {
+	if err := os.WriteFile(config, []byte("[logging]\nlevel = \"debug\"\noutput = \"stderr\"\n"), 0o600); err != nil {
 		return err
 	}
 	prefix := paths.EnvPrefix(name)

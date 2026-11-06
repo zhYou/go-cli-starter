@@ -67,7 +67,7 @@ func (f *cleanupFaultFS) RemoveAll(path string) error {
 			if err := f.Fs.RemoveAll(path); err != nil {
 				return err
 			}
-			if err := f.Mkdir(path, 0700); err != nil {
+			if err := f.Mkdir(path, 0o700); err != nil {
 				return err
 			}
 		} else if err := f.Fs.Remove(filepath.Join(path, suffix)); err != nil {
@@ -132,7 +132,7 @@ func TestRecoveryRejectsInconsistentExistence(t *testing.T) {
 			}
 			modified, err := json.Marshal(doc)
 			require.NoError(t, err)
-			require.NoError(t, afero.WriteFile(i.FS, path, modified, 0600))
+			require.NoError(t, afero.WriteFile(i.FS, path, modified, 0o600))
 			before, err := afero.ReadFile(i.FS, filepath.Join(root, "go.mod"))
 			require.NoError(t, err)
 			_, err = i.Initialize(context.Background(), root, "example.com/tool", "tool")
@@ -167,12 +167,12 @@ func TestRecoveryRejectsEditedOrEscapingPaths(t *testing.T) {
 			journal := filepath.Join(root, ".template-init", "journal.json")
 			switch mode {
 			case "edited":
-				require.NoError(t, afero.WriteFile(i.FS, path, []byte("人工修改"), 0600))
+				require.NoError(t, afero.WriteFile(i.FS, path, []byte("人工修改"), 0o600))
 			case "escape":
 				data, _ := afero.ReadFile(i.FS, journal)
-				require.NoError(t, afero.WriteFile(i.FS, journal, []byte(strings.Replace(string(data), `"go.mod"`, `"../outside"`, 1)), 0600))
+				require.NoError(t, afero.WriteFile(i.FS, journal, []byte(strings.Replace(string(data), `"go.mod"`, `"../outside"`, 1)), 0o600))
 			case "corrupt":
-				require.NoError(t, afero.WriteFile(i.FS, journal, []byte("{"), 0600))
+				require.NoError(t, afero.WriteFile(i.FS, journal, []byte("{"), 0o600))
 			}
 			before, _ := afero.ReadFile(i.FS, path)
 			module := "example.com/tool"
@@ -193,15 +193,18 @@ func TestRollbackFailureKeepsRecoveryData(t *testing.T) {
 	i, root := memoryInitializer(t)
 	base := i.FS
 	targets := 0
-	i.FS = faultFS{Fs: base, rename: func(a, b string) error {
-		if b == filepath.Join(root, "go.mod") || b == filepath.Join(root, "README.md") || b == filepath.Join(root, "cmd", TemplateName, "main.go") {
-			targets++
-			if targets >= 2 {
-				return errors.New("写入和回滚失败")
+	i.FS = faultFS{
+		Fs: base,
+		rename: func(a, b string) error {
+			if b == filepath.Join(root, "go.mod") || b == filepath.Join(root, "README.md") || b == filepath.Join(root, "cmd", TemplateName, "main.go") {
+				targets++
+				if targets >= 2 {
+					return errors.New("写入和回滚失败")
+				}
 			}
-		}
-		return base.Rename(a, b)
-	}}
+			return base.Rename(a, b)
+		},
+	}
 	_, err := i.Initialize(context.Background(), root, "example.com/tool", "tool")
 	require.Error(t, err)
 	ok, _ := afero.Exists(base, filepath.Join(root, ".template-init", "journal.json"))
@@ -220,15 +223,18 @@ func TestWriteFailureRestoresOriginalBytes(t *testing.T) {
 			before[n], _ = afero.ReadFile(base, filepath.Join(root, n))
 		}
 		count := 0
-		i.FS = faultFS{Fs: base, rename: func(a, b string) error {
-			if b == filepath.Join(root, "go.mod") || b == filepath.Join(root, "README.md") || b == filepath.Join(root, "cmd", TemplateName, "main.go") {
-				count++
-				if count == failAt {
-					return errors.New("指定写入失败")
+		i.FS = faultFS{
+			Fs: base,
+			rename: func(a, b string) error {
+				if b == filepath.Join(root, "go.mod") || b == filepath.Join(root, "README.md") || b == filepath.Join(root, "cmd", TemplateName, "main.go") {
+					count++
+					if count == failAt {
+						return errors.New("指定写入失败")
+					}
 				}
-			}
-			return base.Rename(a, b)
-		}}
+				return base.Rename(a, b)
+			},
+		}
 		_, err := i.Initialize(context.Background(), root, "example.com/tool", "tool")
 		require.Error(t, err)
 		for n, want := range before {
@@ -246,7 +252,9 @@ func TestLockHelper(t *testing.T) {
 	if err != nil {
 		os.Exit(3)
 	}
-	defer func() { _ = unlock() }()
+	defer func() {
+		_ = unlock()
+	}()
 	_, _ = os.Stdout.WriteString("就绪\n")
 	_, _ = os.Stdin.Read(make([]byte, 1))
 }
@@ -268,8 +276,18 @@ func TestConcurrentInitializationDoesNotRecoverLiveTransaction(t *testing.T) {
 
 	var waitOnce sync.Once
 	var waitErr error
-	waitChild := func() error { waitOnce.Do(func() { waitErr = cmd.Wait() }); return waitErr }
-	t.Cleanup(func() { cancel(); _ = in.Close(); _ = cmd.Process.Kill(); _ = waitChild() })
+	waitChild := func() error {
+		waitOnce.Do(func() {
+			waitErr = cmd.Wait()
+		})
+		return waitErr
+	}
+	t.Cleanup(func() {
+		cancel()
+		_ = in.Close()
+		_ = cmd.Process.Kill()
+		_ = waitChild()
+	})
 	line, err := bufio.NewReader(out).ReadString('\n')
 	require.NoError(t, err)
 	require.Equal(t, "就绪\n", line)

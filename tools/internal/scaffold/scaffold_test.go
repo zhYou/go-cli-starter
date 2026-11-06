@@ -17,7 +17,7 @@ const appName = "` + TemplateName + `"
 func main() {}
 `
 	//nolint:gosec // G306：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
-	require.NoError(t, os.WriteFile(filepath.Join(root, "cmd", TemplateName, "main.go"), []byte(source), 0640))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "cmd", TemplateName, "main.go"), []byte(source), 0o640))
 	changed, err := Initialize(root, "example.com/team/repository", "my-cli")
 	require.NoError(t, err)
 	require.NotEmpty(t, changed)
@@ -65,12 +65,12 @@ func TestInitializeRejectsGoVersionNamesBeforeWriting(t *testing.T) {
 func TestInitializeAcceptanceIdentityWhitelist(t *testing.T) {
 	root := projectFixture(t, TemplateModule, TemplateName)
 	for _, name := range []string{"tools/internal/acceptance/acceptance.go", "tools/release/release_install.go"} {
-		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(root, name)), 0700))
+		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(root, name)), 0o700))
 		content := "package main\nimport _ \"" + TemplateModule + "/internal/base/paths\"\n"
-		require.NoError(t, os.WriteFile(filepath.Join(root, name), []byte(content), 0600))
+		require.NoError(t, os.WriteFile(filepath.Join(root, name), []byte(content), 0o600))
 	}
 	unknown := filepath.Join(root, "user.toml")
-	require.NoError(t, os.WriteFile(unknown, []byte("name = \""+TemplateName+"\""), 0600))
+	require.NoError(t, os.WriteFile(unknown, []byte("name = \""+TemplateName+"\""), 0o600))
 	_, err := Initialize(root, "example.com/team/mycli", "mycli")
 	require.NoError(t, err)
 	for _, name := range []string{"tools/internal/acceptance/acceptance.go", "tools/release/release_install.go"} {
@@ -136,10 +136,15 @@ func TestInitializeIsIdempotentAndRejectsConflictingIdentity(t *testing.T) {
 
 func TestInitializeRejectsInvalidInputsBeforeWriting(t *testing.T) {
 	for _, tc := range []struct{ module, name string }{
-		{"", "tool"}, {"example.com/tool", ""}, {"example.com/tool", "../tool"},
-		{"example.com/tool", "tool;touch bad"}, {"../tool", "tool"},
-		{"example.com/team//tool", "tool"}, {"example.com/tool\nother", "tool"},
-		{"example.com/tool/v1", "tool"}, {"example.com/tool.", "tool"},
+		{"", "tool"},
+		{"example.com/tool", ""},
+		{"example.com/tool", "../tool"},
+		{"example.com/tool", "tool;touch bad"},
+		{"../tool", "tool"},
+		{"example.com/team//tool", "tool"},
+		{"example.com/tool\nother", "tool"},
+		{"example.com/tool/v1", "tool"},
+		{"example.com/tool.", "tool"},
 	} {
 		root := fixture(t)
 		if _, err := Initialize(root, tc.module, tc.name); err == nil {

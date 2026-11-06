@@ -7,4 +7,6 @@ type Config struct {
 }
 
 // Defaults 返回本模块的默认配置。
-func Defaults() Config { return Config{Level: "info", Output: "file"} }
+func Defaults() Config {
+	return Config{Level: "info", Output: "file"}
+}

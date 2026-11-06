@@ -69,7 +69,9 @@ func run(ctx context.Context, args []string, opts Options, loadBundle func() (*m
 			shadowOptions.Language = call.localizer.Language()
 			shadowOptions.Out, shadowOptions.ErrOut = io.Discard, io.Discard
 			//nolint:contextcheck // 仅构造独立解析树；实际请求仍由 ExecuteContextC 注入调用者 ctx。
-			shadow, _, setupErr := buildRoot(shadowOptions, func() (*messages.Bundle, error) { return call.bundle, nil })
+			shadow, _, setupErr := buildRoot(shadowOptions, func() (*messages.Bundle, error) {
+				return call.bundle, nil
+			})
 			if setupErr != nil {
 				err = fault.Wrap(fault.Runtime, "", setupErr)
 			} else {
@@ -141,7 +143,17 @@ func buildRoot(opts Options, loadBundle func() (*messages.Bundle, error), args .
 	}
 	call.bundle = bundle
 	call.localizer = bundle.Localizer(languageEnglish)
-	root := &cobra.Command{Use: opts.Name, Short: "供用户和自动化工具使用的 CLI 模板", Version: opts.Version, Args: noArgs, SilenceErrors: true, SilenceUsage: true, RunE: func(cmd *cobra.Command, _ []string) error { return cmd.Help() }}
+	root := &cobra.Command{
+		Use:           opts.Name,
+		Short:         "供用户和自动化工具使用的 CLI 模板",
+		Version:       opts.Version,
+		Args:          noArgs,
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return cmd.Help()
+		},
+	}
 	root.SetIn(opts.In)
 	root.SetOut(opts.Out)
 	root.SetErr(opts.ErrOut)
@@ -170,7 +182,12 @@ func buildRoot(opts Options, loadBundle func() (*messages.Bundle, error), args .
 			return (fault.Definition{Code: "cli.config_failed", Kind: fault.Configuration}).Wrap(err)
 		}
 		ctx, owned := session.Begin(cmd.Context(), cfg, logging.RunInfo{Component: opts.Name, Command: cmd.CommandPath(), Version: opts.Version, Commit: opts.Commit}, session.Options{
-			Paths: paths.Options{AppName: opts.Name, LookupEnv: opts.LookupEnv}, Directories: opts.Directories, Stderr: opts.ErrOut, ExternalLogger: call.deps.Logger, NewLogger: call.deps.NewLogger, Localizer: call.localizer,
+			Paths:          paths.Options{AppName: opts.Name, LookupEnv: opts.LookupEnv},
+			Directories:    opts.Directories,
+			Stderr:         opts.ErrOut,
+			ExternalLogger: call.deps.Logger,
+			NewLogger:      call.deps.NewLogger,
+			Localizer:      call.localizer,
 		}, func(err error) {
 			_, _ = fmt.Fprintln(opts.ErrOut, call.localizer.Text("cli.warning", map[string]any{paramMessage: call.localizer.Render(err)}))
 		})
@@ -188,13 +205,58 @@ func buildRoot(opts Options, loadBundle func() (*messages.Bundle, error), args .
 	completion := newCompletionCommand(root, call, opts.Name)
 	doctorCommand := newDoctorCommand(call)
 	root.AddCommand(greet, version, schema, completion, doctorCommand)
-	call.bindCommand(doctorCommand, commandTexts{short: message("cli.doctor"), example: textMessage{id: "cli.doctor_example", params: map[string]any{paramName: opts.Name}}})
-	call.bindCommand(root, commandTexts{example: textMessage{id: "cli.root_example", params: map[string]any{paramName: opts.Name}}, short: message("cli.root")})
-	call.bindCommand(help, commandTexts{example: textMessage{id: "cli.help_example", params: map[string]any{paramName: opts.Name}}, short: message("cli.help"), use: message("cli.help_use")})
-	call.bindCommand(greet, commandTexts{short: message("cli.greet"), use: message("cli.greet_use"), example: textMessage{id: "cli.greet_example", params: map[string]any{paramName: opts.Name}}})
-	call.bindCommand(version, commandTexts{example: textMessage{id: "cli.version_example", params: map[string]any{paramName: opts.Name}}, short: message("cli.version")})
-	call.bindCommand(schema, commandTexts{example: textMessage{id: "cli.schema_example", params: map[string]any{paramName: opts.Name}}, short: message("cli.schema"), use: message("cli.schema_use")})
-	call.bindCommand(completion, commandTexts{example: textMessage{id: "cli.completion_example", params: map[string]any{paramName: opts.Name}}, short: message("cli.completion")})
+	call.bindCommand(doctorCommand, commandTexts{
+		short: message("cli.doctor"),
+		example: textMessage{
+			id:     "cli.doctor_example",
+			params: map[string]any{paramName: opts.Name},
+		},
+	})
+	call.bindCommand(root, commandTexts{
+		example: textMessage{
+			id:     "cli.root_example",
+			params: map[string]any{paramName: opts.Name},
+		},
+		short: message("cli.root"),
+	})
+	call.bindCommand(help, commandTexts{
+		example: textMessage{
+			id:     "cli.help_example",
+			params: map[string]any{paramName: opts.Name},
+		},
+		short: message("cli.help"),
+		use:   message("cli.help_use"),
+	})
+	call.bindCommand(greet, commandTexts{
+		short: message("cli.greet"),
+		use:   message("cli.greet_use"),
+		example: textMessage{
+			id:     "cli.greet_example",
+			params: map[string]any{paramName: opts.Name},
+		},
+	})
+	call.bindCommand(version, commandTexts{
+		example: textMessage{
+			id:     "cli.version_example",
+			params: map[string]any{paramName: opts.Name},
+		},
+		short: message("cli.version"),
+	})
+	call.bindCommand(schema, commandTexts{
+		example: textMessage{
+			id:     "cli.schema_example",
+			params: map[string]any{paramName: opts.Name},
+		},
+		short: message("cli.schema"),
+		use:   message("cli.schema_use"),
+	})
+	call.bindCommand(completion, commandTexts{
+		example: textMessage{
+			id:     "cli.completion_example",
+			params: map[string]any{paramName: opts.Name},
+		},
+		short: message("cli.completion"),
+	})
 	for _, binding := range []struct{ flag, id string }{
 		{flagJSON, "cli.json"}, {flagConfig, "cli.config"}, {flagLogLevel, "cli.log_level"}, {flagLanguage, "cli.lang"},
 	} {
@@ -225,6 +287,7 @@ func buildRoot(opts Options, loadBundle func() (*messages.Bundle, error), args .
 	}
 	return root, call, selectionErr
 }
+
 func skipsConfig(cmd, root *cobra.Command) bool {
 	if cmd == root || cmd.Annotations[annotationSkipConfig] == annotationEnabled {
 		return true

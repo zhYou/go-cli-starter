@@ -34,10 +34,12 @@ func TestCleanupPreservesUnknownFileAddedDuringRevalidation(t *testing.T) {
 	require.NoError(t, err)
 	marker := filepath.Join(run.Path, "user.txt")
 	metadataPath := filepath.Join(run.Path, metadataName)
-	require.NoError(t, os.WriteFile(metadataPath, data, 0600))
+	require.NoError(t, os.WriteFile(metadataPath, data, 0o600))
 	fd, err := syscall.InotifyInit1(syscall.IN_NONBLOCK | syscall.IN_CLOEXEC)
 	require.NoError(t, err)
-	defer func() { _ = syscall.Close(fd) }()
+	defer func() {
+		_ = syscall.Close(fd)
+	}()
 	_, err = syscall.InotifyAddWatch(fd, metadataPath, syscall.IN_OPEN)
 	require.NoError(t, err)
 	inserted := make(chan error, 1)
@@ -58,7 +60,7 @@ func TestCleanupPreservesUnknownFileAddedDuringRevalidation(t *testing.T) {
 				if mask&syscall.IN_OPEN != 0 {
 					count++
 					if count == 2 {
-						inserted <- os.WriteFile(marker, []byte("保留用户内容"), 0600)
+						inserted <- os.WriteFile(marker, []byte("保留用户内容"), 0o600)
 						return
 					}
 				}

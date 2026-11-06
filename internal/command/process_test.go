@@ -96,6 +96,7 @@ func TestOwnedDescendantsStopOnEveryReturn(t *testing.T) {
 		}
 	}
 }
+
 func TestCleanupDoesNotKillSibling(t *testing.T) {
 	sibling, opts := helper(t, "heartbeat")
 	path := filepath.Join(opts.Dir, "sibling")
@@ -108,7 +109,11 @@ func TestCleanupDoesNotKillSibling(t *testing.T) {
 	if err := process.Start(); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { cancel(); _ = process.Process.Kill(); _ = process.Wait() })
+	t.Cleanup(func() {
+		cancel()
+		_ = process.Process.Kill()
+		_ = process.Wait()
+	})
 	waitMarker(t, path)
 	call, options := helper(t, "exit")
 	err := Run(t.Context(), call, options)

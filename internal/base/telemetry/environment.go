@@ -12,7 +12,9 @@ import (
 // 仅检查 SDK 无法跳过的构造路径；本地出口不读取远程导出环境变量。
 // 无法安全构造时只做本地化降级告警，不改写进程环境或全局 SDK handler。
 func validateSDKEnvironment() error {
-	invalid := func() error { return sdkenvironment.New() }
+	invalid := func() error {
+		return sdkenvironment.New()
+	}
 	for _, key := range []string{
 		"OTEL_BSP_SCHEDULE_DELAY", "OTEL_BSP_EXPORT_TIMEOUT", "OTEL_BSP_MAX_QUEUE_SIZE", "OTEL_BSP_MAX_EXPORT_BATCH_SIZE",
 		"OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT", "OTEL_ATTRIBUTE_COUNT_LIMIT", "OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT",

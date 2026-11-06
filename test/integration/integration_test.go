@@ -29,38 +29,42 @@ func TestProcessExitCodes(t *testing.T) {
 	cmd.Dir = root
 	data, err := cmd.CombinedOutput()
 	require.NoError(t, err, "%s", data)
-	testscript.Run(t, testscript.Params{Dir: "testdata/process", Setup: func(env *testscript.Env) error {
-		home := filepath.Join(env.WorkDir, "home")
-		if err := os.MkdirAll(home, 0700); err != nil {
-			return err
-		}
-		for _, key := range []string{"HOME", "USERPROFILE", "XDG_CONFIG_HOME", "APPDATA", "LOCALAPPDATA", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"} {
-			env.Setenv(key, home)
-		}
-		env.Setenv("GO_CLI_STARTER_HOME", home)
-		for _, key := range []string{"GO_CLI_STARTER_LOG_LEVEL", "GO_CLI_STARTER_LOGGING_LEVEL", "GO_CLI_STARTER_LOGGING_OUTPUT", "GO_CLI_STARTER_LANG", "GO_CLI_STARTER_TELEMETRY_EXPORTER"} {
-			env.Setenv(key, "")
-		}
-		return nil
-	}, Cmds: map[string]func(*testscript.TestScript, bool, []string){"cli": func(ts *testscript.TestScript, neg bool, args []string) {
-		if neg || len(args) == 0 {
-			ts.Fatalf("用法：cli <退出码> [参数...]")
-		}
-		want, err := strconv.Atoi(args[0])
-		ts.Check(err)
-		err = ts.Exec(binary, args[1:]...)
-		code := 0
-		if err != nil {
-			var exit *exec.ExitError
-			if !errors.As(err, &exit) {
-				ts.Fatalf("执行程序失败：%v", err)
+	testscript.Run(t, testscript.Params{
+		Dir: "testdata/process",
+		Setup: func(env *testscript.Env) error {
+			home := filepath.Join(env.WorkDir, "home")
+			if err := os.MkdirAll(home, 0o700); err != nil {
+				return err
 			}
-			code = exit.ExitCode()
-		}
-		if code != want {
-			ts.Fatalf("退出码=%d，期望=%d", code, want)
-		}
-	}}})
+			for _, key := range []string{"HOME", "USERPROFILE", "XDG_CONFIG_HOME", "APPDATA", "LOCALAPPDATA", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"} {
+				env.Setenv(key, home)
+			}
+			env.Setenv("GO_CLI_STARTER_HOME", home)
+			for _, key := range []string{"GO_CLI_STARTER_LOG_LEVEL", "GO_CLI_STARTER_LOGGING_LEVEL", "GO_CLI_STARTER_LOGGING_OUTPUT", "GO_CLI_STARTER_LANG", "GO_CLI_STARTER_TELEMETRY_EXPORTER"} {
+				env.Setenv(key, "")
+			}
+			return nil
+		},
+		Cmds: map[string]func(*testscript.TestScript, bool, []string){"cli": func(ts *testscript.TestScript, neg bool, args []string) {
+			if neg || len(args) == 0 {
+				ts.Fatalf("用法：cli <退出码> [参数...]")
+			}
+			want, err := strconv.Atoi(args[0])
+			ts.Check(err)
+			err = ts.Exec(binary, args[1:]...)
+			code := 0
+			if err != nil {
+				var exit *exec.ExitError
+				if !errors.As(err, &exit) {
+					ts.Fatalf("执行程序失败：%v", err)
+				}
+				code = exit.ExitCode()
+			}
+			if code != want {
+				ts.Fatalf("退出码=%d，期望=%d", code, want)
+			}
+		}},
+	})
 }
 
 // 用 Go overlay 重建真实内嵌目录，避免修改仓库或共享可变全局变量。
@@ -69,11 +73,11 @@ func TestCorruptCatalogEndToEnd(t *testing.T) {
 	require.NoError(t, err)
 	dir := t.TempDir()
 	broken := filepath.Join(dir, "broken.toml")
-	require.NoError(t, os.WriteFile(broken, []byte("[invalid\n"), 0600))
+	require.NoError(t, os.WriteFile(broken, []byte("[invalid\n"), 0o600))
 	overlay, err := json.Marshal(map[string]any{"Replace": map[string]string{filepath.Join(root, "internal", "locales", "active.en.toml"): broken}})
 	require.NoError(t, err)
 	overlayFile := filepath.Join(dir, "overlay.json")
-	require.NoError(t, os.WriteFile(overlayFile, overlay, 0600))
+	require.NoError(t, os.WriteFile(overlayFile, overlay, 0o600))
 
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()

@@ -29,7 +29,9 @@ type flagTextBinding struct {
 	text textMessage
 }
 
-func message(id string) textMessage { return textMessage{id: id} }
+func message(id string) textMessage {
+	return textMessage{id: id}
+}
 
 func (call *invocation) bindCommand(cmd *cobra.Command, texts commandTexts) {
 	call.commandTexts = append(call.commandTexts, commandTextBinding{command: cmd, name: cmd.Name(), texts: texts})
@@ -48,7 +50,9 @@ func (call *invocation) localizeTree(root *cobra.Command, language string) error
 		}
 		return localizer.Format(text.id, messages.FormatOptions{Params: text.params})
 	}
-	type renderedCommand struct{ short, long, use, example string }
+	type renderedCommand struct {
+		short, long, use, example string
+	}
 	commands := make([]renderedCommand, len(call.commandTexts))
 	for i, binding := range call.commandTexts {
 		fields := []struct {

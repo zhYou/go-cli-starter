@@ -11,7 +11,11 @@ import (
 
 func TestConfiguredLevelRetainsFailedCommandWithoutErrorCause(t *testing.T) {
 	var output bytes.Buffer
-	logger := New(RunInfo{Component: "go-cli-starter", Command: "greet"}, Options{Config: Config{Level: "error"}, Writer: &output, RunID: "fixture"}, nil)
+	logger := New(RunInfo{Component: "go-cli-starter", Command: "greet"}, Options{
+		Config: Config{Level: "error"},
+		Writer: &output,
+		RunID:  "fixture",
+	}, nil)
 	logger.Infow("filtered")
 	logger.Record(CommandResult{ExitCode: 1, Duration: time.Second})
 	require.NoError(t, logger.Sync())

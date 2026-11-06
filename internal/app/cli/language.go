@@ -21,9 +21,11 @@ func canonicalLanguage(value string) (string, bool) {
 		return "", false
 	}
 }
+
 func usageProblem(code string, params fault.Params) error {
 	return (fault.Definition{Code: fault.Code("cli." + code), Kind: fault.Usage}).New(fault.WithParams(params))
 }
+
 func languageEnvironment(opts Options) string {
 	lookup := opts.LookupEnv
 	if lookup == nil {
@@ -58,7 +60,9 @@ func selectLanguage(root *cobra.Command, args []string, env string) (string, err
 	// 与 Execute 使用相同的命令查找，子命令选项也可能位于命令名之前。
 	// Find 不执行选项 Set；查找错误留给实际执行路径处理。
 	current, scan, _ := root.Find(args)
-	findFlag := func(name string, short bool) *pflag.Flag { return commandFlag(current, name, short) }
+	findFlag := func(name string, short bool) *pflag.Flag {
+		return commandFlag(current, name, short)
+	}
 
 	for i := 0; i < len(scan); i++ {
 		arg := scan[i]
@@ -116,8 +120,14 @@ type languageValue struct {
 	completing  bool
 }
 
-func (v *languageValue) String() string { return v.call.localizer.Language() }
-func (v *languageValue) Type() string   { return "string" }
+func (v *languageValue) String() string {
+	return v.call.localizer.Language()
+}
+
+func (v *languageValue) Type() string {
+	return "string"
+}
+
 func (v *languageValue) Set(s string) error {
 	lang, ok := canonicalLanguage(s)
 	if !ok {
@@ -142,7 +152,9 @@ func completionRequest(root *cobra.Command, args []string) (int, bool) {
 	if target == nil {
 		target = root
 	}
-	lookup := func(name string, short bool) *pflag.Flag { return commandFlag(target, name, short) }
+	lookup := func(name string, short bool) *pflag.Flag {
+		return commandFlag(target, name, short)
+	}
 
 	for i := 0; i < len(args); i++ {
 		arg := args[i]

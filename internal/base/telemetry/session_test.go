@@ -18,7 +18,9 @@ func TestFileTracePreservesParentChildWithoutStdout(t *testing.T) {
 	var out bytes.Buffer
 	cfg := Defaults()
 	cfg.Exporter = File
-	session := Start(t.Context(), cfg, Info{Service: "go-cli-starter", RunID: "test"}, &out, func(err error) { t.Error(err) })
+	session := Start(t.Context(), cfg, Info{Service: "go-cli-starter", RunID: "test"}, &out, func(err error) {
+		t.Error(err)
+	})
 	ctx, root := session.Tracer.Start(t.Context(), "go-cli-starter.doctor")
 	_, child := session.Tracer.Start(ctx, "doctor.check")
 	child.End()
@@ -36,7 +38,9 @@ func TestFileTraceFlushesAfterCanceledBusinessContextAndFiltersResources(t *test
 	cfg := Defaults()
 	cfg.Exporter = File
 	ctx, cancel := context.WithCancel(t.Context())
-	s := Start(ctx, cfg, Info{Service: "go-cli-starter"}, &out, func(err error) { t.Error(err) })
+	s := Start(ctx, cfg, Info{Service: "go-cli-starter"}, &out, func(err error) {
+		t.Error(err)
+	})
 	_, span := s.Tracer.Start(ctx, "fixture")
 	span.End()
 	cancel()
@@ -50,7 +54,9 @@ func TestFileTraceFlushesAfterCanceledBusinessContextAndFiltersResources(t *test
 func TestDisabledTraceIgnoresSDKEnvironment(t *testing.T) {
 	t.Setenv("OTEL_TRACES_SAMPLER", "invalid-private-fixture")
 	var out bytes.Buffer
-	s := Start(t.Context(), Defaults(), Info{}, &out, func(err error) { t.Error(err) })
+	s := Start(t.Context(), Defaults(), Info{}, &out, func(err error) {
+		t.Error(err)
+	})
 	_, span := s.Tracer.Start(t.Context(), "disabled")
 	require.False(t, span.IsRecording())
 	require.False(t, trace.SpanContextFromContext(t.Context()).IsValid())
@@ -64,7 +70,9 @@ func TestFileExporterFailureWarnsOnce(t *testing.T) {
 	cfg.Exporter = File
 	cfg.BatchSize = 1
 	var warnings atomic.Int32
-	s := Start(t.Context(), cfg, Info{}, failingWriter{}, func(error) { warnings.Add(1) })
+	s := Start(t.Context(), cfg, Info{}, failingWriter{}, func(error) {
+		warnings.Add(1)
+	})
 	for range 4 {
 		_, span := s.Tracer.Start(t.Context(), "failed-export")
 		span.End()
@@ -75,18 +83,26 @@ func TestFileExporterFailureWarnsOnce(t *testing.T) {
 
 type failingWriter struct{}
 
-func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("fixture write failure") }
+func (failingWriter) Write([]byte) (int, error) {
+	return 0, errors.New("fixture write failure")
+}
 
 func TestFileShutdownWaitIsBounded(t *testing.T) {
 	writer := &blockingWriter{started: make(chan struct{}), release: make(chan struct{}), done: make(chan struct{})}
 	var release sync.Once
-	t.Cleanup(func() { release.Do(func() { close(writer.release) }) })
+	t.Cleanup(func() {
+		release.Do(func() {
+			close(writer.release)
+		})
+	})
 	cfg := Defaults()
 	cfg.Exporter = File
 	cfg.BatchSize = 1
 	cfg.ShutdownTimeout = 30 * time.Millisecond
 	var warnings atomic.Int32
-	s := Start(t.Context(), cfg, Info{}, writer, func(error) { warnings.Add(1) })
+	s := Start(t.Context(), cfg, Info{}, writer, func(error) {
+		warnings.Add(1)
+	})
 	_, span := s.Tracer.Start(t.Context(), "slow")
 	span.End()
 	select {
@@ -98,7 +114,9 @@ func TestFileShutdownWaitIsBounded(t *testing.T) {
 	require.ErrorIs(t, s.Close(t.Context()), context.DeadlineExceeded)
 	require.Less(t, time.Since(start), 300*time.Millisecond)
 	require.Equal(t, int32(1), warnings.Load())
-	release.Do(func() { close(writer.release) })
+	release.Do(func() {
+		close(writer.release)
+	})
 	select {
 	case <-writer.done:
 	case <-time.After(time.Second):
@@ -106,7 +124,9 @@ func TestFileShutdownWaitIsBounded(t *testing.T) {
 	}
 }
 
-type blockingWriter struct{ started, release, done chan struct{} }
+type blockingWriter struct {
+	started, release, done chan struct{}
+}
 
 func (w *blockingWriter) Write(data []byte) (int, error) {
 	close(w.started)
@@ -119,7 +139,11 @@ func TestGuardedExporterCancelsWhenSessionEnds(t *testing.T) {
 	life, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	target := &contextExporter{started: make(chan struct{}), canceled: make(chan struct{})}
-	guarded := guardedExporter{SpanExporter: target, life: life, warn: func(error) {}}
+	guarded := guardedExporter{
+		SpanExporter: target,
+		life:         life,
+		warn:         func(error) {},
+	}
 	done := make(chan struct{})
 	go func() {
 		_ = guarded.ExportSpans(t.Context(), nil)
@@ -143,7 +167,9 @@ func TestGuardedExporterCancelsWhenSessionEnds(t *testing.T) {
 	}
 }
 
-type contextExporter struct{ started, canceled chan struct{} }
+type contextExporter struct {
+	started, canceled chan struct{}
+}
 
 func (e *contextExporter) ExportSpans(ctx context.Context, _ []sdktrace.ReadOnlySpan) error {
 	close(e.started)
@@ -152,4 +178,6 @@ func (e *contextExporter) ExportSpans(ctx context.Context, _ []sdktrace.ReadOnly
 	return ctx.Err()
 }
 
-func (*contextExporter) Shutdown(context.Context) error { return nil }
+func (*contextExporter) Shutdown(context.Context) error {
+	return nil
+}

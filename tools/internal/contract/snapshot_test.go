@@ -11,7 +11,19 @@ func TestNormalizationPreservesBusinessFieldNames(t *testing.T) {
 	for _, name := range []string{"description", "examples", "use"} {
 		t.Run(name, func(t *testing.T) {
 			document := func(kind string) []byte {
-				value := map[string]any{"schema": map[string]any{"commands": []any{map[string]any{"path": "contract-cli greet", "description": "中文命令说明", "flags": []any{}, "commands": []any{}, "result_schema": map[string]any{"type": "object", "properties": map[string]any{name: map[string]any{"type": kind, "description": "字段说明"}}}}}}, "results": map[string]any{"greet": map[string]any{name: kind}}}
+				value := map[string]any{
+					"schema": map[string]any{"commands": []any{map[string]any{
+						"path":        "contract-cli greet",
+						"description": "中文命令说明",
+						"flags":       []any{},
+						"commands":    []any{},
+						"result_schema": map[string]any{
+							"type":       "object",
+							"properties": map[string]any{name: map[string]any{"type": kind, "description": "字段说明"}},
+						},
+					}}},
+					"results": map[string]any{"greet": map[string]any{name: kind}},
+				}
 				raw, err := json.Marshal(value)
 				require.NoError(t, err)
 				return raw
@@ -56,7 +68,15 @@ func TestExitCodeChangeRequiresBreakingVersion(t *testing.T) {
 	changes, err := Diff([]byte(`{"schema":{"exit_codes":{"runtime":1}}}`), []byte(`{"schema":{"exit_codes":{"runtime":3}}}`))
 	require.NoError(t, err)
 	require.Len(t, changes, 1)
-	record := Record{ID: "exit-code", Compatibility: "review-required", Summary: "修改运行退出码", Paths: []string{"/schema/exit_codes/runtime"}, PreviousVersion: "v1.0.0", TargetVersion: "v1.0.1", Migration: "更新调用者"}
+	record := Record{
+		ID:              "exit-code",
+		Compatibility:   "review-required",
+		Summary:         "修改运行退出码",
+		Paths:           []string{"/schema/exit_codes/runtime"},
+		PreviousVersion: "v1.0.0",
+		TargetVersion:   "v1.0.1",
+		Migration:       "更新调用者",
+	}
 	require.Error(t, ValidateRecords(changes, []Record{record}, false))
 	record.Compatibility = "breaking"
 	require.Error(t, ValidateRecords(changes, []Record{record}, false))

@@ -33,7 +33,7 @@ func TestWindowsConcurrentJobIsolation(t *testing.T) {
 	if !errors.Is(r.Err, context.Canceled) || r.Status != Canceled {
 		t.Fatalf("取消结果: %+v", r)
 	}
-	if err := os.WriteFile(gate, nil, 0600); err != nil {
+	if err := os.WriteFile(gate, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	survivor := awaitCapture(t, survivorDone)
@@ -141,7 +141,10 @@ func windowsHostJobScenario(marker string, quota bool) (result windowsHostJobRes
 	result.Stage = "run_backend"
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	call := Invocation{Program: executable, Args: []string{"-test.run=^TestWindowsHelper$", "--", "marker-exit", marker}}
+	call := Invocation{
+		Program: executable,
+		Args:    []string{"-test.run=^TestWindowsHelper$", "--", "marker-exit", marker},
+	}
 	options := Execution{Dir: filepath.Dir(marker), Env: os.Environ()}
 	if quota {
 		// helper 已占满唯一名额。新子进程必须在创建阶段失败，不能降级或逃离宿主。

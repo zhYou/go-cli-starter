@@ -27,6 +27,7 @@ func realCommand(ctx context.Context, name string, args ...string) ([]byte, erro
 	cmd.Env = append(os.Environ(), "GOWORK=off")
 	return cmd.CombinedOutput()
 }
+
 func osLock(path string) (func() error, error) {
 	lock := flock.New(path)
 	ok, err := lock.TryLock()
@@ -40,6 +41,7 @@ func osLock(path string) (func() error, error) {
 	}
 	return lock.Close, nil
 }
+
 func (i *Initializer) defaults() Initializer {
 	copy := *i
 	if copy.FS == nil {
@@ -53,12 +55,15 @@ func (i *Initializer) defaults() Initializer {
 	}
 	return copy
 }
+
 func (i *Initializer) validateModule(ctx context.Context, module string) error {
 	dir, err := os.MkdirTemp("", "cli-module-check-*")
 	if err != nil {
 		return err
 	}
-	defer func() { _ = os.RemoveAll(dir) }()
+	defer func() {
+		_ = os.RemoveAll(dir)
+	}()
 	output, err := i.RunCommand(ctx, "go", "-C", dir, "mod", "init", module)
 	if err != nil {
 		return fmt.Errorf("无效的 Go 模块路径：%w：%s", err, strings.TrimSpace(string(output)))
@@ -93,6 +98,7 @@ func (i *Initializer) safePath(root, relative string) (string, error) {
 	}
 	return filepath.Join(root, filepath.FromSlash(relative)), nil
 }
+
 func (i *Initializer) atomicWrite(item change) error {
 	file, err := afero.TempFile(i.FS, filepath.Dir(item.path), ".template-init-*")
 	if err != nil {
@@ -112,7 +118,9 @@ func (i *Initializer) atomicWriteAt(item change, temporary string) error {
 
 func (i *Initializer) finishAtomicWrite(file afero.File, item change) error {
 	tempName := file.Name()
-	defer func() { _ = i.FS.Remove(tempName) }()
+	defer func() {
+		_ = i.FS.Remove(tempName)
+	}()
 	if err := i.FS.Chmod(tempName, item.mode); err != nil {
 		_ = file.Close()
 		return err

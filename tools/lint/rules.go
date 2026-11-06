@@ -24,12 +24,15 @@ func checkRules(ctx context.Context) error {
 	}
 	return nil
 }
+
 func checkRuleFixture(ctx context.Context, kind string) error {
 	dir, err := os.MkdirTemp("", "starter-rules-")
 	if err != nil {
 		return err
 	}
-	defer func() { _ = os.RemoveAll(dir) }()
+	defer func() {
+		_ = os.RemoveAll(dir)
+	}()
 	for _, name := range []string{moduleFile, "go.sum", ".golangci.yml"} {
 		if err := fixture.CopyFile(name, filepath.Join(dir, name)); err != nil {
 			return err
@@ -49,7 +52,7 @@ func checkRuleFixture(ctx context.Context, kind string) error {
 			return err
 		}
 		dest := filepath.Join(dir, strings.TrimSuffix(rel, ".txt"))
-		if err := os.MkdirAll(filepath.Dir(dest), 0700); err != nil {
+		if err := os.MkdirAll(filepath.Dir(dest), 0o700); err != nil {
 			return err
 		}
 		//nolint:gosec // G304：路径来自受版本管理的 fixture 清单，相对路径仅写入本次临时目录。
@@ -63,12 +66,26 @@ func checkRuleFixture(ctx context.Context, kind string) error {
 			}
 		}
 		//nolint:gosec // G703：路径来自受版本管理的 fixture 清单，相对路径仅写入本次临时目录。
-		return os.WriteFile(dest, data, 0600)
+		return os.WriteFile(dest, data, 0o600)
 	})
 	if err != nil {
 		return err
 	}
-	result := cmdexec.Capture(ctx, cmdexec.Invocation{Program: lintProgram, Args: []string{runCommand, "--enable-only=depguard,forbidigo", "--allow-serial-runners", "--issues-exit-code=0", "--show-stats=false", "--max-issues-per-linter=0", "--max-same-issues=0", "--output.json.path=stdout", "--output.text.path=", allPackages}}, cmdexec.Execution{Dir: dir}, cmdexec.CaptureOptions{})
+	result := cmdexec.Capture(ctx, cmdexec.Invocation{
+		Program: lintProgram,
+		Args: []string{
+			runCommand,
+			"--enable-only=depguard,forbidigo",
+			"--allow-serial-runners",
+			"--issues-exit-code=0",
+			"--show-stats=false",
+			"--max-issues-per-linter=0",
+			"--max-same-issues=0",
+			"--output.json.path=stdout",
+			"--output.text.path=",
+			allPackages,
+		},
+	}, cmdexec.Execution{Dir: dir}, cmdexec.CaptureOptions{})
 	if result.Err != nil {
 		return fmt.Errorf("%s fixture 分析失败：%w\n%s", kind, result.Err, result.Stderr)
 	}

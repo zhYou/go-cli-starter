@@ -32,6 +32,6 @@ func TestExecutableAcceptanceVerifiesIdentityAndMetadata(t *testing.T) {
 	require.Error(t, Verify(executable, dir, "wrong-name", example, "0.2.0", "acceptance"))
 	require.Error(t, Verify(executable, dir, name, example, "wrong-version", "acceptance"))
 	require.Error(t, Verify(executable, dir, name, example, "0.2.0", "wrong-commit"))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "bad.toml"), []byte("unknown = true"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "bad.toml"), []byte("unknown = true"), 0o600))
 	require.Error(t, Verify(executable, dir, name, filepath.Join(dir, "bad.toml"), "0.2.0", "acceptance"))
 }

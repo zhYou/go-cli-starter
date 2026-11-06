@@ -52,6 +52,7 @@ func normalize(value any) any {
 	}
 	return root
 }
+
 func normalizeCommand(command map[string]any) any {
 	out := map[string]any{}
 	for key, value := range command {
@@ -78,6 +79,7 @@ func normalizeCommand(command map[string]any) any {
 	}
 	return out
 }
+
 func normalizeNamed(value any, key string, visit func(map[string]any) any) any {
 	switch items := value.(type) {
 	case []any:
@@ -113,6 +115,7 @@ func normalizeNamed(value any, key string, visit func(map[string]any) any) any {
 	}
 	return value
 }
+
 func normalizeSchema(value any) any {
 	schema, ok := value.(map[string]any)
 	if !ok {

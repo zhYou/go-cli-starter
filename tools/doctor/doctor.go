@@ -32,10 +32,13 @@ type doctorProbe struct {
 
 func runDoctorProbes(ctx context.Context, calls []cmdexec.Invocation) []cmdexec.Result {
 	results, _ := cmdexec.RunBatch(ctx, calls, cmdexec.Execution{}, cmdexec.BatchOptions{
-		Concurrency: doctorConcurrency, ItemTimeout: doctorTimeout, Capture: cmdexec.CaptureOptions{Limit: doctorCaptureLimit},
+		Concurrency: doctorConcurrency,
+		ItemTimeout: doctorTimeout,
+		Capture:     cmdexec.CaptureOptions{Limit: doctorCaptureLimit},
 	})
 	return results
 }
+
 func doctorProbeError(name string, result cmdexec.Result) error {
 	var problems []error
 	if result.StdoutTruncated || result.StderrTruncated {
@@ -51,6 +54,7 @@ func doctorProbeError(name string, result cmdexec.Result) error {
 	}
 	return errors.Join(problems...)
 }
+
 func reportDoctorProbes(out io.Writer, probes []doctorProbe, results []cmdexec.Result) error {
 	var problems []error
 	for i, probe := range probes {
@@ -88,6 +92,7 @@ func reportDoctorProbes(out io.Writer, probes []doctorProbe, results []cmdexec.R
 	}
 	return errors.Join(problems...)
 }
+
 func doctor() error {
 	versions, err := toolchain.Load(".")
 	if err != nil {
@@ -97,7 +102,10 @@ func doctor() error {
 	if err != nil {
 		return err
 	}
-	probes := []doctorProbe{{key: miseProgram, want: versions.MiseMinimum, spec: miseSpec}, {spec: toolchain.ToolSpec{Name: gitProgram, Args: []string{versionFlag}}}}
+	probes := []doctorProbe{{key: miseProgram, want: versions.MiseMinimum, spec: miseSpec}, {spec: toolchain.ToolSpec{
+		Name: gitProgram,
+		Args: []string{versionFlag},
+	}}}
 	for _, key := range toolchain.SortedTools(versions) {
 		spec, err := toolchain.Spec(key)
 		if err != nil {
@@ -122,7 +130,13 @@ func doctor() error {
 		probes = append(probes, probe)
 	}
 	for _, name := range []string{"gh", "codex", "rtk"} {
-		probes = append(probes, doctorProbe{spec: toolchain.ToolSpec{Name: name, Args: []string{versionFlag}}, optional: true})
+		probes = append(probes, doctorProbe{
+			spec: toolchain.ToolSpec{
+				Name: name,
+				Args: []string{versionFlag},
+			},
+			optional: true,
+		})
 	}
 	calls := make([]cmdexec.Invocation, len(probes))
 	for i, probe := range probes {

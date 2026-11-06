@@ -34,7 +34,7 @@ func TestReleaseSnapshotRejectsMissingOrMismatchedSBOM(t *testing.T) {
 				require.NoError(t, os.Remove(filepath.Join(dir, sbom)))
 			case "hash":
 				//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
-				require.NoError(t, os.WriteFile(filepath.Join(dir, sbom), []byte("{}"), 0600))
+				require.NoError(t, os.WriteFile(filepath.Join(dir, sbom), []byte("{}"), 0o600))
 			case "duplicate":
 				data = append(data, []byte(lines[0]+"\n")...)
 			case "escape":
@@ -42,7 +42,7 @@ func TestReleaseSnapshotRejectsMissingOrMismatchedSBOM(t *testing.T) {
 			case "wrong-document":
 				raw, _ := json.Marshal(map[string]any{"spdxVersion": "SPDX-2.3", "name": "wrong"})
 				//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
-				require.NoError(t, os.WriteFile(filepath.Join(dir, sbom), raw, 0600))
+				require.NoError(t, os.WriteFile(filepath.Join(dir, sbom), raw, 0o600))
 				sum := sha256.Sum256(raw)
 				for i, line := range lines {
 					if strings.HasSuffix(line, "  "+sbom) {
@@ -56,7 +56,7 @@ func TestReleaseSnapshotRejectsMissingOrMismatchedSBOM(t *testing.T) {
 				raw, err := os.ReadFile(filepath.Join(dir, sbom))
 				require.NoError(t, err)
 				//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
-				require.NoError(t, os.WriteFile(outside, raw, 0600))
+				require.NoError(t, os.WriteFile(outside, raw, 0o600))
 				//nolint:gosec // G703：测试路径和权限只来自当前临时 fixture，不读取用户文件。
 				require.NoError(t, os.Remove(filepath.Join(dir, sbom)))
 				if err := os.Symlink(outside, filepath.Join(dir, sbom)); err != nil {
@@ -64,7 +64,7 @@ func TestReleaseSnapshotRejectsMissingOrMismatchedSBOM(t *testing.T) {
 				}
 			}
 			//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
-			require.NoError(t, os.WriteFile(sumPath, data, 0600))
+			require.NoError(t, os.WriteFile(sumPath, data, 0o600))
 			err = checkReleaseSnapshot(dir)
 			if mode == "valid" {
 				require.NoError(t, err)

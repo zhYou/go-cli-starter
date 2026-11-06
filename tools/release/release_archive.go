@@ -35,7 +35,9 @@ func validateArchive(path, binary string) error {
 		if err != nil {
 			return fmt.Errorf("读取 zip 归档失败：%w", err)
 		}
-		defer func() { _ = archive.Close() }()
+		defer func() {
+			_ = archive.Close()
+		}()
 		for _, file := range archive.File {
 			if err := accept(file.Name, file.Mode().IsRegular(), file.UncompressedSize64 > 0); err != nil {
 				return err
@@ -57,12 +59,16 @@ func validateArchive(path, binary string) error {
 		if err != nil {
 			return err
 		}
-		defer func() { _ = file.Close() }()
+		defer func() {
+			_ = file.Close()
+		}()
 		compressed, err := gzip.NewReader(file)
 		if err != nil {
 			return fmt.Errorf("读取 gzip 归档失败：%w", err)
 		}
-		defer func() { _ = compressed.Close() }()
+		defer func() {
+			_ = compressed.Close()
+		}()
 		archive := tar.NewReader(compressed)
 		for {
 			header, err := archive.Next()

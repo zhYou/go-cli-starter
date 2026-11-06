@@ -63,7 +63,7 @@ func TestHelperProcess(t *testing.T) {
 	case "gate-fail":
 		signal.Ignore(syscall.SIGTERM)
 		//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
-		_ = os.WriteFile(args[1], []byte("ready"), 0600)
+		_ = os.WriteFile(args[1], []byte("ready"), 0o600)
 		until := time.Now().Add(5 * time.Second)
 		for time.Now().Before(until) {
 			//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
@@ -78,11 +78,11 @@ func TestHelperProcess(t *testing.T) {
 		signal.Notify(received, syscall.SIGTERM)
 		defer signal.Stop(received)
 		//nolint:gosec // G703：测试路径和权限只来自当前临时 fixture，不读取用户文件。
-		_ = os.WriteFile(args[1], []byte("ready"), 0600)
+		_ = os.WriteFile(args[1], []byte("ready"), 0o600)
 		select {
 		case <-received:
 			//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
-			_ = os.WriteFile(args[2], []byte("term"), 0600)
+			_ = os.WriteFile(args[2], []byte("term"), 0o600)
 		case <-time.After(5 * time.Second):
 			os.Exit(8)
 		}
@@ -90,7 +90,7 @@ func TestHelperProcess(t *testing.T) {
 	case "interval":
 		start := time.Now().UnixNano()
 		//nolint:gosec // G703：同步路径只由当前测试的临时目录生成。
-		if err := os.WriteFile(args[1], []byte("ready"), 0600); err != nil {
+		if err := os.WriteFile(args[1], []byte("ready"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 		waitMarker(t, args[2])
@@ -99,7 +99,7 @@ func TestHelperProcess(t *testing.T) {
 
 	case "ready-sleep":
 		//nolint:gosec // G703：同步路径只由当前测试的临时目录生成。
-		if err := os.WriteFile(args[1], []byte("ready"), 0600); err != nil {
+		if err := os.WriteFile(args[1], []byte("ready"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 		delay, err := time.ParseDuration(args[2])
@@ -110,7 +110,7 @@ func TestHelperProcess(t *testing.T) {
 		_, _ = os.Stdout.WriteString(args[3])
 	case "gate-output":
 		//nolint:gosec // G703：同步路径只由当前测试的临时目录生成。
-		if err := os.WriteFile(args[1], []byte("ready"), 0600); err != nil {
+		if err := os.WriteFile(args[1], []byte("ready"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 		waitMarker(t, args[2])
@@ -121,11 +121,13 @@ func TestHelperProcess(t *testing.T) {
 		_, _ = os.Stdout.WriteString(args[2])
 	case "heartbeat":
 		signal.Ignore(syscall.SIGTERM)
-		timer := time.AfterFunc(10*time.Second, func() { os.Exit(10) })
+		timer := time.AfterFunc(10*time.Second, func() {
+			os.Exit(10)
+		})
 		defer timer.Stop()
 		for {
 			//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
-			_ = os.WriteFile(args[1], []byte(strconv.FormatInt(time.Now().UnixNano(), 10)), 0600)
+			_ = os.WriteFile(args[1], []byte(strconv.FormatInt(time.Now().UnixNano(), 10)), 0o600)
 			time.Sleep(10 * time.Millisecond)
 		}
 	case "branch":
@@ -168,7 +170,10 @@ func helper(t *testing.T, args ...string) (Invocation, Execution) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return Invocation{Program: executable, Operation: "test.helper", Args: append([]string{"-test.run=^TestHelperProcess$", "--"}, args...)}, Execution{Dir: root, Env: []string{"COMMAND_HELPER=1", "GORACE=atexit_sleep_ms=0", "GO_CLI_STARTER_HOME=" + root, "HOME=" + root, "USERPROFILE=" + root, "SYSTEMROOT=" + os.Getenv("SYSTEMROOT")}}
+	return Invocation{Program: executable, Operation: "test.helper", Args: append([]string{"-test.run=^TestHelperProcess$", "--"}, args...)}, Execution{
+		Dir: root,
+		Env: []string{"COMMAND_HELPER=1", "GORACE=atexit_sleep_ms=0", "GO_CLI_STARTER_HOME=" + root, "HOME=" + root, "USERPROFILE=" + root, "SYSTEMROOT=" + os.Getenv("SYSTEMROOT")},
+	}
 }
 
 // startCapture 让主测试控制就绪与取消，清理始终等待执行器归还资源。
@@ -177,7 +182,10 @@ func startCapture(t *testing.T, ctx context.Context, call Invocation, options Ex
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	done := make(chan Result, 1)
 	finished := make(chan struct{})
-	go func() { defer close(finished); done <- Capture(ctx, call, options, CaptureOptions{}) }()
+	go func() {
+		defer close(finished)
+		done <- Capture(ctx, call, options, CaptureOptions{})
+	}()
 	t.Cleanup(func() {
 		cancel()
 		select {

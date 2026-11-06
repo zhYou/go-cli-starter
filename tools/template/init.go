@@ -16,7 +16,9 @@ func initialize(args []string, root string, out, errOut io.Writer) int {
 	name := flags.String("name", "", "可执行文件名称，例如 mycli；不能使用 v2、v10 等 Go 版本段")
 	usage := func() {
 		_, _ = fmt.Fprintln(out, "用法：mise run template:init --module 模块路径 --name 名称")
-		flags.VisitAll(func(f *flag.Flag) { _, _ = fmt.Fprintf(out, "  --%s <string>\t%s\n", f.Name, f.Usage) })
+		flags.VisitAll(func(f *flag.Flag) {
+			_, _ = fmt.Fprintf(out, "  --%s <string>\t%s\n", f.Name, f.Usage)
+		})
 	}
 	flags.Usage = func() {}
 	if err := flags.Parse(args); err != nil {

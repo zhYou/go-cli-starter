@@ -95,7 +95,9 @@ func TestWindowsHandleWhitelistAndCleanup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = windows.CloseHandle(event) }()
+	defer func() {
+		_ = windows.CloseHandle(event)
+	}()
 	call, options := windowsHelper(t, "handle", strconv.FormatUint(uint64(event), 10))
 	if err = Run(t.Context(), call, options); err != nil {
 		t.Fatalf("泄漏了无关可继承句柄: %v", err)

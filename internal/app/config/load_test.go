@@ -28,8 +28,14 @@ func TestConfigurationPrecedence(t *testing.T) {
 			if tc.flag != "" {
 				override = &tc.flag
 			}
-			cfg, err := Load(Options{AppName: "my-cli", Path: tc.path, UserConfigDir: dir, LogLevel: override,
-				LookupEnv: func(key string) (string, bool) { return tc.env, key == "MY_CLI_LOG_LEVEL" && tc.env != "" },
+			cfg, err := Load(Options{
+				AppName:       "my-cli",
+				Path:          tc.path,
+				UserConfigDir: dir,
+				LogLevel:      override,
+				LookupEnv: func(key string) (string, bool) {
+					return tc.env, key == "MY_CLI_LOG_LEVEL" && tc.env != ""
+				},
 			})
 			if err != nil || cfg.Logging.Level != tc.want {
 				t.Fatalf("cfg=%+v err=%v", cfg, err)
@@ -61,7 +67,13 @@ func TestLoadsDefaultUserConfiguration(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "mycli", "config.toml"), []byte("[logging]\nlevel = \"debug\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	cfg, err := Load(Options{AppName: "mycli", UserConfigDir: dir, LookupEnv: func(string) (string, bool) { return "", false }})
+	cfg, err := Load(Options{
+		AppName:       "mycli",
+		UserConfigDir: dir,
+		LookupEnv: func(string) (string, bool) {
+			return "", false
+		},
+	})
 	if err != nil || cfg.Logging.Level != "debug" {
 		t.Fatalf("cfg=%+v err=%v", cfg, err)
 	}
@@ -71,7 +83,14 @@ func TestExplicitDefaultOverridesEnvironment(t *testing.T) {
 	dir := t.TempDir()
 	warn := "warn"
 	for _, override := range []*string{nil, &warn} {
-		cfg, err := Load(Options{AppName: "my-cli", UserConfigDir: dir, LogLevel: override, LookupEnv: func(k string) (string, bool) { return "debug", k == "MY_CLI_LOG_LEVEL" }})
+		cfg, err := Load(Options{
+			AppName:       "my-cli",
+			UserConfigDir: dir,
+			LogLevel:      override,
+			LookupEnv: func(k string) (string, bool) {
+				return "debug", k == "MY_CLI_LOG_LEVEL"
+			},
+		})
 		require.NoError(t, err)
 		want := "debug"
 		if override != nil {
@@ -86,10 +105,13 @@ func TestStrictTOML(t *testing.T) {
 		text  string
 		valid bool
 	}{
-		{"", true}, {"[logging]\nlevel = \"info\"", true},
+		{"", true},
+		{"[logging]\nlevel = \"info\"", true},
 		{"[logging]\nlevel = \"warn\"\nlevel = \"error\"", false},
-		{"[logging]\nunknown = 1", false}, {"unknown = 1", false},
-		{"[logging]\nlevel = 123", false}, {"[logging]\nlevel = [\"info\"]", false},
+		{"[logging]\nunknown = 1", false},
+		{"unknown = 1", false},
+		{"[logging]\nlevel = 123", false},
+		{"[logging]\nlevel = [\"info\"]", false},
 		{"[logging]\noutput = \"stdout\"", false},
 		{"[diagnostics]\nmax_size_mib = 0", false},
 		{"[diagnostics]\nmax_backups = 1.2", false},
@@ -102,8 +124,15 @@ func TestStrictTOML(t *testing.T) {
 	} {
 		t.Run(tc.text, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "config.toml")
-			require.NoError(t, os.WriteFile(path, []byte(tc.text), 0600))
-			_, err := Load(Options{AppName: "testcli", Path: path, UserConfigDir: t.TempDir(), LookupEnv: func(string) (string, bool) { return "", false }})
+			require.NoError(t, os.WriteFile(path, []byte(tc.text), 0o600))
+			_, err := Load(Options{
+				AppName:       "testcli",
+				Path:          path,
+				UserConfigDir: t.TempDir(),
+				LookupEnv: func(string) (string, bool) {
+					return "", false
+				},
+			})
 			if tc.valid {
 				require.NoError(t, err)
 			} else {
@@ -116,7 +145,14 @@ func TestStrictTOML(t *testing.T) {
 func TestModuleDefaultsAndEnvironmentTypes(t *testing.T) {
 	env := map[string]string{"TOOL_LOGGING_OUTPUT": "none", "TOOL_LOGGING_LEVEL": "warn", "TOOL_LOG_LEVEL": "error", "TOOL_DIAGNOSTICS_MAX_BACKUPS": "8", "TOOL_TELEMETRY_EXPORT_TIMEOUT": "250ms"}
 	load := func() (Config, error) {
-		return Load(Options{AppName: "tool", UserConfigDir: t.TempDir(), LookupEnv: func(k string) (string, bool) { v, ok := env[k]; return v, ok }})
+		return Load(Options{
+			AppName:       "tool",
+			UserConfigDir: t.TempDir(),
+			LookupEnv: func(k string) (string, bool) {
+				v, ok := env[k]
+				return v, ok
+			},
+		})
 	}
 	cfg, err := load()
 	require.NoError(t, err)
@@ -141,9 +177,16 @@ func TestModuleDefaultsAndEnvironmentTypes(t *testing.T) {
 
 func TestAppHomeOverridesDefaultAndRejectsRelativeEvenWithExplicitFile(t *testing.T) {
 	home := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(home, "config.toml"), []byte("[logging]\nlevel = \"debug\"\n"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(home, "config.toml"), []byte("[logging]\nlevel = \"debug\"\n"), 0o600))
 	load := func(file string) (Config, error) {
-		return Load(Options{AppName: "tool", Path: file, UserConfigDir: t.TempDir(), LookupEnv: func(k string) (string, bool) { return home, k == "TOOL_HOME" }})
+		return Load(Options{
+			AppName:       "tool",
+			Path:          file,
+			UserConfigDir: t.TempDir(),
+			LookupEnv: func(k string) (string, bool) {
+				return home, k == "TOOL_HOME"
+			},
+		})
 	}
 	cfg, err := load("")
 	require.NoError(t, err)
@@ -175,9 +218,14 @@ value = "debug"`, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			file := filepath.Join(t.TempDir(), "config.toml")
-			require.NoError(t, os.WriteFile(file, []byte(tc.text), 0600))
+			require.NoError(t, os.WriteFile(file, []byte(tc.text), 0o600))
 			for i := 0; i < 32; i++ {
-				cfg, err := Load(Options{Path: file, LookupEnv: func(string) (string, bool) { return "", false }})
+				cfg, err := Load(Options{
+					Path: file,
+					LookupEnv: func(string) (string, bool) {
+						return "", false
+					},
+				})
 				if tc.valid {
 					require.NoError(t, err)
 					require.Equal(t, "debug", cfg.Logging.Level)

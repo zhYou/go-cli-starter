@@ -6,7 +6,9 @@ import "context"
 type Options struct{}
 
 // Validate 检查调用者是否已取消；空入口没有需要校验的参数。
-func (Options) Validate(ctx context.Context) error { return ctx.Err() }
+func (Options) Validate(ctx context.Context) error {
+	return ctx.Err()
+}
 
 // 稳定状态用于机器判断，用户可见说明放在 Detail 中。
 const (
@@ -33,5 +35,8 @@ func Run(ctx context.Context, opts Options) (Result, error) {
 	if err := opts.Validate(ctx); err != nil {
 		return Result{}, err
 	}
-	return Result{RequiredAvailable: true, Checks: []Check{}}, nil
+	return Result{
+		RequiredAvailable: true,
+		Checks:            []Check{},
+	}, nil
 }

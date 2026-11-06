@@ -30,7 +30,11 @@ func checkMCP() error {
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	defer func() { _ = in.Close(); _ = cmd.Process.Kill(); _ = cmd.Wait() }()
+	defer func() {
+		_ = in.Close()
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+	}()
 	encoder, decoder := json.NewEncoder(in), json.NewDecoder(out)
 	call := func(id int, method string, params any) (json.RawMessage, error) {
 		if err := encoder.Encode(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": params}); err != nil {
@@ -55,8 +59,9 @@ func checkMCP() error {
 		}
 	}
 	if _, err := call(1, "initialize", map[string]any{
-		"protocolVersion": "2025-03-26", "capabilities": map[string]any{},
-		"clientInfo": map[string]string{"name": "template-check", mcpVersionField: "1"},
+		"protocolVersion": "2025-03-26",
+		"capabilities":    map[string]any{},
+		"clientInfo":      map[string]string{"name": "template-check", mcpVersionField: "1"},
 	}); err != nil {
 		return err
 	}
@@ -92,7 +97,10 @@ func checkMCP() error {
 	if err != nil {
 		return err
 	}
-	result, err = call(3, "tools/call", map[string]any{"name": "go_diagnostics", "arguments": map[string]any{"files": []string{path}}})
+	result, err = call(3, "tools/call", map[string]any{
+		"name":      "go_diagnostics",
+		"arguments": map[string]any{"files": []string{path}},
+	})
 	if err != nil {
 		return err
 	}

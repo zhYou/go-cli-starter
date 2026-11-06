@@ -12,6 +12,7 @@ func main() {
 		os.Exit(1)
 	}
 }
+
 func run(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("用法：contract <check [--against Git引用]|update>")
