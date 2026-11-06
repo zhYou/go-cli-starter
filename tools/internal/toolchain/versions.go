@@ -8,7 +8,6 @@ import (
 	"regexp"
 	"slices"
 	"sort"
-	"strings"
 
 	"github.com/pelletier/go-toml/v2"
 	"golang.org/x/mod/semver"
@@ -18,6 +17,7 @@ import (
 type VersionSet struct {
 	MiseMinimum string
 	Tools       map[string]string
+	Variables   map[string]string
 }
 
 // Load 读取并校验 mise 中的准确工具版本。
@@ -30,20 +30,48 @@ func Load(root string) (VersionSet, error) {
 	var cfg struct {
 		Minimum string            `toml:"min_version"`
 		Tools   map[string]string `toml:"tools"`
+		Vars    map[string]string `toml:"vars"`
 	}
 	if err := toml.Unmarshal(data, &cfg); err != nil {
 		return VersionSet{}, err
 	}
-	v := VersionSet{MiseMinimum: cfg.Minimum, Tools: cfg.Tools}
-	if !regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`).MatchString(v.MiseMinimum) {
+	v := VersionSet{MiseMinimum: cfg.Minimum, Tools: cfg.Tools, Variables: cfg.Vars}
+	if !regexp.MustCompile(exactVersionPattern).MatchString(v.MiseMinimum) {
 		return v, fmt.Errorf("mise 最低版本必须精确固定")
 	}
 	for key, version := range v.Tools {
-		if !regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`).MatchString(version) {
+		if !regexp.MustCompile(exactVersionPattern).MatchString(version) {
 			return v, fmt.Errorf("工具 %s 必须固定稳定的精确版本", key)
 		}
 	}
+	for key, version := range v.Variables {
+		if !regexp.MustCompile(exactVersionPattern).MatchString(version) {
+			return v, fmt.Errorf("工具变量 %s 必须固定稳定的精确版本", key)
+		}
+		if _, err := VariableLabel(key); err != nil {
+			return v, err
+		}
+	}
 	return v, nil
+}
+
+// VariableLabel 返回按需执行的工具或独立运行时在文档版本表中的名称。
+func VariableLabel(key string) (string, error) {
+	labels := map[string]string{
+		"prettier_version":         "Prettier",
+		"xml_plugin_version":       "@prettier/plugin-xml",
+		"toml_plugin_version":      "prettier-plugin-toml",
+		"markdownlint_version":     "markdownlint-cli2",
+		"yamllint_version":         "yamllint",
+		"pre_commit_hooks_version": "pre-commit-hooks",
+		"serena_version":           "Serena",
+		"serena_python_version":    "Serena Python",
+	}
+	label, ok := labels[key]
+	if !ok {
+		return "", fmt.Errorf("未知的工具版本变量 %s", key)
+	}
+	return label, nil
 }
 
 // ToolSpec 描述真实工具的版本探测命令与输出格式。
@@ -112,23 +140,13 @@ func Spec(key string) (ToolSpec, error) {
 		}, nil
 	case "uv":
 		return ToolSpec{"uv", "uv", `(?m)^uv ([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`, []string{versionFlag}}, nil
-	case "npm:prettier":
+	case "taplo":
 		return ToolSpec{
-			"prettier",
-			"Prettier",
-			plainVersionPattern,
+			"taplo",
+			"Taplo",
+			`(?m)^taplo ([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`,
 			[]string{versionFlag},
 		}, nil
-	case "pypi:yamllint":
-		return ToolSpec{
-			"yamllint",
-			"yamllint",
-			`(?m)^yamllint ([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`,
-			[]string{versionFlag},
-		}, nil
-	case "npm:@prettier/plugin-xml", "npm:prettier-plugin-toml", "npm:markdownlint-cli2", "pypi:pre-commit-hooks":
-		_, display, _ := strings.Cut(key, ":")
-		return ToolSpec{miseProgram, display, "", []string{"where", key}}, nil
 	case "syft":
 		return ToolSpec{
 			"syft",
@@ -146,10 +164,6 @@ func Match(key, output, want string) error {
 	spec, err := Spec(key)
 	if err != nil {
 		return err
-	}
-	if spec.Name == miseProgram && key != miseProgram {
-		prefix, _, _ := strings.Cut(strings.TrimSpace(output), "\n")
-		return matchInstalledPackage(key, strings.TrimSpace(prefix), want)
 	}
 	match := regexp.MustCompile(spec.Pattern).FindStringSubmatch(output)
 	if key == miseProgram {

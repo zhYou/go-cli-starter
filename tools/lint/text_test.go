@@ -4,7 +4,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -122,19 +121,36 @@ func TestTextTasksCoverFiveFormatsAndExclusions(t *testing.T) {
 	require.NoError(t, err, output)
 }
 
-func TestTextTasksDoNotInstallMissingTools(t *testing.T) {
+func TestTextTasksPrepareToolsOutsideProject(t *testing.T) {
 	root := textFixture(t)
-	file := filepath.Join(root, "mise.toml")
-	data := readTextFixture(t, file)
-	replaced := strings.Replace(string(data), `"npm:prettier" = "3.9.10"`, `"npm:prettier" = "999.999.999"`, 1)
-	require.NotEqual(t, string(data), replaced)
-	require.NoError(t, os.WriteFile(file, []byte(replaced), 0o600))
+	cache := t.TempDir()
+	t.Setenv("npm_config_cache", filepath.Join(cache, "npm"))
+	t.Setenv("UV_CACHE_DIR", filepath.Join(cache, "uv"))
+	writeTextFixture(t, root, "目录 with spaces/sample.xml", "<root value = \"x\">text <b>bold</b> tail</root>\n")
+	writeTextFixture(t, root, "sample.toml", "value=1\n")
+	output, err := textTask(t, root, "fmt:text")
+	require.NoError(t, err, output)
+	output, err = textTask(t, root, "lint:text")
+	require.NoError(t, err, output)
+	// 热缓存复用不需要联网；检查仍应执行，不能因缓存命中跳过。
+	t.Setenv("npm_config_offline", "true")
+	t.Setenv("UV_OFFLINE", "true")
+	output, err = textTask(t, root, "lint:text")
+	require.NoError(t, err, output)
+	for _, name := range []string{"node_modules", ".venv", "package.json", "package-lock.json"} {
+		_, err := os.Stat(filepath.Join(root, name))
+		require.ErrorIs(t, err, os.ErrNotExist)
+	}
+}
+
+func TestTextTaskDownloadFailureKeepsFiles(t *testing.T) {
+	root := textFixture(t)
+	file := writeTextFixture(t, root, "unchanged.toml", "value=1\n")
+	t.Setenv("npm_config_cache", t.TempDir())
+	t.Setenv("npm_config_offline", "true")
 	output, err := textTask(t, root, "lint:text")
 	require.Error(t, err, output)
-	require.Contains(t, output, "999.999.999")
-	require.NotContains(t, output, "Installing")
-	after := readTextFixture(t, file)
-	require.Equal(t, replaced, string(after))
+	require.Equal(t, "value=1\n", string(readTextFixture(t, file)))
 }
 
 func readTextFixture(t *testing.T, path string) []byte {

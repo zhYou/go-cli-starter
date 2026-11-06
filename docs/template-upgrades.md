@@ -93,3 +93,14 @@
 同步自定义 CI 的工具测试路径、受管清单和包文档；共享能力只放在 `tools/internal`。
 只读格式和版本检查纳入 lint，规则自测、契约、构建与模板验收纳入 check；MCP、发布和安全检查独立。
 最终按[验证矩阵](development.md#实现与检查)执行对应检查；涉及发布验收时在最终提交后生成 snapshot，再 release:verify。
+
+## Serena 与按需文本工具
+
+将 Codex 项目 MCP 从 gopls 改为统一 mcp:serve 的 Serena，保留固定 gopls 供 Go 后端及 CLI 使用。
+合并六语言 `.serena/project.yml`，将项目名纳入初始化受管文件；按绝对 checkout 路径激活，避免 worktree 同名项目混淆。
+Serena 使用 uvx 和独立兼容 Python，关闭 dashboard；后台依赖与真实验收见[开发说明](development.md#serena-查询与-go-cli-补充)。
+
+从 mise 工具清单移除 npm/PyPI 文本包，将准确版本移到 `[vars]`；同步 npx/uvx task、Prettier 插件解析、doctor 和版本检查。
+删除旧包安装布局探测及其测试，保留有效格式、语法、排除规则与只读回归。既有用户级安装无需卸载，不修改个人工具配置。
+setup 继续显式准备 mise 工具与 Go 模块；npx/uvx 可在外部缓存按需下载，不再要求预热或禁止安装。
+不在项目中生成 node_modules、.venv、package.json 或 npm 锁文件，检查不改写源码和配置。

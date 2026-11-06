@@ -267,7 +267,7 @@ CommandContext 默认取消单个进程，并不承诺清理整棵树；errgroup
 
 测试观察真实结果：临时 Git 仓库、真实子进程、文件锁竞争、可控故障和取消。
 配置存在、进程启动或 mock 成功不足以证明安装、清理或资源回收成功。
-gopls 与 MCP 回退、应用 HOME 隔离和验证选择统一见[开发说明](development.md#实现与检查)；
+Serena 与 Go CLI 补充、应用 HOME 隔离和验证选择统一见[开发说明](development.md#实现与检查)；
 平台、发布及托管证据见[维护清单](maintenance.md#ci-与验收证据)。
 
 ## 扩展 doctor

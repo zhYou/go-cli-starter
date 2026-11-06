@@ -1,23 +1,8 @@
-const { execFileSync } = require("node:child_process");
-const { existsSync } = require("node:fs");
+const { realpathSync } = require("node:fs");
 const { createRequire } = require("node:module");
-const { join } = require("node:path");
 
-// mise 分别安装 npm 包；按实际安装目录解析插件，不依赖全局模块或个人路径。
-function plugin(name) {
-  const prefix = execFileSync("mise", ["where", `npm:${name}`], {
-    cwd: __dirname,
-    encoding: "utf8",
-    timeout: 3000,
-    stdio: ["ignore", "pipe", "pipe"],
-  }).trim();
-  for (const base of [prefix, join(prefix, "lib")]) {
-    if (existsSync(join(base, "node_modules", name, "package.json"))) {
-      return createRequire(join(base, "package.json")).resolve(name);
-    }
-  }
-  throw new Error(`找不到 mise 已安装的插件 ${name}，请运行 mise run setup`);
-}
+// npx 将 Prettier 与插件放在同一外部缓存环境；从真实 CLI 入口解析，兼容 Windows 包装脚本。
+const prettierRequire = createRequire(realpathSync(process.argv[1]));
 
 module.exports = {
   printWidth: 120,
@@ -27,5 +12,5 @@ module.exports = {
   proseWrap: "preserve",
   embeddedLanguageFormatting: "off",
   xmlWhitespaceSensitivity: "strict",
-  plugins: [plugin("@prettier/plugin-xml"), plugin("prettier-plugin-toml")],
+  plugins: [prettierRequire.resolve("@prettier/plugin-xml"), prettierRequire.resolve("prettier-plugin-toml")],
 };
