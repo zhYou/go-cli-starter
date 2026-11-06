@@ -20,18 +20,30 @@ syft = "1.55.0"
 node = "26.13.0"
 python = "3.15.2"
 uv = "0.13.7"
-"npm:prettier" = "3.9.10"
-"npm:@prettier/plugin-xml" = "3.4.2"
-"npm:prettier-plugin-toml" = "4.1.0"
-"npm:markdownlint-cli2" = "0.24.0"
-"pypi:yamllint" = "1.38.0"
-"pypi:pre-commit-hooks" = "6.0.0"
+taplo = "0.10.0"
 
-# 环境安装只由 setup 显式执行；其他任务只检查、构建或验收。
+[vars]
+# renovate: datasource=npm depName=prettier
+prettier_version = "3.9.10"
+# renovate: datasource=npm depName=@prettier/plugin-xml
+xml_plugin_version = "3.4.2"
+# renovate: datasource=npm depName=prettier-plugin-toml
+toml_plugin_version = "4.1.0"
+# renovate: datasource=npm depName=markdownlint-cli2
+markdownlint_version = "0.24.0"
+# renovate: datasource=pypi depName=yamllint
+yamllint_version = "1.38.0"
+# renovate: datasource=pypi depName=pre-commit-hooks
+pre_commit_hooks_version = "6.0.0"
+# renovate: datasource=pypi depName=serena-agent
+serena_version = "2.1.0"
+serena_python_version = "3.14.10"
+
+# mise 工具由 setup 显式安装；npx/uvx 工具允许在外部缓存按需准备。
 [tasks.setup]
 description = "安装固定版本的开发工具并下载 Go 依赖"
 run = [
-  "mise install go golangci-lint actionlint goreleaser go:golang.org/x/vuln/cmd/govulncheck syft go:golang.org/x/tools/gopls node python uv npm:prettier npm:@prettier/plugin-xml npm:prettier-plugin-toml npm:markdownlint-cli2 pypi:yamllint pypi:pre-commit-hooks",
+  "mise install go golangci-lint actionlint goreleaser go:golang.org/x/vuln/cmd/govulncheck syft go:golang.org/x/tools/gopls node python uv taplo",
   "go mod download"
 ]
 
@@ -96,8 +108,12 @@ description = "在临时副本中验收初始化、lint、测试、构建和安�
 run = "go run ./tools/template check"
 
 [tasks."mcp:check"]
-description = "握手真实 gopls MCP，发现工具并诊断当前工作区"
+description = "验收真实 Serena、六类后台服务和同连接 worktree 切换"
 run = "go run ./tools/mcp"
+
+[tasks."mcp:serve"]
+description = "通过 uvx 启动可动态切换项目的 Serena MCP"
+run = "uvx --isolated --python {{vars.serena_python_version}} --from serena-agent=={{vars.serena_version}} serena start-mcp-server --context codex --language-backend LSP --agent-interface tools --project-from-cwd --enable-web-dashboard false --open-web-dashboard false --enable-gui-log-window false"
 
 [tasks."release:verify"]
 description = "验证六目标归档、SPDX、SHA-256，并隔离安装宿主归档"
@@ -117,15 +133,15 @@ description = "格式化文本，可指定文件或目录；默认覆盖全部�
 usage = 'arg "[paths]" var=#true'
 shell = "{{ os(windows='powershell -NoProfile -Command', linux='sh -eu -c', macos='sh -eu -c') }}"
 run = """
-prettier --write {% if usage.paths | length > 0 %}{% for path in usage.paths %}{% if os() == 'windows' %}'{{ path | replace(from="'", to="''") }}'{% else %}{{ path | quote }}{% endif %} {% endfor %}{% else %}"**/*.{json,xml,toml,md,yaml,yml}" .prettierrc.cjs{% endif %}
+npx --yes --package=prettier@{{vars.prettier_version}} --package=@prettier/plugin-xml@{{vars.xml_plugin_version}} --package=prettier-plugin-toml@{{vars.toml_plugin_version}} prettier --write {% if usage.paths | length > 0 %}{% for path in usage.paths %}{% if os() == 'windows' %}'{{ path | replace(from="'", to="''") }}'{% else %}{{ path | quote }}{% endif %} {% endfor %}{% else %}"**/*.{json,xml,toml,md,yaml,yml}" .prettierrc.cjs{% endif %}
 """
 
 [tasks."lint:text"]
 description = "只读检查五类文本的格式、语法及 Markdown/YAML 规则"
 run = [
-  'prettier --check "**/*.{json,xml,toml,md,yaml,yml}" .prettierrc.cjs',
-  "markdownlint-cli2 --config .markdownlint-cli2.yaml",
-  "yamllint -c .yamllint.yaml .",
+  'npx --yes --package=prettier@{{vars.prettier_version}} --package=@prettier/plugin-xml@{{vars.xml_plugin_version}} --package=prettier-plugin-toml@{{vars.toml_plugin_version}} prettier --check "**/*.{json,xml,toml,md,yaml,yml}" .prettierrc.cjs',
+  "npx --yes --package=markdownlint-cli2@{{vars.markdownlint_version}} markdownlint-cli2 --config .markdownlint-cli2.yaml",
+  "uvx --python python --from yamllint=={{vars.yamllint_version}} yamllint -c .yamllint.yaml .",
   { task = "lint:syntax" },
 ]
 
@@ -141,7 +157,7 @@ files=$(mktemp)
 trap 'rm -f "$files"' EXIT HUP INT TERM
 for kind in json xml toml; do
   git ls-files --cached --others --exclude-standard --deduplicate -z -- "*.$kind" ':(exclude)tools/lint/testdata/**' ':(exclude)vendor/**' > "$files"
-  xargs -0 "check-$kind" -- < "$files"
+  xargs -0 uvx --python python --from pre-commit-hooks=={{vars.pre_commit_hooks_version}} "check-$kind" -- < "$files"
 done
 '''
 run_windows = '''
@@ -152,7 +168,7 @@ foreach ($kind in @('json', 'xml', 'toml')) {
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   $files = @(($listed -join "`n") -split [char]0 | Where-Object { $_ })
   if ($files.Count -gt 0) {
-    & "check-$kind" -- @files
+    & uvx --python python --from pre-commit-hooks=={{vars.pre_commit_hooks_version}} "check-$kind" -- @files
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   }
 }

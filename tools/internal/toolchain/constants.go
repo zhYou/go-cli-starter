@@ -1,6 +1,7 @@
 package toolchain
 
 const (
+	exactVersionPattern = `^[0-9]+\.[0-9]+\.[0-9]+$`
 	miseProgram         = "mise"
 	miseConfig          = "mise.toml"
 	goplsTool           = "go:golang.org/x/tools/gopls"

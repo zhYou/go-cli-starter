@@ -1,2 +1,2 @@
-// Command mcp 启动固定版本的 gopls MCP，完成协议握手、工具发现和工作区诊断。
+// Command mcp 验收真实 Serena MCP、六类语言服务及同连接中的新建 worktree 切换。
 package main

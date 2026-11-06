@@ -34,12 +34,7 @@ func TestVersionsLoadUnifiedTools(t *testing.T) {
 		"node":                                 "26.13.0",
 		"python":                               "3.15.2",
 		"uv":                                   "0.13.7",
-		"npm:prettier":                         "3.9.10",
-		"npm:@prettier/plugin-xml":             "3.4.2",
-		"npm:prettier-plugin-toml":             "4.1.0",
-		"npm:markdownlint-cli2":                "0.24.0",
-		"pypi:yamllint":                        "1.38.0",
-		"pypi:pre-commit-hooks":                "6.0.0",
+		"taplo":                                "0.10.0",
 		"go:golang.org/x/tools/gopls":          "0.24.0",
 	}, versions.Tools)
 	require.NoError(t, checkVersions(root))
@@ -83,6 +78,23 @@ func TestVersionsRejectGoplsDocumentationMismatch(t *testing.T) {
 		),
 	)
 	require.ErrorContains(t, checkVersions(root), "README 工具 gopls")
+}
+
+func TestVersionsRequireTaskVariableBindings(t *testing.T) {
+	for _, replacement := range []string{"{{vars.missing_version}}", "3.9.10"} {
+		t.Run(replacement, func(t *testing.T) {
+			root := versionFixture(t)
+			path := filepath.Join(root, "mise.toml")
+			//nolint:gosec // G304：只读取本次临时版本检查 fixture。
+			data, err := os.ReadFile(path)
+			require.NoError(t, err)
+			changed := strings.ReplaceAll(string(data), "{{vars.prettier_version}}", replacement)
+			require.NotEqual(t, string(data), changed)
+			//nolint:gosec // G703：只改写同一临时 fixture 的工具声明。
+			require.NoError(t, os.WriteFile(path, []byte(changed), 0o600))
+			require.Error(t, checkVersions(root))
+		})
+	}
 }
 
 func TestVersionsRejectCIMismatch(t *testing.T) {

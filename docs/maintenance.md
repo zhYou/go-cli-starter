@@ -16,7 +16,7 @@
 - 为 main 设置规则集，要求 PR、审查、分支更新及必需检查。按实际运行名称启用 `check`、`platforms (macos-latest)`、`platforms (windows-latest)`、`vulnerability`，首次运行后核对名称。
 - 保护 `v*` 标签，限制创建和修改权限；采用不可变发布资产策略。
 - 按 [SECURITY](../SECURITY.md) 填写私密报告入口，启用对应功能，公布支持版本和响应安排。
-- 安装或授权 Renovate。现有配置覆盖 Go、Actions SHA 和 `mise.toml`，禁用自动合并及预发布更新；工具升级方法见[开发说明](development.md#修改模板与升级工具)。
+- 安装或授权 Renovate。现有配置覆盖 Go、Actions SHA、mise 工具及 npm/PyPI 版本变量，禁用自动合并及预发布更新；工具升级方法见[开发说明](development.md#修改模板与升级工具)。
 - 确认 release job 可申请 OIDC 和 attestations 写权限，并满足 GitHub 套餐及组织、仓库策略。普通 PR 和定时扫描只读，不使用发布凭据。
 - 指定定时安全扫描失败的接收人；停用或归档前交接维护责任。
 
@@ -28,12 +28,13 @@ CI 和 Security 检查目标为 main 的 PR 及 main 更新，开发分支普通
 PR 改目标、标题或描述会重新检查；同一 PR 新运行取消旧运行，其他运行按各自 ID 隔离。
 每日 Security 独立运行；推送 `v*` 标签时 Release 先复用同一提交的完整 CI 与 Security，再执行发布。
 
-Linux 源码、race、fuzz/benchmark、snapshot/安装及 MCP 验收分组并行，macOS/Windows 保留原生任务，并运行五类文本的格式和 lint 验收。
+Linux 源码、race、fuzz/benchmark、snapshot/安装及 MCP 验收分组并行；Linux/macOS/Windows 均真实运行 Serena MCP，
+macOS/Windows 保留原生任务。三平台实际验证 npx/uvx、XML/TOML 插件、五类文本与冷/热缓存，不能用命令替换或跨编译代替。
 CI 的 `check` 汇总全部作业，任一失败、取消或跳过都不能通过。平台运行、MCP、漏洞和发布验收独立于本地 `mise run check`。
-基础 CI 无需安装 Codex、RTK 或 superpowers；MCP job 复用统一 setup。
+基础 CI 无需安装 Codex、RTK 或 superpowers；MCP job 复用统一 setup，再通过 uvx 按需准备 Serena 与后台依赖。
 源码任务通过统一 lint 运行 actionlint 工作流语义检查，模板副本验收同样复用该入口。
 
-Go 缓存区分 OS、架构、Go 版本和依赖摘要，编译缓存再区分任务及提交；lint 独立缓存，项目工具复用 mise 缓存。
+Go 缓存区分 OS、架构、Go 版本和依赖摘要，编译缓存再区分任务及提交；lint 独立缓存，项目工具复用 mise 缓存，npx/uvx 与独立 Python 仅缓存外部工具目录，按 OS、架构及版本声明区分。
 Windows 只跨运行缓存模块，编译结果在当前 runner 内复用。缓存不包含应用状态、诊断文件或发布资产，命中不能跳过验证。
 排查性能时记录冷、热缓存耗时和命中情况；具体键与任务以 workflow 为准。
 

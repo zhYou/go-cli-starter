@@ -24,7 +24,7 @@ mise run check
 ## 本地环境
 
 [安装 mise](https://mise.jdx.dev/getting-started.html)。mise、Git、gh、Codex、RTK 和 superpowers 由用户维护；
-项目只安装 `mise.toml` 声明的固定版本工具、运行环境和插件。
+mise 安装声明的运行时、Go 和原生工具；文本工具与 Serena 通过固定版本的 npx/uvx 在外部缓存按需准备。
 
 <!-- tool-versions:start -->
 
@@ -48,17 +48,21 @@ mise run check
 | Node.js              | 26.13.0  |
 | Python               | 3.15.2   |
 | uv                   | 0.13.7   |
+| Taplo                | 0.10.0   |
 | Prettier             | 3.9.10   |
 | @prettier/plugin-xml | 3.4.2    |
 | prettier-plugin-toml | 4.1.0    |
 | markdownlint-cli2    | 0.24.0   |
 | yamllint             | 1.38.0   |
 | pre-commit-hooks     | 6.0.0    |
+| Serena               | 2.1.0    |
+| Serena Python        | 3.14.10  |
 
 <!-- tool-versions:end -->
 
 首次准备环境、工具版本或 Go 模块变更后执行 `mise run setup`，再运行 `mise run doctor`；声明未变时无需重复 setup。
-普通任务和 exec 均关闭自动安装，`GOTOOLCHAIN=local` 防止隐式下载工具链。
+mise 普通任务和 exec 关闭运行时自动安装，`GOTOOLCHAIN=local` 防止隐式下载 Go 工具链。
+npx/uvx 可按需下载固定版本，检查不改写项目文件，不创建本地 `node_modules`、`.venv` 或 npm 工程。
 项目不使用 mise 锁文件，`go.sum` 校验模块。doctor 的必需项和可选报告见[开发说明](docs/development.md#协作与环境)。
 
 ```sh
@@ -162,7 +166,9 @@ GO_CLI_STARTER_HOME="$example_home" ./bin/go-cli-starter greet --name Codex --la
 ## Codex 开发
 
 环境准备完成后，从仓库根目录启动 `codex`。当前仅支持 Codex，RTK 和 superpowers 使用用户级安装。
-受信任项目通过 `.codex/config.toml` 启动固定版本的 gopls MCP，服务启动失败不阻塞 Codex。
+受信任项目通过 `.codex/config.toml` 和统一 `mcp:serve` 启动 uvx Serena，服务启动失败不阻塞 Codex。
+Serena 使用独立兼容 Python 并关闭 dashboard，覆盖 Go、JavaScript、JSON、YAML、TOML 和 Markdown。
+创建或切换 worktree 后，以绝对路径激活并核对项目根目录；未覆盖的 Go 能力使用当前 checkout 的 gopls CLI。
 连接验证和 CLI 回退见[开发说明](docs/development.md#实现与检查)；协作、分支及交付规则见 [AGENTS.md](AGENTS.md)。
 
 ## 开发命令

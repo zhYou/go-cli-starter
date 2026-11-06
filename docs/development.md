@@ -7,12 +7,16 @@
 
 项目命令在仓库根目录执行；优先使用 task，直接调用项目 `[tools]` 纳管工具时用 `mise exec --`，其他命令直接执行。
 首次准备环境、工具版本或 Go 模块变更后显式 setup，再 doctor；声明未变且环境已准备时不重复安装。
-普通任务和 exec 关闭自动安装，`GOTOOLCHAIN=local` 禁止隐式下载工具链。缺工具应报错，不由检查修复。
+mise 普通任务和 exec 关闭运行时自动安装，`GOTOOLCHAIN=local` 禁止隐式下载 Go 工具链。
+npx、uvx 可按固定版本下载并在外部缓存准备工具环境；不生成项目内依赖目录、npm 工程或锁文件。
+检查不改写源码和配置，下载失败保留非零退出；缓存命中不跳过检查。
 
-项目工具、运行环境和插件由 `mise.toml` 固定，setup 只安装显式清单并下载模块；mise、Git、gh、Codex、RTK 和 superpowers 由用户维护。
-doctor 要求 Git 可用、mise 达到最低版本、项目工具、运行环境和插件版本准确；gh、Codex、RTK 仅报告状态，
+`mise.toml` 的 `[tools]` 固定运行时、Go 和原生工具，`[vars]` 固定按需执行工具及插件版本；禁止 latest 和版本范围。
+setup 只安装 mise 工具并下载 Go 模块，不强制预热 npx/uvx 或语言服务。mise、Git、gh、Codex、RTK 和 superpowers 由用户维护。
+doctor 要求 Git 可用、mise 达到最低版本、mise 工具及运行环境版本准确，并确认 npx、uvx 入口存在。
+它不扫描 npm/Python 包缓存，不通过逐包版本探测触发安装；工具功能由实际 task 验收。gh、Codex、RTK 仅报告状态，
 缺失、执行失败、超时或截断不影响结果，不检查认证或固定版本。superpowers 以会话技能列表为准。
-基础检查无需 Codex、RTK 或 superpowers；gopls MCP 的验收独立运行。
+基础检查无需 Codex、RTK 或 superpowers；Serena MCP 的真实验收独立运行。
 
 开发 doctor 最多四项并行，每项三秒、每流 2 KiB；govulncheck 核对本地构建来源和版本并执行 `-h`，不访问漏洞库。
 真正联网扫描使用 `mise exec -- govulncheck ./...`，数据库访问失败同样失败。
@@ -29,7 +33,7 @@ mise 聚合流程，领域 Go 入口只处理各自能力；参数不足、未�
 
 | 命令                                                         | 用途                                                                           |
 | ------------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| `mise run setup`                                             | 安装声明的固定版本工具、运行环境和插件，下载模块                               |
+| `mise run setup`                                             | 安装 mise 声明的运行时与工具，下载 Go 模块                                     |
 | `mise run doctor`                                            | 检查项目环境，报告用户工具状态                                                 |
 | `mise run fmt`                                               | 显式格式化 Go 和五类文本；分项可指定路径                                       |
 | `mise run fmt:go -- <路径...>` / `fmt:text -- <路径...>`     | 仅格式化指定 Go / 文本文件或目录；省略路径处理全部受检文件                     |
@@ -47,7 +51,7 @@ mise 聚合流程，领域 Go 入口只处理各自能力；参数不足、未�
 | `mise run template:init --module <模块路径> --name <命令名>` | 初始化模板身份                                                                 |
 | `mise run contract:check` / `contract:update`                | 检查 / 显式更新机器契约                                                        |
 | `mise run lint:versions`                                     | 检查工具、模块、CI 和文档版本一致性                                            |
-| `mise run mcp:check`                                         | 验证 gopls MCP 的实际连接和诊断                                                |
+| `mise run mcp:check`                                         | 验收 Serena 六后端、真实调用和同连接 worktree 切换                             |
 | `mise run release:verify`                                    | 验证发布归档，并隔离安装宿主程序                                               |
 
 直接调用纳管工具无需 shell 激活；以下直接工具命令也可用于针对性验证：
@@ -76,10 +80,11 @@ mise exec -- go test ./internal/app/cli -run=^$ -bench=. -benchmem
 
 ## 文本格式与检查
 
-Prettier 统一格式化 JSON、XML、TOML、Markdown、YAML；XML、TOML 使用 mise 分别安装的插件。
-配置集中在根目录：`.prettierrc.cjs` 通过 `mise where` 定位插件，兼容 mise 的 npm 安装布局，
-`.prettierignore` 排除生成快照、vendor 和故障夹具。没有本地 npm 工程，不使用 npx/uvx 按需安装。
-工具安装只由 setup 执行，doctor 核对 mise 选中的实际可执行文件；没有版本命令的包读取本地元数据。
+Prettier 通过同一 npx 调用取得固定版本本体、XML 和 TOML 插件，统一格式化 JSON、XML、TOML、Markdown、YAML。
+根目录 `.prettierrc.cjs` 从实际 Prettier CLI 入口解析同一缓存环境中的插件，不依赖 mise 安装布局或全局模块。
+`.prettierignore` 排除生成快照、vendor 和故障夹具。markdownlint-cli2 使用 npx；yamllint 和 pre-commit-hooks 使用 uvx，
+通过 `--python python` 选择 mise 提供的项目 Python。所有工具与插件版本由 `[vars]` 明确声明，允许冷缓存按需下载。
+格式化与检查不需要本地 node_modules、.venv、package.json 或 npm 锁文件；配置文件仍集中在仓库根目录。
 
 文本使用两空格、UTF-8、LF 和末尾换行，`.editorconfig` 与格式器一致。
 Prettier 目标行宽为 120，保留 Markdown 人工换行和代码块内容，XML 使用严格空白模式。
@@ -217,7 +222,7 @@ bin/dist、`docs/superpowers/` 工作记录、生成代码和外部 `*_test` 包
 | 受检版本表、工具声明格式                      | `mise run lint:versions`；工具或模块实质变更还须运行完整 check，并按 Go/依赖、MCP、打包与发布的影响补充对应验证                                   |
 | 文档中的模板身份或可执行示例                  | 身份和受管文件变更运行 `mise run template:check`；修改示例时验证对应入口、参数或 API，执行时隔离应用 HOME                                         |
 | Go 代码、测试、依赖、应用配置                 | 格式化受影响的 Go 文件，运行针对性测试、`mise run check`；支持的宿主运行 `mise exec -- go test -race ./...`                                       |
-| MCP 配置、验收工具或影响 MCP 的 Go/gopls 升级 | 增加 `mise run mcp:check`；Codex 客户端配置变更在受信任会话核对 `codex mcp list` 包含 gopls                                                       |
+| MCP 配置、验收工具或影响 MCP 的 Go/gopls 升级 | 增加 `mise run mcp:check`；Codex 客户端配置变更在受信任会话核对 `codex mcp list` 包含 Serena，并验证实际调用                                      |
 | 打包与发布流程                                | 按[发布验收](maintenance.md#升级和发布)完成 snapshot、release:verify 及发布前检查                                                                 |
 
 消息和配置编辑期间分别可用 `lint:i18n`、`lint:config` 快速反馈；它们及 `lint:doc`、`lint:style`、`lint:versions`、
@@ -225,13 +230,29 @@ bin/dist、`docs/superpowers/` 工作记录、生成代码和外部 `*_test` 包
 只格式化授权的 Go 文件或目录，例如 `mise exec -- golangci-lint fmt --color=never internal/app/cli/greet.go`。
 无法执行的检查说明原因，不把配置存在、启动成功或 mock 当作真实验收。
 
-### Go 查询与 MCP 回退
+### Serena 查询与 Go CLI 补充
 
-修改 Go 语义时，优先通过绑定实际 checkout 的 gopls MCP 查符号、引用和诊断；
-首次使用先读 `mise exec -- gopls mcp -instructions`，修改后检查受影响文件诊断。
-MCP 不可用或绑定错误 checkout 时，改用当前 checkout 的 gopls CLI、Go 工具及源码检查，并报告限制；
-不得用其他 checkout 的诊断证明当前改动正确。普通非 Go 操作无需调用 gopls，同一 checkout 串行修改。
-MCP 集成本身的变更仍须通过真实 `mcp:check`，CLI 回退不能替代该验收。
+项目通过 `mise run mcp:serve` 启动固定版本的 uvx Serena。它使用独立 Python 3.14.10、LSP 后端和独立工具接口，
+关闭 web dashboard、自动打开浏览器和 GUI 日志窗口；首次使用可在外部缓存下载运行环境与后台依赖。
+Codex 启动超时为 300 秒、工具调用为 180 秒；独立 mcp:check 总超时为 10 分钟。
+
+项目工作区为根目录 `.`，配置启用 go、typescript、json、yaml、toml、markdown；JavaScript/CommonJS 由 typescript 服务处理。
+后台依赖为 gopls 0.24.0、TypeScript 5.9.3、typescript-language-server 5.1.3、vscode-json-languageserver 1.3.4、
+yaml-language-server 1.19.2、Taplo 0.10.0 和 Marksman 2024-12-18。gopls、Taplo 与 Node.js 由 mise 提供；
+其余后台依赖沿用固定 Serena 版本的内置准确版本，由 Serena 在外部缓存按需准备，不新增禁止安装或强制预热层。
+Taplo 纳入 mise 可避免 Serena 将 PATH 中未配置的旧 shim 误认为可用后台程序。
+
+首次读取 `initial_instructions` 并取得 session 信息。创建、切换或恢复 worktree 后，
+先用绝对路径调用 `activate_project`，核对返回的根目录，再查询或编辑；共享项目名不能证明 checkout 身份。
+六种语言各按后端实际能力提供符号与结构查询；JSON 不承诺跨文件引用。
+隐藏配置、文档、CI 和故障夹具均纳入项目；普通文本、go.mod、go.sum 和 txtar 可通过非代码文本检索与 Codex 文件操作处理。
+遵循 Git 忽略规则，排除构建产物、缓存和嵌套 worktree；Serena 项目配置提交，memory、日志、缓存及本地覆盖不提交。
+
+Go 专用能力和 Serena 未支持的操作使用当前 checkout 的 gopls CLI，例如 `mise exec -- gopls call_hierarchy <位置>`、
+`mise exec -- gopls codeaction <位置>`、`mise exec -- gopls check <文件...>`。
+包 API、测试、漏洞检查继续使用 Go、现有 task 和 govulncheck。Serena 不可用时可使用 CLI，并报告限制；
+不得使用其他 checkout 的结果证明当前改动正确。同一 checkout 串行修改。
+MCP 集成变更必须通过真实 mcp:check，验证六后端、引用/重命名/诊断和同连接新建 worktree；CLI 回退不能代替验收。
 
 ### 测试与示例隔离
 
@@ -440,8 +461,8 @@ mise run lint:versions
 
 随后按[验证矩阵](#实现与检查)补充对应检查，提交统一准确版本声明；平台支持以原生 CI 和六目标发布构建为证。
 gopls 等 Go 后端从固定模块版本在宿主平台编译；非升级任务继续使用已锁定版本。
-README 的 tool-versions 标记与工具显示标签由 lint:versions 解析，修改表格时保留它们。
-Renovate 由管理员启用，覆盖 mise.toml；权限不足时人工更新版本声明并完成检查，不放宽检查。
+README 的 tool-versions 标记与工具显示标签由 lint:versions 解析，同时检查 `[tools]` 和 `[vars]`，修改表格时保留它们。
+Renovate 由管理员启用，覆盖 mise 工具及带 datasource/depName 注释的 npm/PyPI 版本变量；权限不足时人工更新版本声明并完成检查，不放宽检查。
 用户工具通过各自渠道维护，项目 setup 不安装或更新它们。
 
 ## 安装发布程序

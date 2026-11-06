@@ -37,6 +37,8 @@ go.work.sum
 /.superpowers/
 /docs/superpowers/
 /.worktrees/
+/.serena/*
+!/.serena/project.yml
 mise.local.toml
 mise.local.lock
 

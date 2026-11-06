@@ -9,6 +9,7 @@ import (
 
 	"github.com/zhYou/go-cli-starter/tools/internal/toolchain"
 
+	"github.com/pelletier/go-toml/v2"
 	"go.yaml.in/yaml/v3"
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/semver"
@@ -17,6 +18,9 @@ import (
 func checkVersions(root string) error {
 	versions, err := toolchain.Load(root)
 	if err != nil {
+		return err
+	}
+	if err := checkVersionBindings(root, versions.Variables); err != nil {
 		return err
 	}
 	//nolint:gosec // G304：开发工具读取显式项目文件或执行固定 Git 子命令，不经过 shell，不是外部服务入口。
@@ -65,6 +69,13 @@ func checkVersions(root string) error {
 			return err
 		}
 		expected[spec.Display] = want
+	}
+	for key, want := range versions.Variables {
+		label, err := toolchain.VariableLabel(key)
+		if err != nil {
+			return err
+		}
+		expected[label] = want
 	}
 	for key, want := range expected {
 		if table[key] != want {
@@ -115,6 +126,38 @@ func checkVersions(root string) error {
 	}
 	if count == 0 {
 		return fmt.Errorf("未找到 CI mise 引导声明")
+	}
+	return nil
+}
+
+func checkVersionBindings(root string, variables map[string]string) error {
+	//nolint:gosec // G304：只读取调用者指定 checkout 的固定工具配置。
+	data, err := os.ReadFile(filepath.Join(root, "mise.toml"))
+	if err != nil {
+		return err
+	}
+	var config struct {
+		Tasks map[string]any `toml:"tasks"`
+	}
+	if err := toml.Unmarshal(data, &config); err != nil {
+		return err
+	}
+	tasks, err := toml.Marshal(config.Tasks)
+	if err != nil {
+		return err
+	}
+	used := map[string]bool{}
+	for _, match := range regexp.MustCompile(`\{\{\s*vars\.([a-z_]+)\s*\}\}`).FindAllSubmatch(tasks, -1) {
+		key := string(match[1])
+		if _, exists := variables[key]; !exists {
+			return fmt.Errorf("任务引用了未声明的版本变量 %s", key)
+		}
+		used[key] = true
+	}
+	for key := range variables {
+		if !used[key] {
+			return fmt.Errorf("版本变量 %s 未被任务引用", key)
+		}
 	}
 	return nil
 }

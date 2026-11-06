@@ -1,124 +1,113 @@
 package main
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/zhYou/go-cli-starter/tools/internal/scaffold"
 )
 
-// checkMCP 验证 Codex 配置中使用的 stdio 命令。
+// checkMCP 与 Codex 复用 mcp:serve，真实调用不能由配置存在或 CLI 回退替代。
 func checkMCP() (resultErr error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, miseProgram, "exec", "--", goplsProgram, "mcp")
-	cmd.Stderr = os.Stderr
-	in, err := cmd.StdinPipe()
+	root, err := os.Getwd()
 	if err != nil {
 		return err
 	}
-	out, err := cmd.StdoutPipe()
+	configPath := filepath.Join(root, serenaDirectory, serenaProjectFile)
+	//nolint:gosec // G304：只读取当前 checkout 的固定 Serena 项目配置，检测意外迁移。
+	configBefore, err := os.ReadFile(configPath)
 	if err != nil {
-		return err
-	}
-	if err := cmd.Start(); err != nil {
 		return err
 	}
 	defer func() {
-		closeErr := in.Close()
-		if resultErr != nil {
-			if err := cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
-				resultErr = errors.Join(resultErr, err)
-			}
+		//nolint:gosec // G304：同一固定路径的验收后只读快照。
+		configAfter, readErr := os.ReadFile(configPath)
+		if readErr != nil {
+			resultErr = errors.Join(resultErr, readErr)
+		} else if !bytes.Equal(configBefore, configAfter) {
+			resultErr = errors.Join(resultErr, errors.New("验收时 Serena 改写了项目配置，请补齐固定版本要求的配置字段"))
 		}
-		resultErr = errors.Join(resultErr, closeErr, cmd.Wait())
 	}()
-	encoder, decoder := json.NewEncoder(in), json.NewDecoder(out)
-	call := func(id int, method string, params any) (json.RawMessage, error) {
-		if err := encoder.Encode(
-			map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": params},
-		); err != nil {
-			return nil, err
-		}
-		for {
-			var response struct {
-				ID     int             `json:"id"`
-				Result json.RawMessage `json:"result"`
-				Error  json.RawMessage `json:"error"`
-			}
-			if err := decoder.Decode(&response); err != nil {
-				return nil, fmt.Errorf("读取 %s 响应失败：%w", method, err)
-			}
-			if response.ID != id {
-				continue
-			}
-			if len(response.Error) != 0 {
-				return nil, fmt.Errorf("%s 调用失败：%s", method, response.Error)
-			}
-			return response.Result, nil
-		}
-	}
-	if _, err := call(1, "initialize", map[string]any{
-		"protocolVersion": "2025-03-26",
-		"capabilities":    map[string]any{},
-		"clientInfo":      map[string]string{"name": "template-check", mcpVersionField: "1"},
-	}); err != nil {
-		return err
-	}
-	if err := encoder.Encode(map[string]any{"jsonrpc": "2.0", "method": "notifications/initialized"}); err != nil {
-		return err
-	}
-	result, err := call(2, "tools/list", map[string]any{})
+	temporary, err := os.MkdirTemp("", "serena-mcp-check-*")
 	if err != nil {
 		return err
 	}
-	var catalog struct {
-		Tools []struct {
-			Name string `json:"name"`
-		} `json:"tools"`
-	}
-	if err := json.Unmarshal(result, &catalog); err != nil {
+	defer func() {
+		resultErr = errors.Join(resultErr, os.RemoveAll(temporary))
+	}()
+	client, closeClient := startMCP(ctx, root, filepath.Join(temporary, "serena-home"))
+	defer func() {
+		resultErr = errors.Join(resultErr, closeClient())
+	}()
+	if err := client.initialize(); err != nil {
 		return err
 	}
-	found := false
-	for _, tool := range catalog.Tools {
-		if tool.Name == "go_diagnostics" {
-			found = true
-		}
-	}
-	if !found {
-		return errors.New("gopls 未提供 go_diagnostics 工具")
-	}
-	project, err := scaffold.Inspect(".")
+	instructions, err := client.tool("initial_instructions", map[string]any{})
 	if err != nil {
 		return err
 	}
-	path, err := filepath.Abs(filepath.Join(project.CommandPath, "main.go"))
+	session, err := sessionFromInstructions(instructions)
 	if err != nil {
 		return err
 	}
-	result, err = call(3, "tools/call", map[string]any{
-		"name":      "go_diagnostics",
-		"arguments": map[string]any{"files": []string{path}},
-	})
+	project, err := scaffold.Inspect(root)
 	if err != nil {
 		return err
 	}
-	var diagnostic struct {
-		IsError bool `json:"isError"`
-	}
-	if err := json.Unmarshal(result, &diagnostic); err != nil {
+	if err := client.overview(filepath.ToSlash(filepath.Join(project.CommandPath, "main.go")), "main"); err != nil {
 		return err
 	}
-	if diagnostic.IsError {
-		return fmt.Errorf("gopls 诊断失败：%s", result)
+	base := filepath.Join(temporary, "fixture with spaces")
+	if err := prepareMCPFixture(ctx, root, base); err != nil {
+		return err
 	}
-	fmt.Printf("MCP 已初始化，发现 %d 个工具，已诊断 %s。\n", len(catalog.Tools), path)
+	if err := client.activate(base, session); err != nil {
+		return err
+	}
+	if err := verifyMCPFixture(client, baseMarkerPrefix); err != nil {
+		return err
+	}
+	// 必须在 MCP 连接建立后创建；路径嵌套在已激活项目内，且含空格。
+	linked := filepath.Join(base, ".worktrees", "new checkout")
+	if err := fixtureGit(ctx, base, "worktree", "add", quietFlag, "--detach", linked, "HEAD"); err != nil {
+		return err
+	}
+	if err := writeMCPFiles(linked, "Linked"); err != nil {
+		return err
+	}
+	if err := client.activate(linked, session); err != nil {
+		return err
+	}
+	if err := verifyMCPFixture(client, "Linked"); err != nil {
+		return err
+	}
+	result, err := client.tool(
+		"find_symbol",
+		map[string]any{"name_path_pattern": "BaseGoMarker", relativePathField: goFixtureFile},
+	)
+	if err != nil {
+		return err
+	}
+	if strings.Contains(result, "BaseGoMarker") {
+		return fmt.Errorf("worktree 查询混入原 checkout：%s", result)
+	}
+	if err := verifyGoReferencesAndDiagnostics(client, linked); err != nil {
+		return err
+	}
+	if err := client.activate(base, session); err != nil {
+		return err
+	}
+	if err := verifyMCPFixture(client, baseMarkerPrefix); err != nil {
+		return err
+	}
+	fmt.Println("Serena MCP 已通过：真实 checkout、六类语言服务、文本检索、引用/重命名/诊断，以及同连接新建 worktree 与切回。")
 	return nil
 }

@@ -2,12 +2,27 @@ package toolchain
 
 import (
 	"debug/buildinfo"
+	"os"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestLoadRejectsUnpinnedRunnerVersion(t *testing.T) {
+	for _, version := range []string{"latest", "3", "^3.9.10", "3.9.10-rc.1"} {
+		t.Run(version, func(t *testing.T) {
+			root := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(root, "mise.toml"), []byte(
+				"min_version = \"2026.10.21\"\n[tools]\ngo = \"1.27.3\"\n[vars]\nprettier_version = \""+version+"\"\n",
+			), 0o600))
+			_, err := Load(root)
+			require.ErrorContains(t, err, "必须固定稳定的精确版本")
+		})
+	}
+}
 
 func TestGovulncheckBuildInfoExact(t *testing.T) {
 	valid := buildinfo.BuildInfo{
@@ -62,8 +77,7 @@ func TestTextToolVersions(t *testing.T) {
 		{"node", "v26.13.0", "26.13.0"},
 		{"python", "Python 3.15.2", "3.15.2"},
 		{"uv", "uv 0.13.7", "0.13.7"},
-		{"npm:prettier", "3.9.10", "3.9.10"},
-		{"pypi:yamllint", "yamllint 1.38.0", "1.38.0"},
+		{"taplo", "taplo 0.10.0", "0.10.0"},
 	}
 	for _, tt := range cases {
 		t.Run(tt.key, func(t *testing.T) {
