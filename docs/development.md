@@ -9,8 +9,8 @@
 首次准备环境、工具版本或 Go 模块变更后显式 setup，再 doctor；声明未变且环境已准备时不重复安装。
 普通任务和 exec 关闭自动安装，`GOTOOLCHAIN=local` 禁止隐式下载工具链。缺工具应报错，不由检查修复。
 
-六个项目工具由 `mise.toml` 固定，setup 只安装显式清单并下载模块；mise、Git、gh、Codex、RTK 和 superpowers 由用户维护。
-doctor 要求 Git 可用、mise 达到最低版本、六个项目工具版本准确；gh、Codex、RTK 仅报告状态，
+项目工具、运行环境和插件由 `mise.toml` 固定，setup 只安装显式清单并下载模块；mise、Git、gh、Codex、RTK 和 superpowers 由用户维护。
+doctor 要求 Git 可用、mise 达到最低版本、项目工具、运行环境和插件版本准确；gh、Codex、RTK 仅报告状态，
 缺失、执行失败、超时或截断不影响结果，不检查认证或固定版本。superpowers 以会话技能列表为准。
 基础检查无需 Codex、RTK 或 superpowers；gopls MCP 的验收独立运行。
 
@@ -26,35 +26,40 @@ doctor 要求 Git 可用、mise 达到最低版本、六个项目工具版本准
 
 mise 聚合流程，领域 Go 入口只处理各自能力；参数不足、未知或多余时立即失败。
 
-| 命令 | 用途 |
-| --- | --- |
-| `mise run setup` | 安装六个固定版本的项目工具，下载模块 |
-| `mise run doctor` | 检查项目环境，报告用户工具状态 |
-| `mise run lint` | 只读检查格式、双语消息、应用配置、包文档、版本声明和 18 项静态规则 |
-| `mise run lint:i18n` / `lint:config` | 校验双语消息目录 / 受管应用配置；均纳入 lint 和 check |
-| `mise run lint:doc` | 检查正式 Go 包的 doc.go 与包说明位置；纳入 lint 和 check |
-| `mise run lint:test` | 用真实 fixture 测试静态规则自身；仅纳入 check |
-| `mise run build` | 构建到 bin，注入版本信息 |
-| `mise run check` | 完整源码检查，含测试、构建、契约和模板验收 |
-| `mise run template:check` | 在临时副本中验证改名、lint、测试、构建、安装和发布配置 |
-| `mise run template:init --module <模块路径> --name <命令名>` | 初始化模板身份 |
-| `mise run contract:check` / `contract:update` | 检查 / 显式更新机器契约 |
-| `mise run lint:versions` | 检查工具、模块、CI 和文档版本一致性 |
-| `mise run mcp:check` | 验证 gopls MCP 的实际连接和诊断 |
-| `mise run release:verify` | 验证发布归档，并隔离安装宿主程序 |
-直接调用纳管工具无需 shell 激活；以下命令不另设任务别名：
+| 命令                                                         | 用途                                                               |
+| ------------------------------------------------------------ | ------------------------------------------------------------------ |
+| `mise run setup`                                             | 安装声明的固定版本工具、运行环境和插件，下载模块                   |
+| `mise run doctor`                                            | 检查项目环境，报告用户工具状态                                     |
+| `mise run fmt`                                               | 显式格式化 Go 和五类文本；分项可指定路径                           |
+| `mise run fmt:go -- <路径...>` / `fmt:text -- <路径...>`     | 仅格式化指定 Go / 文本文件或目录；省略路径处理全部受检文件         |
+| `mise run lint:text`                                         | 只读检查 JSON、XML、TOML、Markdown、YAML 的格式、语法及规则        |
+| `mise run lint:syntax`                                       | 用现成 CLI 检查 JSON、XML、TOML 语法和重复键                       |
+| `mise run lint`                                              | 只读检查格式、双语消息、应用配置、包文档、版本声明和 18 项静态规则 |
+| `mise run lint:i18n` / `lint:config`                         | 校验双语消息目录 / 受管应用配置；均纳入 lint 和 check              |
+| `mise run lint:doc`                                          | 检查正式 Go 包的 doc.go 与包说明位置；纳入 lint 和 check           |
+| `mise run lint:test`                                         | 用真实 fixture 测试静态规则自身；仅纳入 check                      |
+| `mise run build`                                             | 构建到 bin，注入版本信息                                           |
+| `mise run check`                                             | 完整源码检查，含测试、构建、契约和模板验收                         |
+| `mise run template:check`                                    | 在临时副本中验证改名、lint、测试、构建、安装和发布配置             |
+| `mise run template:init --module <模块路径> --name <命令名>` | 初始化模板身份                                                     |
+| `mise run contract:check` / `contract:update`                | 检查 / 显式更新机器契约                                            |
+| `mise run lint:versions`                                     | 检查工具、模块、CI 和文档版本一致性                                |
+| `mise run mcp:check`                                         | 验证 gopls MCP 的实际连接和诊断                                    |
+| `mise run release:verify`                                    | 验证发布归档，并隔离安装宿主程序                                   |
 
-| 命令 | 用途 |
-| --- | --- |
-| `mise exec -- golangci-lint fmt --color=never` | 使用 gofumpt 和 goimports 格式化 |
-| `mise exec -- golangci-lint fmt --diff --color=never` | 只读检查格式；有差异时失败 |
-| `mise exec -- go test ./...` | 单元与命令测试 |
-| `mise exec -- go test -race ./...` | 竞态检测，需要 C 编译器 |
-| `mise exec -- go vet ./...` | Go vet 检查 |
-| `mise exec -- go mod tidy -diff` | 只读检查模块元数据 |
-| `mise exec -- govulncheck ./...` | 联网扫描 Go 漏洞 |
-| `mise exec -- goreleaser check` | 验证发布配置，需要 Git remote |
-| `mise exec -- goreleaser release --snapshot --clean --parallelism 2` | 本地构建全部发布压缩包，不发布 |
+直接调用纳管工具无需 shell 激活；以下直接工具命令也可用于针对性验证：
+
+| 命令                                                                 | 用途                             |
+| -------------------------------------------------------------------- | -------------------------------- |
+| `mise exec -- golangci-lint fmt --color=never`                       | 使用 gofumpt 和 goimports 格式化 |
+| `mise exec -- golangci-lint fmt --diff --color=never`                | 只读检查格式；有差异时失败       |
+| `mise exec -- go test ./...`                                         | 单元与命令测试                   |
+| `mise exec -- go test -race ./...`                                   | 竞态检测，需要 C 编译器          |
+| `mise exec -- go vet ./...`                                          | Go vet 检查                      |
+| `mise exec -- go mod tidy -diff`                                     | 只读检查模块元数据               |
+| `mise exec -- govulncheck ./...`                                     | 联网扫描 Go 漏洞                 |
+| `mise exec -- goreleaser check`                                      | 验证发布配置，需要 Git remote    |
+| `mise exec -- goreleaser release --snapshot --clean --parallelism 2` | 本地构建全部发布压缩包，不发布   |
 
 Linux CI 另执行五秒 argv fuzz 和没有性能门槛的 benchmark：
 
@@ -63,27 +68,49 @@ mise exec -- go test ./internal/app/cli -run=^$ -fuzz=FuzzArgv -fuzztime=5s
 mise exec -- go test ./internal/app/cli -run=^$ -bench=. -benchmem
 ```
 
-`lint` 聚合消息、配置、包文档、版本、格式及静态规则；`lint:test` 验证规则自身，仅纳入 check。
+`lint` 聚合五类文本、消息、配置、包文档、版本、格式及静态规则；`lint:test` 验证规则自身，仅纳入 check。
 `check` 进一步完成测试、vet、模块元数据、构建、机器契约和模板副本验收；它不改源码，但会写缓存、临时文件和 bin。
+
+## 文本格式与检查
+
+Prettier 统一格式化 JSON、XML、TOML、Markdown、YAML；XML、TOML 使用 mise 分别安装的插件。
+配置集中在根目录：`.prettierrc.cjs` 通过 `mise where` 定位插件，兼容 mise 的 npm 安装布局，
+`.prettierignore` 排除生成快照、vendor 和故障夹具。没有本地 npm 工程，不使用 npx/uvx 按需安装。
+工具安装只由 setup 执行，doctor 核对 mise 选中的实际可执行文件；没有版本命令的包读取本地元数据。
+
+文本使用两空格、UTF-8、LF 和末尾换行，`.editorconfig` 与格式器一致。
+Prettier 目标行宽为 120，保留 Markdown 人工换行和代码块内容，XML 使用严格空白模式。
+README 的应用路径表随模板改名改变列宽，用局部 `prettier-ignore` 保留格式，初始化不额外改写文档。
+
+`.markdownlint-cli2.yaml` 检查标题层级、同级重复标题、代码块语言、空链接和引用；不要求中文段落固定行长。
+`.yamllint.yaml` 检查重复键、锚点和布尔值歧义，允许 Actions 的 `on` 键；排版由 Prettier 检查。
+JSON、XML、TOML 的语法由 pre-commit-hooks 包的 `check-json`、`check-xml`、`check-toml` 检查，
+只运行现成命令，不启用 Git hooks。没有业务 Schema、拼写或联网链接检查。
+
+文件选择覆盖隐藏配置，遵循仓库 Git 忽略规则；vendor 和 `tools/lint/testdata/` 明确排除。
+`test/testdata/contracts/` 和 `.template-origin.json` 保留生成器格式，仍检查语法。
+`lint:syntax` 使用 Git 的文件列表，因此新建项目须先 `git init`，并在检查前暂存删除操作。
+任务不按成功缓存跳过检查；检查输出到终端，临时列表放在系统临时目录，不产生仓库内报告或依赖目录。
+`.gitignore` 仅登记实际产物，本次工具接入无需新增忽略项。配置文件提交到仓库。
 
 ## 目录和依赖
 
-| 位置 | 职责 |
-| --- | --- |
-| `cmd/<name>/` | 程序入口、信号、退出及入口测试 |
-| `internal/app/cli` | 独立命令树、参数、输出和退出码映射 |
-| `internal/app/config` | 模块配置组合与严格加载 |
-| `internal/app/session` | 自建日志、Trace、诊断及工作收尾 |
-| `internal/app/greeting` | 可移除业务示例 |
-| `internal/base` | fault、messages、paths、validation、IO、logging、telemetry、diagnostics、结果 schema |
-| `internal/locales` | 集中双语 TOML 消息目录与共享 Bundle |
-| `internal/command` | 独立 argv、进程所有权、捕获和有界批量执行 |
-| `tools/doctor/`、`tools/build/` | 环境探测、本地构建 |
-| `tools/lint/` | 消息、配置、包文档、版本声明检查和规则自测 |
-| `tools/contract/`、`tools/template/` | 契约维护、模板初始化与隔离副本验收 |
-| `tools/mcp/`、`tools/release/` | MCP 连接、发布归档与宿主安装验收 |
-| `tools/internal/` | 工具私有共享实现：模板事务、契约比较、工具版本、二进制验收、进程调用与 fixture |
-| `configs/`、`test/integration/`、`test/testdata/contracts/` | 配置示例、真实进程脚本、共享契约基线 |
+| 位置                                                        | 职责                                                                                 |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `cmd/<name>/`                                               | 程序入口、信号、退出及入口测试                                                       |
+| `internal/app/cli`                                          | 独立命令树、参数、输出和退出码映射                                                   |
+| `internal/app/config`                                       | 模块配置组合与严格加载                                                               |
+| `internal/app/session`                                      | 自建日志、Trace、诊断及工作收尾                                                      |
+| `internal/app/greeting`                                     | 可移除业务示例                                                                       |
+| `internal/base`                                             | fault、messages、paths、validation、IO、logging、telemetry、diagnostics、结果 schema |
+| `internal/locales`                                          | 集中双语 TOML 消息目录与共享 Bundle                                                  |
+| `internal/command`                                          | 独立 argv、进程所有权、捕获和有界批量执行                                            |
+| `tools/doctor/`、`tools/build/`                             | 环境探测、本地构建                                                                   |
+| `tools/lint/`                                               | 消息、配置、包文档、版本声明检查和规则自测                                           |
+| `tools/contract/`、`tools/template/`                        | 契约维护、模板初始化与隔离副本验收                                                   |
+| `tools/mcp/`、`tools/release/`                              | MCP 连接、发布归档与宿主安装验收                                                     |
+| `tools/internal/`                                           | 工具私有共享实现：模板事务、契约比较、工具版本、二进制验收、进程调用与 fixture       |
+| `configs/`、`test/integration/`、`test/testdata/contracts/` | 配置示例、真实进程脚本、共享契约基线                                                 |
 
 base 不依赖 app、command、tools 或 Cobra。领域码及结果由所属模块定义，文案集中维护；新目录按实际职责增加。
 运行时代码与测试不依赖开发包；工具可以复用运行时包。`tools/internal` 的导入范围由 Go 限制在 tools 子树内。
@@ -174,14 +201,14 @@ bin/dist、生成代码和外部 `*_test` 包不受约束；普通 `*_test.go` �
 分类按实际影响判断：纯文字是说明和规则表述，不包括工具配置、版本表、模板身份或可执行示例。
 多类改动取并集；完整 check 已覆盖的任务无需再单独执行。此表只调整本地要求，CI 和发布门禁保持完整。
 
-| 改动 | 必需验证 |
-| --- | --- |
-| 纯文字、协作规则 | `git diff --check`，核对本地链接、标题锚点及内容与实现一致性；无需 Go 格式化、全量 check 或 race |
-| 受检版本表、工具声明格式 | `mise run lint:versions`；工具或模块实质变更还须运行完整 check，并按 Go/依赖、MCP、打包与发布的影响补充对应验证 |
-| 文档中的模板身份或可执行示例 | 身份和受管文件变更运行 `mise run template:check`；修改示例时验证对应入口、参数或 API，执行时隔离应用 HOME |
-| Go 代码、测试、依赖、应用配置 | 格式化受影响的 Go 文件，运行针对性测试、`mise run check`；支持的宿主运行 `mise exec -- go test -race ./...` |
-| MCP 配置、验收工具或影响 MCP 的 Go/gopls 升级 | 增加 `mise run mcp:check`；Codex 客户端配置变更在受信任会话核对 `codex mcp list` 包含 gopls |
-| 打包与发布流程 | 按[发布验收](maintenance.md#升级和发布)完成 snapshot、release:verify 及发布前检查 |
+| 改动                                          | 必需验证                                                                                                                                          |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 纯文字、协作规则                              | 格式化本次修改的文本，运行 `mise run lint:text`、`git diff --check`，核对本地链接、标题锚点及内容与实现一致性；无需 Go 格式化、全量 check 或 race |
+| 受检版本表、工具声明格式                      | `mise run lint:versions`；工具或模块实质变更还须运行完整 check，并按 Go/依赖、MCP、打包与发布的影响补充对应验证                                   |
+| 文档中的模板身份或可执行示例                  | 身份和受管文件变更运行 `mise run template:check`；修改示例时验证对应入口、参数或 API，执行时隔离应用 HOME                                         |
+| Go 代码、测试、依赖、应用配置                 | 格式化受影响的 Go 文件，运行针对性测试、`mise run check`；支持的宿主运行 `mise exec -- go test -race ./...`                                       |
+| MCP 配置、验收工具或影响 MCP 的 Go/gopls 升级 | 增加 `mise run mcp:check`；Codex 客户端配置变更在受信任会话核对 `codex mcp list` 包含 gopls                                                       |
+| 打包与发布流程                                | 按[发布验收](maintenance.md#升级和发布)完成 snapshot、release:verify 及发布前检查                                                                 |
 
 消息和配置编辑期间分别可用 `lint:i18n`、`lint:config` 快速反馈；它们及 `lint:doc`、`lint:versions`、
 `lint:test`、`template:check`、`contract:check` 已由完整 check 覆盖。MCP、漏洞扫描、发布验收及其他 OS 原生运行独立执行。
@@ -317,7 +344,7 @@ GoLand 使用分号分隔子后缀，完整文件名也可以作为后缀匹配�
 
 ## 静态规则与开发探测
 
-`mise run lint` 检查双语消息、应用配置、包文档和版本声明，再检查格式并启用以下 18 项，生产导出 API 需中文 GoDoc；测试仅豁免 GoDoc，其他边界仍生效：
+`mise run lint` 检查五类文本、双语消息、应用配置、包文档和版本声明，再检查 Go 格式并启用以下 18 项，生产导出 API 需中文 GoDoc；测试仅豁免 GoDoc，其他边界仍生效：
 
 ```text
 errcheck govet ineffassign staticcheck unused bodyclose errorlint gosec godoclint

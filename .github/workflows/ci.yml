@@ -139,6 +139,7 @@ jobs:
       - *module-cache
       - *build-cache
       - *setup
+      - run: mise run doctor
       - name: 原生进程树、取消与资源所有权验收
         env:
           GO_CLI_STARTER_HOME: ${{ runner.temp }}/native-command-home
@@ -146,8 +147,9 @@ jobs:
       - name: 原生模板构建与二进制验收
         env:
           GO_CLI_STARTER_HOME: ${{ runner.temp }}/template-starter-home
-          MYCLI_HOME: ${{ runner.temp }}/template-mycli-home
+          # 生成应用由测试按实际身份隔离，避免模板改名后重复声明同一环境变量。
         run: mise exec -- go test -count=1 ./tools/template -run '^TestTemplateExecutable(Path|Acceptance)$'
+      - run: mise run lint:text
       - run: mise exec -- go test ./...
       - run: mise run build
   check:

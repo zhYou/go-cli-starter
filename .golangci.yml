@@ -45,22 +45,22 @@ linters:
         koanf-boundary:
           # 仅豁免精确配置加载文件，同名文件与测试不能绕过边界。
           files:
-            - '$all'
-            - '!${base-path}/internal/app/config/load.go'
+            - "$all"
+            - "!${base-path}/internal/app/config/load.go"
           deny:
             - pkg: github.com/knadh/koanf/v2$
               desc: 仅允许登记的配置加载文件引入 koanf
         zap-boundary:
           files:
-            - '$all'
-            - '!${base-path}/internal/base/logging/*.go'
+            - "$all"
+            - "!${base-path}/internal/base/logging/*.go"
           deny:
             - pkg: go.uber.org/zap
               desc: zap 后端与编码仅允许在 logging 包内使用
         telemetry-boundary:
           files:
-            - '$all'
-            - '!${base-path}/internal/base/telemetry/*.go'
+            - "$all"
+            - "!${base-path}/internal/base/telemetry/*.go"
           deny:
             - pkg: go.opentelemetry.io/otel/sdk
               desc: OTel SDK 生命周期仅允许在 telemetry 包内管理

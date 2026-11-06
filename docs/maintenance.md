@@ -28,7 +28,7 @@ CI 和 Security 检查目标为 main 的 PR 及 main 更新，开发分支普通
 PR 改目标、标题或描述会重新检查；同一 PR 新运行取消旧运行，其他运行按各自 ID 隔离。
 每日 Security 独立运行；推送 `v*` 标签时 Release 先复用同一提交的完整 CI 与 Security，再执行发布。
 
-Linux 源码、race、fuzz/benchmark、snapshot/安装及 MCP 验收分组并行，macOS/Windows 保留原生任务。
+Linux 源码、race、fuzz/benchmark、snapshot/安装及 MCP 验收分组并行，macOS/Windows 保留原生任务，并运行五类文本的格式和 lint 验收。
 CI 的 `check` 汇总全部作业，任一失败、取消或跳过都不能通过。平台运行、MCP、漏洞和发布验收独立于本地 `mise run check`。
 基础 CI 无需安装 Codex、RTK 或 superpowers；MCP job 复用统一 setup。
 

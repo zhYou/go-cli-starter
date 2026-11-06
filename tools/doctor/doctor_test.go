@@ -181,6 +181,19 @@ func doctorToolFixture(t *testing.T) string {
 import ("fmt"; "os"; "path/filepath"; "strings"; "time")
 func main() {
     name := strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe")
+    if name == "mise" && len(os.Args) == 3 && os.Args[1] == "which" {
+        path := filepath.Join(os.Getenv("DOCTOR_PROJECT_BIN"), os.Args[2])
+        if os.Args[2] == "prettier" { fmt.Println(path+".cmd"); return }
+        if runtime := os.Getenv("DOCTOR_EXE_SUFFIX"); runtime != "" { path += runtime }
+        if _, err := os.Stat(path); err != nil { os.Exit(1) }
+        fmt.Println(path); return
+    }
+    if name == "mise" && len(os.Args) == 3 && os.Args[1] == "where" && os.Args[2] == "npm:prettier" {
+        fmt.Println(os.Getenv("DOCTOR_PRETTIER_PREFIX")); return
+    }
+    if name == "node" && len(os.Args) == 3 && strings.HasSuffix(os.Args[1], "prettier.cjs") && os.Args[2] == "--version" {
+        fmt.Println("3.9.10"); return
+    }
     arg := "--version"
     if name == "gopls" { arg = "version" }
     if len(os.Args) != 2 || os.Args[1] != arg { os.Exit(2) }
@@ -193,6 +206,9 @@ func main() {
     }
     switch name {
     case "mise": fmt.Println(os.Getenv("DOCTOR_MISE_VERSION"))
+    case "node": fmt.Println("v26.13.0")
+    case "uv":
+        if filepath.Dir(os.Args[0]) == os.Getenv("DOCTOR_PROJECT_BIN") { fmt.Println("uv 0.13.7") } else { fmt.Println("uv 0.13.6") }
     case "gopls": fmt.Println("golang.org/x/tools/gopls v" + os.Getenv("DOCTOR_GOPLS_VERSION"))
     default: fmt.Println(name + " fixture")
     }
@@ -223,6 +239,10 @@ func doctorEnvironmentFixture(t *testing.T, binary, missing string) *os.File {
 		require.NoError(t, fixture.CopyFile(binary, filepath.Join(bin, name)))
 	}
 	t.Setenv("PATH", bin)
+	t.Setenv("DOCTOR_PROJECT_BIN", bin)
+	if runtime.GOOS == windowsPlatform {
+		t.Setenv("DOCTOR_EXE_SUFFIX", executableSuffix)
+	}
 	t.Setenv("DOCTOR_MISE_VERSION", "2026.10.25 linux-x64")
 	t.Setenv("DOCTOR_GOPLS_VERSION", "0.24.0")
 	t.Setenv("GO_CLI_STARTER_HOME", t.TempDir())
@@ -325,4 +345,49 @@ func TestDoctorUserToolsOnlyReport(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestDoctorUsesMiseSelectedExecutable(t *testing.T) {
+	binary := doctorToolFixture(t)
+	doctorEnvironmentFixture(t, binary, "")
+	file, err := os.OpenFile("mise.toml", os.O_APPEND|os.O_WRONLY, 0)
+	require.NoError(t, err)
+	_, err = file.WriteString("uv = \"0.13.7\"\n")
+	require.NoError(t, err)
+	require.NoError(t, file.Close())
+	name := "uv"
+	if runtime.GOOS == windowsPlatform {
+		name += executableSuffix
+	}
+	require.NoError(t, fixture.CopyFile(binary, filepath.Join(os.Getenv("DOCTOR_PROJECT_BIN"), name)))
+	shadow := t.TempDir()
+	require.NoError(t, fixture.CopyFile(binary, filepath.Join(shadow, name)))
+	t.Setenv("PATH", shadow+string(os.PathListSeparator)+os.Getenv("PATH"))
+	require.NoError(t, doctor())
+}
+
+func TestDoctorRunsPrettierEntryWithSelectedNode(t *testing.T) {
+	binary := doctorToolFixture(t)
+	doctorEnvironmentFixture(t, binary, "")
+	cfg, err := os.OpenFile("mise.toml", os.O_APPEND|os.O_WRONLY, 0)
+	require.NoError(t, err)
+	_, err = cfg.WriteString("node = \"26.13.0\"\n\"npm:prettier\" = \"3.9.10\"\n")
+	require.NoError(t, err)
+	require.NoError(t, cfg.Close())
+	node := "node"
+	if runtime.GOOS == windowsPlatform {
+		node += executableSuffix
+	}
+	bin := os.Getenv("DOCTOR_PROJECT_BIN")
+	require.NoError(t, fixture.CopyFile(binary, filepath.Join(bin, node)))
+	//nolint:gosec // G703：只在本次临时工具目录中创建不可执行的 npm 包装脚本夹具。
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "prettier.cmd"), []byte("not an executable"), 0o600))
+	prefix := filepath.Join(t.TempDir(), "npm tools with spaces")
+	entry := filepath.Join(prefix, "node_modules/prettier/bin/prettier.cjs")
+	require.NoError(t, os.MkdirAll(filepath.Dir(entry), 0o700))
+	require.NoError(t, os.WriteFile(entry, []byte("// fixture"), 0o600))
+	t.Setenv("DOCTOR_PRETTIER_PREFIX", prefix)
+	require.NoError(t, doctor())
+	require.NoError(t, os.Remove(entry))
+	require.ErrorContains(t, doctor(), "Prettier")
 }
