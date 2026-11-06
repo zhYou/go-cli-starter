@@ -227,6 +227,25 @@ func doctorEnvironmentFixture(t *testing.T, binary, missing string) *os.File {
 	t.Setenv("DOCTOR_GOPLS_VERSION", "0.24.0")
 	t.Setenv("GO_CLI_STARTER_HOME", t.TempDir())
 	t.Chdir(root)
+
+	// 先完成 fixture 的首次启动，避免宿主启动开销占用被测探测的三秒预算。
+	for _, name := range []string{"mise", "git", "gh", "codex", "rtk", "gopls"} {
+		if name == missing {
+			continue
+		}
+		arg := "--version"
+		if name == "gopls" {
+			arg = "version"
+		}
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+		//nolint:gosec // G204：只启动 PATH 指向的本次测试 fixture；故障模式在就绪后单独设置。
+		cmd := exec.CommandContext(ctx, name, arg)
+		cmd.Env = append(os.Environ(), "DOCTOR_FAULT_TOOL=", "DOCTOR_FAULT=")
+		output, err := cmd.CombinedOutput()
+		cancel()
+		require.NoError(t, err, "fixture %s 未就绪：%s", name, output)
+	}
+
 	out, err := os.CreateTemp(t.TempDir(), "doctor-output")
 	require.NoError(t, err)
 	original := os.Stdout
@@ -270,25 +289,39 @@ func TestDoctorRequiredTools(t *testing.T) {
 
 func TestDoctorUserToolsOnlyReport(t *testing.T) {
 	binary := doctorToolFixture(t)
+	out := doctorEnvironmentFixture(t, binary, "")
 	for _, name := range []string{"gh", "codex", "rtk"} {
 		for _, fault := range []struct{ mode, detail string }{
 			{"available", "fixture"}, {"missing", "不可用"}, {"failure", "不可用"}, {"timeout", "超时"}, {"truncated", "截断"},
 		} {
 			t.Run(name+"/"+fault.mode, func(t *testing.T) {
-				missing := ""
 				if fault.mode == "missing" {
-					missing = name
+					path, err := exec.LookPath(name)
+					require.NoError(t, err)
+					require.NoError(t, os.Rename(path, path+".hidden"))
+					t.Cleanup(func() {
+						require.NoError(t, os.Rename(path+".hidden", path))
+					})
 				}
-				out := doctorEnvironmentFixture(t, binary, missing)
+				require.NoError(t, out.Truncate(0))
+				_, err := out.Seek(0, 0)
+				require.NoError(t, err)
 				t.Setenv("DOCTOR_FAULT_TOOL", name)
 				t.Setenv("DOCTOR_FAULT", fault.mode)
 				require.NoError(t, doctor())
-				_, err := out.Seek(0, 0)
+				_, err = out.Seek(0, 0)
 				require.NoError(t, err)
 				data, err := io.ReadAll(out)
 				require.NoError(t, err)
-				require.Contains(t, string(data), name)
-				require.Contains(t, string(data), fault.detail)
+				var detail string
+				for _, line := range strings.Split(string(data), "\n") {
+					if strings.HasPrefix(line, "用户工具："+name+"：") {
+						detail = line
+						break
+					}
+				}
+				require.NotEmpty(t, detail)
+				require.Contains(t, detail, fault.detail)
 			})
 		}
 	}
