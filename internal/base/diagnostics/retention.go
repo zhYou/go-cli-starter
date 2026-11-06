@@ -29,7 +29,7 @@ func Cleanup(base string, config Config) error {
 }
 
 // cleanup 的删除操作按调用传入，便于验证文件系统失败或进程中断后的恢复。
-func cleanup(base string, config Config, remove func(*os.Root, string) error) error {
+func cleanup(base string, config Config, remove func(*os.Root, string) error) (resultErr error) {
 	if config.RetentionDays == 0 && config.MaxTotalSizeMiB == 0 {
 		return nil
 	}
@@ -38,7 +38,7 @@ func cleanup(base string, config Config, remove func(*os.Root, string) error) er
 		return err
 	}
 	defer func() {
-		_ = root.Close()
+		resultErr = errors.Join(resultErr, root.Close())
 	}()
 	if info, err := root.Lstat(maintenanceName); err == nil && !info.Mode().IsRegular() {
 		return invalidmaintenancelock.New()
@@ -49,7 +49,7 @@ func cleanup(base string, config Config, remove func(*os.Root, string) error) er
 		return err
 	}
 	defer func() {
-		_ = maintenance.Close()
+		resultErr = errors.Join(resultErr, maintenance.Close())
 	}()
 	if !locked {
 		return nil
@@ -92,8 +92,8 @@ func cleanup(base string, config Config, remove func(*os.Root, string) error) er
 	return nil
 }
 
-func inspect(root *os.Root, name string) (candidate, error) {
-	c := candidate{
+func inspect(root *os.Root, name string) (c candidate, resultErr error) {
+	c = candidate{
 		name:  name,
 		files: map[string]os.FileInfo{},
 	}
@@ -110,14 +110,15 @@ func inspect(root *os.Root, name string) (candidate, error) {
 		return c, err
 	}
 	defer func() {
-		_ = child.Close()
+		resultErr = errors.Join(resultErr, child.Close())
 	}()
 	entries, err := readEntries(child)
 	if err != nil {
 		return c, err
 	}
 	for _, e := range entries {
-		if !e.Type().IsRegular() || (e.Name() != metadataName && e.Name() != metadataTemporaryName && e.Name() != leaseName && !artifactPattern.MatchString(e.Name())) {
+		if !e.Type().IsRegular() ||
+			(e.Name() != metadataName && e.Name() != metadataTemporaryName && e.Name() != leaseName && !artifactPattern.MatchString(e.Name())) {
 			return c, unknowncontent.New()
 		}
 		info, err := e.Info()
@@ -151,7 +152,12 @@ func inspect(root *os.Root, name string) (candidate, error) {
 	return c, nil
 }
 
-func removeCandidate(root *os.Root, base string, c candidate, remove func(*os.Root, string) error) (bool, error) {
+func removeCandidate(
+	root *os.Root,
+	base string,
+	c candidate,
+	remove func(*os.Root, string) error,
+) (_ bool, resultErr error) {
 	leaseInfo, err := root.Lstat(filepath.Join(c.name, leaseName))
 	if err != nil || !leaseInfo.Mode().IsRegular() {
 		return false, nil
@@ -162,7 +168,7 @@ func removeCandidate(root *os.Root, base string, c candidate, remove func(*os.Ro
 		return false, nil
 	}
 	defer func() {
-		_ = lease.Close()
+		resultErr = errors.Join(resultErr, lease.Close())
 	}()
 	if !locked {
 		return false, nil
@@ -180,14 +186,17 @@ func removeCandidate(root *os.Root, base string, c candidate, remove func(*os.Ro
 	if err != nil {
 		return false, err
 	}
+	defer func() {
+		if child != nil {
+			resultErr = errors.Join(resultErr, child.Close())
+		}
+	}()
 	entries, err := readEntries(child)
 	if err != nil {
-		_ = child.Close()
 		return false, err
 	}
 	// 删除前重新核对完整清单；后来新增的文件（即使名称已登记）不属于已校验快照。
 	if !matchesSnapshot(child, entries, fresh.files) {
-		_ = child.Close()
 		return false, nil
 	}
 	for _, e := range entries {
@@ -196,30 +205,29 @@ func removeCandidate(root *os.Root, base string, c candidate, remove func(*os.Ro
 		}
 		info, statErr := child.Lstat(e.Name())
 		if statErr != nil || !info.Mode().IsRegular() || !os.SameFile(fresh.files[e.Name()], info) {
-			_ = child.Close()
 			return false, nil
 		}
 		if err = remove(child, e.Name()); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			_ = child.Close()
 			return false, err
 		}
 		delete(fresh.files, e.Name())
 	}
 	entries, err = readEntries(child)
 	if err != nil {
-		_ = child.Close()
 		return false, err
 	}
 	if !matchesSnapshot(child, entries, fresh.files) {
-		_ = child.Close()
 		return false, nil
 	}
 	// 数据清理全部成功后再移除标记，进程中断或单个删除失败时仍可被下次清理识别。
 	if err = remove(child, metadataName); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		_ = child.Close()
 		return false, err
 	}
-	_ = child.Close()
+	err = child.Close()
+	child = nil
+	if err != nil {
+		return false, err
+	}
 	// Windows 不允许删除仍打开的锁文件，释放后再次核对目录身份；发布后的目录不会复用。
 	if err = lease.Close(); err != nil {
 		return false, err

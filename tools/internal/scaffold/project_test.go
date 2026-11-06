@@ -44,7 +44,14 @@ func TestInspectRejectsAmbiguousOrInvalidEntry(t *testing.T) {
 			case "multiple":
 				//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
 				require.NoError(t, os.MkdirAll(filepath.Join(root, "cmd", "other"), 0o755))
-				require.NoError(t, os.WriteFile(filepath.Join(root, "cmd", "other", "main.go"), []byte("package main\nconst appName=\"other\"\nfunc main(){}"), 0o600))
+				require.NoError(
+					t,
+					os.WriteFile(
+						filepath.Join(root, "cmd", "other", "main.go"),
+						[]byte("package main\nconst appName=\"other\"\nfunc main(){}"),
+						0o600,
+					),
+				)
 			default:
 				source := map[string]string{
 					"mismatch":     "package main\nconst appName=\"other\"\nfunc main(){}",

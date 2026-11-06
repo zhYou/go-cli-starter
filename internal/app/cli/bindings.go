@@ -15,7 +15,10 @@ type textMessage struct {
 }
 
 type commandTexts struct {
-	short, long, use, example textMessage
+	short   textMessage
+	long    textMessage
+	use     textMessage
+	example textMessage
 }
 
 type commandTextBinding struct {
@@ -51,7 +54,10 @@ func (call *invocation) localizeTree(root *cobra.Command, language string) error
 		return localizer.Format(text.id, messages.FormatOptions{Params: text.params})
 	}
 	type renderedCommand struct {
-		short, long, use, example string
+		short   string
+		long    string
+		use     string
+		example string
 	}
 	commands := make([]renderedCommand, len(call.commandTexts))
 	for i, binding := range call.commandTexts {
@@ -94,7 +100,10 @@ func (call *invocation) localizeTree(root *cobra.Command, language string) error
 	var collectVersions func(*cobra.Command) error
 	collectVersions = func(cmd *cobra.Command) error {
 		if cmd == root || cmd.Version != "" {
-			version, err := localizer.Format("cli.version_template", messages.FormatOptions{Params: map[string]any{paramName: cmd.Name(), "Version": cmd.Version}})
+			version, err := localizer.Format(
+				"cli.version_template",
+				messages.FormatOptions{Params: map[string]any{paramName: cmd.Name(), "Version": cmd.Version}},
+			)
 			if err != nil {
 				return err
 			}

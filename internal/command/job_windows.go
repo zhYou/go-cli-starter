@@ -17,10 +17,14 @@ func newWindowsJob() (windows.Handle, error) {
 	// 不允许 breakaway；nil SECURITY_ATTRIBUTES 保证 Job 句柄不可继承。
 	limits.BasicLimitInformation.LimitFlags = windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
 	//nolint:gosec // G103：同步 Win32 Job API 按固定原生结构大小访问栈对象，不跨调用保存指针。
-	_, err = windows.SetInformationJobObject(job, windows.JobObjectExtendedLimitInformation, uintptr(unsafe.Pointer(&limits)), uint32(unsafe.Sizeof(limits)))
+	_, err = windows.SetInformationJobObject(
+		job,
+		windows.JobObjectExtendedLimitInformation,
+		uintptr(unsafe.Pointer(&limits)),
+		uint32(unsafe.Sizeof(limits)),
+	)
 	if err != nil {
-		_ = windows.CloseHandle(job)
-		return 0, err
+		return 0, errors.Join(err, windows.CloseHandle(job))
 	}
 	return job, nil
 }
@@ -29,14 +33,26 @@ func newWindowsJob() (windows.Handle, error) {
 // https://learn.microsoft.com/windows/win32/api/winnt/ns-winnt-jobobject_basic_accounting_information
 // x/sys 尚未提供此结构。
 type jobAccounting struct {
-	TotalUserTime, TotalKernelTime, ThisPeriodTotalUserTime, ThisPeriodTotalKernelTime int64
-	TotalPageFaultCount, TotalProcesses, ActiveProcesses, TotalTerminatedProcesses     uint32
+	TotalUserTime             int64
+	TotalKernelTime           int64
+	ThisPeriodTotalUserTime   int64
+	ThisPeriodTotalKernelTime int64
+	TotalPageFaultCount       uint32
+	TotalProcesses            uint32
+	ActiveProcesses           uint32
+	TotalTerminatedProcesses  uint32
 }
 
 func jobActiveProcesses(job windows.Handle) (uint32, error) {
 	var info jobAccounting
 	//nolint:gosec // G103：同步 Win32 Job API 按固定原生结构大小访问栈对象，不跨调用保存指针。
-	err := windows.QueryInformationJobObject(job, windows.JobObjectBasicAccountingInformation, uintptr(unsafe.Pointer(&info)), uint32(unsafe.Sizeof(info)), nil)
+	err := windows.QueryInformationJobObject(
+		job,
+		windows.JobObjectBasicAccountingInformation,
+		uintptr(unsafe.Pointer(&info)),
+		uint32(unsafe.Sizeof(info)),
+		nil,
+	)
 	return info.ActiveProcesses, err
 }
 

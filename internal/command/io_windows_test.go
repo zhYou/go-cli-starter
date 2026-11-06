@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestWindowsNativeIOAndBorrowedFiles(t *testing.T) {
@@ -26,7 +28,7 @@ func TestWindowsNativeIOAndBorrowedFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		_ = file.Close()
+		require.NoError(t, file.Close())
 	}()
 	options.IO.Out = file
 	options.IO.ErrOut = file
@@ -71,7 +73,7 @@ func TestWindowsBorrowedInputFileRemainsOpen(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		_ = input.Close()
+		require.NoError(t, input.Close())
 	}()
 	if _, err = input.WriteString("borrowed input"); err != nil {
 		t.Fatal(err)

@@ -19,7 +19,8 @@ func validateMove(move *commandMove, name string) error {
 	if move == nil {
 		return nil
 	}
-	if validateCommandName(name) != nil || name == TemplateName || move.From != "cmd/"+TemplateName || move.To != "cmd/"+name {
+	if validateCommandName(name) != nil || name == TemplateName || move.From != "cmd/"+TemplateName ||
+		move.To != "cmd/"+name {
 		return fmt.Errorf("命令目录移动记录无效")
 	}
 	return nil
@@ -115,14 +116,15 @@ func (i *Initializer) commandLocation(root string, tx transaction) (string, erro
 		return "", fmt.Errorf("命令目录存在状态不明确，保留恢复现场")
 	}
 	location := locations[0]
-	if (tx.Phase == phasePrepared && location != tx.Move.From) || (tx.Phase == phaseCommitted && location != tx.Move.To) {
+	if (tx.Phase == phasePrepared && location != tx.Move.From) ||
+		(tx.Phase == phaseCommitted && location != tx.Move.To) {
 		return "", fmt.Errorf("命令目录与恢复阶段不一致")
 	}
 	expected := map[string]bool{}
 	temporary := []string{}
 	for _, file := range tx.Files {
-		if strings.HasPrefix(file.Path, tx.Move.From+"/") {
-			expected[strings.TrimPrefix(file.Path, tx.Move.From+"/")] = true
+		if after, ok := strings.CutPrefix(file.Path, tx.Move.From+"/"); ok {
+			expected[after] = true
 			temporary = append(temporary, path.Base(transactionTemporary(file.Path)))
 		}
 	}

@@ -25,7 +25,10 @@ other = "你好，{{.Name}}！"
 	require.Equal(t, "你好，Ada！", zh.Text("sample", map[string]any{"Name": "Ada"}))
 	require.NotContains(t, en.Text("missing", nil), "log")
 	cause := errors.New("disk full")
-	e := (fault.Definition{Code: "sample", Kind: fault.Runtime}).Wrap(cause, fault.WithParams(fault.Params{"Name": "Ada"}))
+	e := (fault.Definition{Code: "sample", Kind: fault.Runtime}).Wrap(
+		cause,
+		fault.WithParams(fault.Params{"Name": "Ada"}),
+	)
 	require.Contains(t, en.Render(e), "Hello, Ada!")
 	require.Contains(t, en.Render(e), "disk full")
 	require.NotContains(t, en.Text("sample", nil), "<no value>")
@@ -206,7 +209,9 @@ func TestFormatRejectsUnavailableLanguage(t *testing.T) {
 func TestBundlePreservesReservedTOMLMessageIDs(t *testing.T) {
 	for _, id := range []string{"translation", "other", "id"} {
 		t.Run(id, func(t *testing.T) {
-			catalog := fstest.MapFS{"active.en.toml": {Data: []byte("[\"" + id + "\"]\none = \"One\"\nother = \"Many\"\n")}}
+			catalog := fstest.MapFS{
+				"active.en.toml": {Data: []byte("[\"" + id + "\"]\none = \"One\"\nother = \"Many\"\n")},
+			}
 			bundle, err := NewBundle(catalog)
 			require.NoError(t, err)
 			localizer := bundle.Localizer("en")

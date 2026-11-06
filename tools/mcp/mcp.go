@@ -14,7 +14,7 @@ import (
 )
 
 // checkMCP 验证 Codex 配置中使用的 stdio 命令。
-func checkMCP() error {
+func checkMCP() (resultErr error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, miseProgram, "exec", "--", goplsProgram, "mcp")
@@ -31,13 +31,19 @@ func checkMCP() error {
 		return err
 	}
 	defer func() {
-		_ = in.Close()
-		_ = cmd.Process.Kill()
-		_ = cmd.Wait()
+		closeErr := in.Close()
+		if resultErr != nil {
+			if err := cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+				resultErr = errors.Join(resultErr, err)
+			}
+		}
+		resultErr = errors.Join(resultErr, closeErr, cmd.Wait())
 	}()
 	encoder, decoder := json.NewEncoder(in), json.NewDecoder(out)
 	call := func(id int, method string, params any) (json.RawMessage, error) {
-		if err := encoder.Encode(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": params}); err != nil {
+		if err := encoder.Encode(
+			map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": params},
+		); err != nil {
 			return nil, err
 		}
 		for {

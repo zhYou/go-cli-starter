@@ -24,7 +24,9 @@ func TestRecoveryRejectsRealSymlink(t *testing.T) {
 		},
 	}}
 	require.Panics(t, func() {
-		_, _ = i.Initialize(context.Background(), root, "example.com/tool", "tool")
+		if _, err := i.Initialize(context.Background(), root, "example.com/tool", "tool"); err != nil {
+			t.Error(err)
+		}
 	})
 	outside := filepath.Join(t.TempDir(), "outside")
 	require.NoError(t, os.WriteFile(outside, []byte("人工内容"), 0o600))
@@ -46,6 +48,7 @@ func TestCanceledInitializationDoesNotWrite(t *testing.T) {
 	cancel()
 	_, err := i.Initialize(ctx, root, "example.com/tool", "tool")
 	require.ErrorIs(t, err, context.Canceled)
-	ok, _ := afero.Exists(i.FS, filepath.Join(root, journalDir))
+	ok, err := afero.Exists(i.FS, filepath.Join(root, journalDir))
+	require.NoError(t, err)
 	require.False(t, ok)
 }

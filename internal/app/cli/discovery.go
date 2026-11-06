@@ -120,7 +120,8 @@ func completeHelp(root *cobra.Command) cobra.CompletionFunc {
 		}
 		var choices []cobra.Completion
 		for _, child := range target.Commands() {
-			if !child.Hidden && (child.IsAvailableCommand() || child.Name() == commandHelp) && strings.HasPrefix(child.Name(), prefix) {
+			if !child.Hidden && (child.IsAvailableCommand() || child.Name() == commandHelp) &&
+				strings.HasPrefix(child.Name(), prefix) {
 				choices = append(choices, child.Name()+"\t"+child.Short)
 			}
 		}
@@ -136,7 +137,10 @@ func registerCompletionValues(root *cobra.Command) error {
 		{flagLanguage, []cobra.Completion{languageEnglish, languageChinese, "zh"}},
 		{flagLogLevel, []cobra.Completion{"debug", defaultLogLevel, "warn", "error"}},
 	} {
-		if err := root.RegisterFlagCompletionFunc(flag.name, cobra.FixedCompletions(flag.values, cobra.ShellCompDirectiveNoFileComp)); err != nil {
+		if err := root.RegisterFlagCompletionFunc(
+			flag.name,
+			cobra.FixedCompletions(flag.values, cobra.ShellCompDirectiveNoFileComp),
+		); err != nil {
 			return err
 		}
 	}

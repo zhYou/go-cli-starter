@@ -7,24 +7,6 @@ import (
 	"testing"
 )
 
-func writeFixture(t *testing.T, root, name, contents string) {
-	t.Helper()
-	path := filepath.Join(root, filepath.FromSlash(name))
-	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func fixtureRoot(t *testing.T) string {
-	t.Helper()
-	root := t.TempDir()
-	writeFixture(t, root, "configs/config.example.toml", "[logging]\nlevel = \"info\"\n")
-	return root
-}
-
 func TestCheckAllowsOnlyUnmanagedToolsAndFixtureData(t *testing.T) {
 	root := fixtureRoot(t)
 	for name, contents := range map[string]string{
@@ -59,7 +41,9 @@ func TestCheckAllowsMissingLocalesDuringTransition(t *testing.T) {
 
 func TestCheckRejectsInvalidManagedFiles(t *testing.T) {
 	tests := []struct {
-		name, path, contents string
+		name     string
+		path     string
+		contents string
 	}{
 		{"应用 JSON", "configs/extra/app.json", "{}"},
 		{"应用 YAML", "configs/app.yaml", "name: value"},
@@ -117,4 +101,22 @@ func TestCheckAcceptsRepository(t *testing.T) {
 	if err := checkConfig(filepath.Join("..", "..")); err != nil {
 		t.Fatalf("当前仓库应符合应用配置策略: %v", err)
 	}
+}
+
+func writeFixture(t *testing.T, root, name, contents string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(name))
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func fixtureRoot(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	writeFixture(t, root, "configs/config.example.toml", "[logging]\nlevel = \"info\"\n")
+	return root
 }

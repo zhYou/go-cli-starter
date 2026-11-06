@@ -11,36 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func contractGit(t *testing.T, root string, args ...string) string {
-	t.Helper()
-	//nolint:gosec // G204：测试只运行当前测试二进制或固定 Git/Go 命令，参数来自临时 fixture。
-	cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
-	data, err := cmd.CombinedOutput()
-	require.NoError(t, err, "%s", data)
-	return strings.TrimSpace(string(data))
-}
-
-func contractHistory(t *testing.T) string {
-	t.Helper()
-	root := t.TempDir()
-	contractGit(t, root, "-c", "init.templateDir=", "init", "--quiet")
-	require.NoError(t, os.WriteFile(filepath.Join(root, "README.md"), []byte("fixture"), 0o600))
-	return root
-}
-
-func writeContractFixture(t *testing.T, root, path string, data []byte) {
-	t.Helper()
-	//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
-	require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(root, path)), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(root, path), data, 0o600))
-}
-
-func commitContractFixture(t *testing.T, root string) {
-	t.Helper()
-	contractGit(t, root, "add", ".")
-	contractGit(t, root, "-c", "user.name=fixture", "-c", "user.email=fixture@example.com", "commit", "--quiet", "-m", "fixture")
-}
-
 func TestReadContractBaseAcrossLayoutMigration(t *testing.T) {
 	for _, mode := range []string{"old", "new", "both", "none"} {
 		t.Run(mode, func(t *testing.T) {
@@ -73,7 +43,10 @@ func TestReadContractBaseRejectsInvalidHistory(t *testing.T) {
 			case "symlink":
 				//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
 				require.NoError(t, os.MkdirAll(filepath.Join(root, "test/testdata/contracts"), 0o755))
-				if err := os.Symlink("../../../README.md", filepath.Join(root, "test/testdata/contracts/v1.json")); err != nil {
+				if err := os.Symlink(
+					"../../../README.md",
+					filepath.Join(root, "test/testdata/contracts/v1.json"),
+				); err != nil {
 					t.Skipf("当前平台无法创建链接：%v", err)
 				}
 			}
@@ -110,7 +83,10 @@ func TestInvalidNewContractDoesNotFallback(t *testing.T) {
 			} else {
 				//nolint:gosec // G301：测试路径和权限只来自当前临时 fixture，不读取用户文件。
 				require.NoError(t, os.MkdirAll(filepath.Join(root, "test/testdata/contracts"), 0o755))
-				if err := os.Symlink("../../../testdata/contracts/v1.json", filepath.Join(root, "test/testdata/contracts/v1.json")); err != nil {
+				if err := os.Symlink(
+					"../../../testdata/contracts/v1.json",
+					filepath.Join(root, "test/testdata/contracts/v1.json"),
+				); err != nil {
 					t.Skipf("当前平台无法创建链接：%v", err)
 				}
 			}
@@ -121,4 +97,45 @@ func TestInvalidNewContractDoesNotFallback(t *testing.T) {
 			require.Error(t, checkContract(context.Background(), "HEAD"))
 		})
 	}
+}
+
+func contractGit(t *testing.T, root string, args ...string) string {
+	t.Helper()
+	//nolint:gosec // G204：测试只运行当前测试二进制或固定 Git/Go 命令，参数来自临时 fixture。
+	cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+	data, err := cmd.CombinedOutput()
+	require.NoError(t, err, "%s", data)
+	return strings.TrimSpace(string(data))
+}
+
+func contractHistory(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	contractGit(t, root, "-c", "init.templateDir=", "init", "--quiet")
+	require.NoError(t, os.WriteFile(filepath.Join(root, "README.md"), []byte("fixture"), 0o600))
+	return root
+}
+
+func writeContractFixture(t *testing.T, root, path string, data []byte) {
+	t.Helper()
+	//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
+	require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(root, path)), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(root, path), data, 0o600))
+}
+
+func commitContractFixture(t *testing.T, root string) {
+	t.Helper()
+	contractGit(t, root, "add", ".")
+	contractGit(
+		t,
+		root,
+		"-c",
+		"user.name=fixture",
+		"-c",
+		"user.email=fixture@example.com",
+		"commit",
+		"--quiet",
+		"-m",
+		"fixture",
+	)
 }

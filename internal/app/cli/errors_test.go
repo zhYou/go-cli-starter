@@ -102,7 +102,7 @@ func TestCobraRequiredFlagIsUsageError(t *testing.T) {
 	require.Equal(t, 2, exitCode(err))
 }
 
-func TestCommandEmbeddingHelper(t *testing.T) {
+func TestCommandEmbeddingHelper(_ *testing.T) {
 	if os.Getenv("COMMAND_EMBED_HELPER") == "1" {
 		os.Exit(7)
 	}
@@ -122,8 +122,15 @@ func TestEmbeddedCommandErrorsFollowCLILanguage(t *testing.T) {
 					Program: executable,
 					Args:    []string{"-test.run=^TestCommandEmbeddingHelper$"},
 				}}, command.Execution{
-					Dir:       home,
-					Env:       []string{"COMMAND_EMBED_HELPER=1", "GORACE=atexit_sleep_ms=0", "GO_CLI_STARTER_HOME=" + home, "HOME=" + home, "USERPROFILE=" + home, "SYSTEMROOT=" + os.Getenv("SYSTEMROOT")},
+					Dir: home,
+					Env: []string{
+						"COMMAND_EMBED_HELPER=1",
+						"GORACE=atexit_sleep_ms=0",
+						"GO_CLI_STARTER_HOME=" + home,
+						"HOME=" + home,
+						"USERPROFILE=" + home,
+						"SYSTEMROOT=" + os.Getenv("SYSTEMROOT"),
+					},
 					Localizer: opts.Localizer,
 				}, command.BatchOptions{})
 				return greeting.Result{}, err
@@ -139,7 +146,8 @@ func TestEmbeddedCommandErrorsFollowCLILanguage(t *testing.T) {
 					return "", false
 				},
 			})
-			if code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), want) || !strings.Contains(stderr.String(), "exit status 7") {
+			if code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), want) ||
+				!strings.Contains(stderr.String(), "exit status 7") {
 				t.Fatalf("嵌入工具诊断 code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 			}
 		})

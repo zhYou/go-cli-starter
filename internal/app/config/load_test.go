@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,7 +17,11 @@ func TestConfigurationPrecedence(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
-		name, path, env, flag, want string
+		name string
+		path string
+		env  string
+		flag string
+		want string
 	}{
 		{"默认值", "", "", "", "info"},
 		{"文件", path, "", "", "info"},
@@ -28,7 +33,7 @@ func TestConfigurationPrecedence(t *testing.T) {
 			if tc.flag != "" {
 				override = &tc.flag
 			}
-			cfg, err := Load(Options{
+			cfg, err := Load(t.Context(), Options{
 				AppName:       "my-cli",
 				Path:          tc.path,
 				UserConfigDir: dir,
@@ -50,11 +55,14 @@ func TestInvalidConfigurationFails(t *testing.T) {
 		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := Load(Options{AppName: "testcli", Path: path}); err == nil {
+		if _, err := Load(t.Context(), Options{AppName: "testcli", Path: path}); err == nil {
 			t.Errorf("错误地接受了无效配置 %q", content)
 		}
 	}
-	if _, err := Load(Options{AppName: "testcli", Path: filepath.Join(t.TempDir(), "missing")}); err == nil {
+	if _, err := Load(
+		t.Context(),
+		Options{AppName: "testcli", Path: filepath.Join(t.TempDir(), "missing")},
+	); err == nil {
 		t.Fatal("错误地接受了不存在的显式配置文件")
 	}
 }
@@ -64,10 +72,14 @@ func TestLoadsDefaultUserConfiguration(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(dir, "mycli"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "mycli", "config.toml"), []byte("[logging]\nlevel = \"debug\"\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(dir, "mycli", "config.toml"),
+		[]byte("[logging]\nlevel = \"debug\"\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
-	cfg, err := Load(Options{
+	cfg, err := Load(t.Context(), Options{
 		AppName:       "mycli",
 		UserConfigDir: dir,
 		LookupEnv: func(string) (string, bool) {
@@ -83,7 +95,7 @@ func TestExplicitDefaultOverridesEnvironment(t *testing.T) {
 	dir := t.TempDir()
 	warn := "warn"
 	for _, override := range []*string{nil, &warn} {
-		cfg, err := Load(Options{
+		cfg, err := Load(t.Context(), Options{
 			AppName:       "my-cli",
 			UserConfigDir: dir,
 			LogLevel:      override,
@@ -125,7 +137,7 @@ func TestStrictTOML(t *testing.T) {
 		t.Run(tc.text, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "config.toml")
 			require.NoError(t, os.WriteFile(path, []byte(tc.text), 0o600))
-			_, err := Load(Options{
+			_, err := Load(t.Context(), Options{
 				AppName:       "testcli",
 				Path:          path,
 				UserConfigDir: t.TempDir(),
@@ -143,9 +155,15 @@ func TestStrictTOML(t *testing.T) {
 }
 
 func TestModuleDefaultsAndEnvironmentTypes(t *testing.T) {
-	env := map[string]string{"TOOL_LOGGING_OUTPUT": "none", "TOOL_LOGGING_LEVEL": "warn", "TOOL_LOG_LEVEL": "error", "TOOL_DIAGNOSTICS_MAX_BACKUPS": "8", "TOOL_TELEMETRY_EXPORT_TIMEOUT": "250ms"}
+	env := map[string]string{
+		"TOOL_LOGGING_OUTPUT":           "none",
+		"TOOL_LOGGING_LEVEL":            "warn",
+		"TOOL_LOG_LEVEL":                "error",
+		"TOOL_DIAGNOSTICS_MAX_BACKUPS":  "8",
+		"TOOL_TELEMETRY_EXPORT_TIMEOUT": "250ms",
+	}
 	load := func() (Config, error) {
-		return Load(Options{
+		return Load(t.Context(), Options{
 			AppName:       "tool",
 			UserConfigDir: t.TempDir(),
 			LookupEnv: func(k string) (string, bool) {
@@ -177,9 +195,12 @@ func TestModuleDefaultsAndEnvironmentTypes(t *testing.T) {
 
 func TestAppHomeOverridesDefaultAndRejectsRelativeEvenWithExplicitFile(t *testing.T) {
 	home := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(home, "config.toml"), []byte("[logging]\nlevel = \"debug\"\n"), 0o600))
+	require.NoError(
+		t,
+		os.WriteFile(filepath.Join(home, "config.toml"), []byte("[logging]\nlevel = \"debug\"\n"), 0o600),
+	)
 	load := func(file string) (Config, error) {
-		return Load(Options{
+		return Load(t.Context(), Options{
 			AppName:       "tool",
 			Path:          file,
 			UserConfigDir: t.TempDir(),
@@ -199,8 +220,9 @@ func TestAppHomeOverridesDefaultAndRejectsRelativeEvenWithExplicitFile(t *testin
 
 func TestTOMLKeyStructureBeforeMerging(t *testing.T) {
 	for _, tc := range []struct {
-		name, text string
-		valid      bool
+		name  string
+		text  string
+		valid bool
 	}{
 		{"点号语法", `logging.level = "debug"
 logging.output = "stderr"`, true},
@@ -219,8 +241,8 @@ value = "debug"`, false},
 		t.Run(tc.name, func(t *testing.T) {
 			file := filepath.Join(t.TempDir(), "config.toml")
 			require.NoError(t, os.WriteFile(file, []byte(tc.text), 0o600))
-			for i := 0; i < 32; i++ {
-				cfg, err := Load(Options{
+			for i := range 32 {
+				cfg, err := Load(t.Context(), Options{
 					Path: file,
 					LookupEnv: func(string) (string, bool) {
 						return "", false
@@ -236,4 +258,18 @@ value = "debug"`, false},
 			}
 		})
 	}
+}
+
+func TestCanceledLoadReturnsBeforeReadingEnvironmentOrFile(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	cfg, err := Load(ctx, Options{
+		Path: filepath.Join(t.TempDir(), "missing.toml"), Explicit: true,
+		LookupEnv: func(string) (string, bool) {
+			t.Fatal("取消后不应读取环境或配置")
+			return "", false
+		},
+	})
+	require.ErrorIs(t, err, context.Canceled)
+	require.Equal(t, Defaults(), cfg)
 }

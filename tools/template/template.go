@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -17,7 +18,7 @@ import (
 	"github.com/zhYou/go-cli-starter/tools/internal/scaffold"
 )
 
-func verifyTemplate() error {
+func verifyTemplate() (resultErr error) {
 	root, err := os.Getwd()
 	if err != nil {
 		return err
@@ -27,7 +28,7 @@ func verifyTemplate() error {
 		return err
 	}
 	defer func() {
-		_ = os.RemoveAll(dir)
+		resultErr = errors.Join(resultErr, os.RemoveAll(dir))
 	}()
 	// 利用 Git 文件列表排除本地凭据、缓存和构建产物。
 	cmd := exec.Command(gitProgram, "ls-files", "--cached", "--others", "--exclude-standard", "-z")
@@ -36,7 +37,7 @@ func verifyTemplate() error {
 	if err != nil {
 		return fmt.Errorf("列出模板文件失败（请在 Git 仓库中运行）：%w", err)
 	}
-	for _, name := range strings.Split(string(files), "\x00") {
+	for name := range strings.SplitSeq(string(files), "\x00") {
 		if name == "" || name == ".template-init.lock" || strings.HasPrefix(name, ".template-init/") {
 			continue
 		}
@@ -71,10 +72,26 @@ func verifyTemplate() error {
 		return err
 	}
 	// 子进程使用生成应用的前缀，原模板的 HOME 不会被改名后的程序读取。
-	if err := toolrun.Run(dir, []string{paths.EnvPrefix(project.Name) + "_HOME=" + filepath.Join(dir, ".template-check-home")}, "go", "test", allPackages); err != nil {
+	if err := toolrun.Run(
+		dir,
+		[]string{paths.EnvPrefix(project.Name) + "_HOME=" + filepath.Join(dir, templateCheckHome)},
+		"go",
+		"test",
+		allPackages,
+	); err != nil {
 		return err
 	}
 	if err := checkTemplateLint(dir, project.Name); err != nil {
+		return err
+	}
+	if err := toolrun.Run(
+		dir,
+		[]string{paths.EnvPrefix(project.Name) + "_HOME=" + filepath.Join(dir, templateCheckHome)},
+		"go",
+		"run",
+		"./tools/lint",
+		"test",
+	); err != nil {
 		return err
 	}
 	//nolint:gosec // G204：开发任务显式执行固定工具及拆分参数，不经过 shell；参数来自仓库或调用者。
@@ -123,13 +140,13 @@ func validateTemplateMetadata(dir string) error {
 	return nil
 }
 
-func verifyCommandInstall(root string, project scaffold.Project) error {
+func verifyCommandInstall(root string, project scaffold.Project) (resultErr error) {
 	installDir, err := os.MkdirTemp("", "cli-install-check-*")
 	if err != nil {
 		return err
 	}
 	defer func() {
-		_ = os.RemoveAll(installDir)
+		resultErr = errors.Join(resultErr, os.RemoveAll(installDir))
 	}()
 	//nolint:gosec // G204：开发任务显式执行固定工具及拆分参数，不经过 shell；参数来自仓库或调用者。
 	cmd := exec.Command("go", "install", "./"+project.CommandPath)
@@ -143,9 +160,22 @@ func verifyCommandInstall(root string, project scaffold.Project) error {
 		name += executableSuffix
 	}
 	if _, err := os.Stat(filepath.Join(root, configExample)); err == nil {
-		return acceptance.Verify(filepath.Join(installDir, name), installDir, project.Name, filepath.Join(root, configExample), developmentVersion, developmentCommit)
+		return acceptance.Verify(
+			filepath.Join(installDir, name),
+			installDir,
+			project.Name,
+			filepath.Join(root, configExample),
+			developmentVersion,
+			developmentCommit,
+		)
 	}
-	return toolrun.Run(root, []string{paths.EnvPrefix(project.Name) + "_HOME=" + filepath.Join(installDir, "home")}, filepath.Join(installDir, name), schemaCommand, greetCommand)
+	return toolrun.Run(
+		root,
+		[]string{paths.EnvPrefix(project.Name) + "_HOME=" + filepath.Join(installDir, "home")},
+		filepath.Join(installDir, name),
+		schemaCommand,
+		greetCommand,
+	)
 }
 
 func templateExecutablePath(dir, platform string) string {
@@ -161,13 +191,20 @@ func verifyTemplateExecutable(dir string, project scaffold.Project) error {
 	if err := toolrun.Run(dir, nil, "go", buildCommand, "-o", executable, "./"+project.CommandPath); err != nil {
 		return err
 	}
-	return acceptance.Verify(executable, dir, project.Name, filepath.Join(dir, configExample), developmentVersion, developmentCommit)
+	return acceptance.Verify(
+		executable,
+		dir,
+		project.Name,
+		filepath.Join(dir, configExample),
+		developmentVersion,
+		developmentCommit,
+	)
 }
 
 // checkTemplateLint 复用副本自己的 lint 流程；信任与应用 HOME 只作用于本次子进程。
 func checkTemplateLint(dir, name string) error {
 	return toolrun.Run(dir, []string{
 		"MISE_TRUSTED_CONFIG_PATHS=" + dir,
-		paths.EnvPrefix(name) + "_HOME=" + filepath.Join(dir, ".template-check-home"),
+		paths.EnvPrefix(name) + "_HOME=" + filepath.Join(dir, templateCheckHome),
 	}, "mise", "run", "lint")
 }

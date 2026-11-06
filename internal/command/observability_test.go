@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/zhYou/go-cli-starter/internal/base/logging"
 	"github.com/zhYou/go-cli-starter/internal/base/telemetry"
 	"github.com/zhYou/go-cli-starter/internal/locales"
@@ -52,7 +53,8 @@ func TestCommandLogsUseExplicitLanguageAndStableFields(t *testing.T) {
 			if begin["msg"] != wantBegin || end["msg"] != wantEnd {
 				t.Fatalf("工具日志语言未生效 %s", sink.Bytes())
 			}
-			if end["event"] != "tool_finished" || end["operation"] != "test.helper" || end["outcome"] != "success" || end["exit_code"] != float64(0) {
+			if end["event"] != "tool_finished" || end["operation"] != "test.helper" || end["outcome"] != "success" ||
+				end["exit_code"] != float64(0) {
 				t.Fatalf("机器字段变化 %v", end)
 			}
 		})
@@ -63,11 +65,17 @@ func TestOnlyStartedItemsEmitSpansAndNoRawData(t *testing.T) {
 	var traceOutput bytes.Buffer
 	cfg := telemetry.Defaults()
 	cfg.Exporter = telemetry.File
-	provider := telemetry.Start(t.Context(), cfg, telemetry.Info{Service: "command-test"}, &traceOutput, func(err error) {
-		t.Error(err)
-	})
+	provider := telemetry.Start(
+		t.Context(),
+		cfg,
+		telemetry.Info{Service: "command-test"},
+		&traceOutput,
+		func(err error) {
+			t.Error(err)
+		},
+	)
 	t.Cleanup(func() {
-		_ = provider.Close(t.Context())
+		require.NoError(t, provider.Close(t.Context()))
 	})
 	var logs bytes.Buffer
 	logger := logging.New(logging.RunInfo{}, logging.Options{
@@ -81,7 +89,12 @@ func TestOnlyStartedItemsEmitSpansAndNoRawData(t *testing.T) {
 	options.Env = append(options.Env, "VALUE=private-env")
 	options.Logger = logger
 	options.Tracer = provider.Tracer
-	results, err := RunBatch(t.Context(), []Invocation{call, call, call}, options, BatchOptions{Concurrency: 1, FailFast: true})
+	results, err := RunBatch(
+		t.Context(),
+		[]Invocation{call, call, call},
+		options,
+		BatchOptions{Concurrency: 1, FailFast: true},
+	)
 	if err == nil || results[1].Status != Skipped {
 		t.Fatalf("意外结果 %v %+v", err, results)
 	}
@@ -89,13 +102,19 @@ func TestOnlyStartedItemsEmitSpansAndNoRawData(t *testing.T) {
 		t.Fatal(err)
 	}
 	var spans []struct {
-		SpanContext struct{ TraceID, SpanID string }
-		Attributes  []struct{ Value struct{ Value any } }
+		SpanContext struct {
+			TraceID string
+			SpanID  string
+		}
+		Attributes []struct{ Value struct{ Value any } }
 	}
-	for _, line := range bytes.Split(bytes.TrimSpace(traceOutput.Bytes()), []byte("\n")) {
+	for line := range bytes.SplitSeq(bytes.TrimSpace(traceOutput.Bytes()), []byte("\n")) {
 		var span struct {
-			SpanContext struct{ TraceID, SpanID string }
-			Attributes  []struct{ Value struct{ Value any } }
+			SpanContext struct {
+				TraceID string
+				SpanID  string
+			}
+			Attributes []struct{ Value struct{ Value any } }
 		}
 		if err := json.Unmarshal(line, &span); err != nil {
 			t.Fatal(err)
@@ -112,7 +131,8 @@ func TestOnlyStartedItemsEmitSpansAndNoRawData(t *testing.T) {
 	if err := json.Unmarshal(logs.Bytes(), &event); err != nil {
 		t.Fatal(err)
 	}
-	if event["trace_id"] != spans[0].SpanContext.TraceID || event["span_id"] != spans[0].SpanContext.SpanID || event["event"] != "tool_finished" {
+	if event["trace_id"] != spans[0].SpanContext.TraceID || event["span_id"] != spans[0].SpanContext.SpanID ||
+		event["event"] != "tool_finished" {
 		t.Fatalf("日志与 span 不关联 %v", event)
 	}
 	for _, a := range spans[0].Attributes {

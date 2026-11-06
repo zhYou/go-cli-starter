@@ -33,8 +33,10 @@ func TestGreetingHonorsInjectedLocalizerAndRejectsIncompleteMessages(t *testing.
 	require.Equal(t, "你好，Ada！", result.Message)
 
 	cases := []struct {
-		name, contents, want string
-		fail                 bool
+		name     string
+		contents string
+		want     string
+		fail     bool
 	}{
 		{"injected", "[\"greeting.message\"]\nother = \"Chosen {{.Name}}\"\n", "Chosen Ada", false},
 		{"missing", "[\"unrelated\"]\nother = \"unused\"\n", "", true},
@@ -60,7 +62,10 @@ func TestGreetingConcurrentLanguagesRemainIsolated(t *testing.T) {
 	require.NoError(t, err)
 	var wg sync.WaitGroup
 	for range 30 {
-		for _, tc := range []struct{ lang, want string }{{"en", "Hello, Ada!"}, {"zh-CN", "你好，Ada！"}} {
+		for _, tc := range []struct {
+			lang string
+			want string
+		}{{"en", "Hello, Ada!"}, {"zh-CN", "你好，Ada！"}} {
 			wg.Go(func() {
 				result, err := Run(context.Background(), Options{Name: "Ada", Localizer: bundle.Localizer(tc.lang)})
 				if err != nil || result.Message != tc.want {
@@ -80,7 +85,9 @@ func TestCorruptCatalogProcess(t *testing.T) {
 	result, err := Run(t.Context(), Options{Name: "Ada"})
 	require.Error(t, err)
 	require.Empty(t, result.Message)
-	bundle, err := messages.NewBundle(fstest.MapFS{"active.en.toml": {Data: []byte("[\"greeting.message\"]\nother = \"Injected {{.Name}}\"\n")}})
+	bundle, err := messages.NewBundle(
+		fstest.MapFS{"active.en.toml": {Data: []byte("[\"greeting.message\"]\nother = \"Injected {{.Name}}\"\n")}},
+	)
 	require.NoError(t, err)
 	result, err = Run(t.Context(), Options{Name: "Ada", Localizer: bundle.Localizer("en")})
 	require.NoError(t, err)

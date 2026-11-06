@@ -10,13 +10,6 @@ import (
 	"github.com/zhYou/go-cli-starter/internal/locales"
 )
 
-func pair(en, zh string) fstest.MapFS {
-	return fstest.MapFS{
-		"active.en.toml":    {Data: []byte(en)},
-		"active.zh-CN.toml": {Data: []byte(zh)},
-	}
-}
-
 func TestEmbeddedCatalog(t *testing.T) {
 	require.NoError(t, checkI18n(locales.Catalog()))
 }
@@ -236,4 +229,11 @@ other = '{{$root := (.User)}}{{$root = (.)}}{{$root.Name}}'
 other = '{{.User}}{{.Name}}'
 `
 	require.NoError(t, checkI18n(pair(en, zh)))
+}
+
+func pair(en, zh string) fstest.MapFS {
+	return fstest.MapFS{
+		"active.en.toml":    {Data: []byte(en)},
+		"active.zh-CN.toml": {Data: []byte(zh)},
+	}
 }

@@ -39,8 +39,7 @@ func observe(ctx context.Context, call Invocation, options Execution) (context.C
 		if err != nil {
 			outcome = "failed"
 			exit = -1
-			var process *exec.ExitError
-			if errors.As(err, &process) {
+			if process, ok := errors.AsType[*exec.ExitError](err); ok {
 				exit = process.ExitCode()
 			}
 			if errors.Is(err, context.DeadlineExceeded) {
@@ -58,7 +57,17 @@ func observe(ctx context.Context, call Invocation, options Execution) (context.C
 			span.End()
 		}
 		if logger != nil {
-			logger.Record(logging.ToolCall{Message: diagnosticText(localizer, "command.finished"), Operation: operation, Tool: tool, Outcome: outcome, ExitCode: exit, Duration: time.Since(start), Err: err})
+			logger.Record(
+				logging.ToolCall{
+					Message:   diagnosticText(localizer, "command.finished"),
+					Operation: operation,
+					Tool:      tool,
+					Outcome:   outcome,
+					ExitCode:  exit,
+					Duration:  time.Since(start),
+					Err:       err,
+				},
+			)
 		}
 	}
 }

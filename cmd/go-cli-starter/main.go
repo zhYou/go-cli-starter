@@ -29,5 +29,18 @@ func signalContext() (context.Context, context.CancelFunc) {
 func run(args []string, deps *cli.Dependencies, notify func() (context.Context, context.CancelFunc)) int {
 	ctx, stop := notify()
 	defer stop()
-	return cli.Run(ctx, args, cli.Options{Name: appName, Version: version, Commit: commit, Date: date, In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr, Dependencies: deps})
+	return cli.Run(
+		ctx,
+		args,
+		cli.Options{
+			Name:         appName,
+			Version:      version,
+			Commit:       commit,
+			Date:         date,
+			In:           os.Stdin,
+			Out:          os.Stdout,
+			ErrOut:       os.Stderr,
+			Dependencies: deps,
+		},
+	)
 }

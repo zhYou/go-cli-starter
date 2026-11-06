@@ -25,8 +25,7 @@ func classifyExecutionError(err error) error {
 	if err == nil {
 		return nil
 	}
-	var typed *fault.Error
-	if errors.As(err, &typed) {
+	if _, ok := errors.AsType[*fault.Error](err); ok {
 		return err
 	}
 	return fault.Wrap(fault.Usage, "", err)
@@ -41,8 +40,7 @@ func wrapRun(run func(*cobra.Command, []string) error) func(*cobra.Command, []st
 		if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			return err
 		}
-		var typed *fault.Error
-		if errors.As(err, &typed) {
+		if _, ok := errors.AsType[*fault.Error](err); ok {
 			return err
 		}
 		return fault.Wrap(fault.Runtime, "", err)

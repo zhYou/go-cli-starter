@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,15 +17,16 @@ import (
 
 const contractFile = "test/testdata/contracts/v1.json"
 
-func captureContract(ctx context.Context) ([]byte, error) {
+func captureContract(ctx context.Context) (_ []byte, resultErr error) {
 	dir, err := os.MkdirTemp("", "cli-contract-*")
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
-		_ = os.RemoveAll(dir)
+		resultErr = errors.Join(resultErr, os.RemoveAll(dir))
 	}()
-	results := map[string]any{}
+	shapes := map[string]any{}
+	results := map[string]any{"results": shapes}
 	for key, args := range map[string][]string{
 		schemaCommand:  {schemaCommand},
 		greetCommand:   {greetCommand, nameFlag, "Codex", jsonFlag},
@@ -55,10 +57,7 @@ func captureContract(ctx context.Context) ([]byte, error) {
 		if key == schemaCommand {
 			results[key] = value
 		} else {
-			if results["results"] == nil {
-				results["results"] = map[string]any{}
-			}
-			results["results"].(map[string]any)[key] = shape(value)
+			shapes[key] = shape(value)
 		}
 	}
 	data, err := json.Marshal(results)

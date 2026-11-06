@@ -19,7 +19,7 @@ func TestCompletionRecognizesInitializedHelpAndVersionFlags(t *testing.T) {
 func TestCanceledCompletionDoesNotCommitErrorDirective(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	code, out, stderr := invokeContext(t, ctx, "__complete", "--unknown", "")
+	code, out, stderr := invokeContext(ctx, t, "__complete", "--unknown", "")
 	require.Equal(t, 130, code)
 	require.Empty(t, out)
 	require.NotEmpty(t, stderr)

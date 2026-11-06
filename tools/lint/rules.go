@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/zhYou/go-cli-starter/tools/internal/fixture"
+	"github.com/zhYou/go-cli-starter/tools/internal/scaffold"
 
 	cmdexec "github.com/zhYou/go-cli-starter/internal/command"
 )
@@ -25,13 +26,18 @@ func checkRules(ctx context.Context) error {
 	return nil
 }
 
-func checkRuleFixture(ctx context.Context, kind string) error {
+func checkRuleFixture(ctx context.Context, kind string) (resultErr error) {
+	module, _, err := scaffold.Identity(".")
+	if err != nil {
+		return err
+	}
+
 	dir, err := os.MkdirTemp("", "starter-rules-")
 	if err != nil {
 		return err
 	}
 	defer func() {
-		_ = os.RemoveAll(dir)
+		resultErr = errors.Join(resultErr, os.RemoveAll(dir))
 	}()
 	for _, name := range []string{moduleFile, "go.sum", ".golangci.yml"} {
 		if err := fixture.CopyFile(name, filepath.Join(dir, name)); err != nil {
@@ -60,6 +66,7 @@ func checkRuleFixture(ctx context.Context, kind string) error {
 		if err != nil {
 			return err
 		}
+		data = []byte(strings.ReplaceAll(string(data), "{{MODULE}}", module))
 		for line, text := range strings.Split(string(data), "\n") {
 			if _, linter, ok := strings.Cut(text, "// want "); ok {
 				expected[fmt.Sprintf("%s:%d:%s", filepath.ToSlash(strings.TrimSuffix(rel, ".txt")), line+1, strings.TrimSpace(linter))]++
@@ -75,7 +82,7 @@ func checkRuleFixture(ctx context.Context, kind string) error {
 		Program: lintProgram,
 		Args: []string{
 			runCommand,
-			"--enable-only=depguard,forbidigo",
+			"--enable-only=depguard,forbidigo,loggercheck,errcheck",
 			"--allow-serial-runners",
 			"--issues-exit-code=0",
 			"--show-stats=false",

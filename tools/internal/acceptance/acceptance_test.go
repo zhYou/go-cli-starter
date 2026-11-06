@@ -23,7 +23,15 @@ func TestExecutableAcceptanceVerifiesIdentityAndMetadata(t *testing.T) {
 		executable += executableSuffix
 	}
 	//nolint:gosec // G204：仅构建当前仓库 CLI 到临时目录。
-	build := exec.Command("go", "build", "-ldflags", "-X main.version=0.2.0 -X main.commit=acceptance", "-o", executable, "./"+project.CommandPath)
+	build := exec.Command(
+		"go",
+		"build",
+		"-ldflags",
+		"-X main.version=0.2.0 -X main.commit=acceptance",
+		"-o",
+		executable,
+		"./"+project.CommandPath,
+	)
 	build.Dir = root
 	output, err := build.CombinedOutput()
 	require.NoError(t, err, "%s", output)

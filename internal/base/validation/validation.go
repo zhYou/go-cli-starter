@@ -44,8 +44,7 @@ func (v *Validator) Struct(ctx context.Context, value any) error {
 		return err
 	}
 	if err := v.engine.StructCtx(ctx, value); err != nil {
-		var fields validator.ValidationErrors
-		if errors.As(err, &fields) {
+		if fields, ok := errors.AsType[validator.ValidationErrors](err); ok {
 			var problems []error
 			for _, field := range fields {
 				code := "validation." + field.Tag()
@@ -54,7 +53,15 @@ func (v *Validator) Struct(ctx context.Context, value any) error {
 				default:
 					code = "validation.rule"
 				}
-				problems = append(problems, (fault.Definition{Code: fault.Code(code), Kind: fault.Usage}).Wrap(err, fault.WithParams(fault.Params{"Field": field.Field(), "Rule": field.Tag(), "Param": field.Param()})))
+				problems = append(
+					problems,
+					(fault.Definition{Code: fault.Code(code), Kind: fault.Usage}).Wrap(
+						err,
+						fault.WithParams(
+							fault.Params{"Field": field.Field(), "Rule": field.Tag(), "Param": field.Param()},
+						),
+					),
+				)
 			}
 			return errors.Join(problems...)
 		}

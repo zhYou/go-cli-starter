@@ -46,6 +46,7 @@ func runPlatform(ctx context.Context, program string, args []string, options Exe
 		for {
 			select {
 			case <-timer.C:
+				//nolint:errcheck // 进程组可能已经退出；此处尽力收尾，根进程结果和取消原因由 Wait 及上层保留。
 				_ = syscall.Kill(pid, syscall.SIGKILL)
 				return
 			case <-ticker.C:

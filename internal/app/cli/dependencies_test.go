@@ -17,7 +17,7 @@ func TestTwoInvocationsDoNotShareDependencies(t *testing.T) {
 	var levels []string
 	makeRoot := func(label string, out *bytes.Buffer) *invocationFixture {
 		deps := Dependencies{
-			LoadConfig: func(o config.Options) (config.Config, error) {
+			LoadConfig: func(_ context.Context, o config.Options) (config.Config, error) {
 				level := "warn"
 				if o.LogLevel != nil {
 					level = *o.LogLevel
@@ -57,7 +57,7 @@ func TestInvalidArgsNeverLoadConfigOrRunBusiness(t *testing.T) {
 	for _, args := range [][]string{{"greet"}, {"greet", "--name", " "}, {"greet", "--name", "x", "extra"}, {"greet", "--unknown"}} {
 		count := 0
 		deps := Dependencies{
-			LoadConfig: func(config.Options) (config.Config, error) {
+			LoadConfig: func(context.Context, config.Options) (config.Config, error) {
 				count++
 				return config.Config{}, nil
 			},
@@ -73,7 +73,7 @@ func TestInvalidArgsNeverLoadConfigOrRunBusiness(t *testing.T) {
 
 func TestDiscoveryNeverLoadsConfiguration(t *testing.T) {
 	count := 0
-	deps := Dependencies{LoadConfig: func(config.Options) (config.Config, error) {
+	deps := Dependencies{LoadConfig: func(context.Context, config.Options) (config.Config, error) {
 		count++
 		return config.Config{}, nil
 	}}

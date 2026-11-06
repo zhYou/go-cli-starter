@@ -34,12 +34,26 @@ func TestNormalizationPreservesBusinessFieldNames(t *testing.T) {
 			require.NoError(t, err)
 			var doc map[string]any
 			require.NoError(t, json.Unmarshal(before, &doc))
-			require.Equal(t, "string", doc["results"].(map[string]any)["greet"].(map[string]any)[name])
-			command := doc["schema"].(map[string]any)["commands"].(map[string]any)["contract-cli greet"].(map[string]any)
+			results, ok := doc["results"].(map[string]any)
+			require.True(t, ok)
+			greet, ok := results["greet"].(map[string]any)
+			require.True(t, ok)
+			require.Equal(t, "string", greet[name])
+			schema, ok := doc["schema"].(map[string]any)
+			require.True(t, ok)
+			commands, ok := schema["commands"].(map[string]any)
+			require.True(t, ok)
+			command, ok := commands["contract-cli greet"].(map[string]any)
+			require.True(t, ok)
 			require.NotContains(t, command, "description")
-			fields := command["result_schema"].(map[string]any)["properties"].(map[string]any)
+			resultSchema, ok := command["result_schema"].(map[string]any)
+			require.True(t, ok)
+			fields, ok := resultSchema["properties"].(map[string]any)
+			require.True(t, ok)
 			require.Contains(t, fields, name)
-			require.Equal(t, "string", fields[name].(map[string]any)["type"])
+			field, ok := fields[name].(map[string]any)
+			require.True(t, ok)
+			require.Equal(t, "string", field["type"])
 			changes, err := Diff(before, after)
 			require.NoError(t, err)
 			require.Len(t, changes, 2)
@@ -51,21 +65,33 @@ func TestNormalizationPreservesBusinessFieldNames(t *testing.T) {
 }
 
 func TestContractNormalization(t *testing.T) {
-	a := []byte(`{"commands":[{"path":"contract-cli greet","description":"旧文案","flags":[{"name":"name","type":"string","required":true,"description":"姓名"}]}]}`)
-	b := []byte(`{"commands":[{"path":"contract-cli greet","description":"新文案","flags":[{"name":"name","type":"string","required":true,"description":"输入"}]}]}`)
+	a := []byte(
+		`{"commands":[{"path":"contract-cli greet","description":"旧文案","flags":[{"name":"name","type":"string","required":true,"description":"姓名"}]}]}`,
+	)
+	b := []byte(
+		`{"commands":[{"path":"contract-cli greet","description":"新文案","flags":[{"name":"name","type":"string","required":true,"description":"输入"}]}]}`,
+	)
 	x, err := Normalize(a)
 	require.NoError(t, err)
 	y, err := Normalize(b)
 	require.NoError(t, err)
 	require.JSONEq(t, string(x), string(y))
-	changes, err := Diff(x, []byte(`{"commands":{"contract-cli greet":{"path":"contract-cli greet","flags":{"name":{"name":"name","type":"number","required":true}}}}}`))
+	changes, err := Diff(
+		x,
+		[]byte(
+			`{"commands":{"contract-cli greet":{"path":"contract-cli greet","flags":{"name":{"name":"name","type":"number","required":true}}}}}`,
+		),
+	)
 	require.NoError(t, err)
 	require.NotEmpty(t, changes)
 	require.Equal(t, "breaking", changes[0].Kind)
 }
 
 func TestExitCodeChangeRequiresBreakingVersion(t *testing.T) {
-	changes, err := Diff([]byte(`{"schema":{"exit_codes":{"runtime":1}}}`), []byte(`{"schema":{"exit_codes":{"runtime":3}}}`))
+	changes, err := Diff(
+		[]byte(`{"schema":{"exit_codes":{"runtime":1}}}`),
+		[]byte(`{"schema":{"exit_codes":{"runtime":3}}}`),
+	)
 	require.NoError(t, err)
 	require.Len(t, changes, 1)
 	record := Record{

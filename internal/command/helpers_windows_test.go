@@ -10,6 +10,8 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/stretchr/testify/require"
+
 	"golang.org/x/sys/windows"
 )
 
@@ -29,14 +31,22 @@ func TestWindowsHelper(t *testing.T) {
 		if err != nil {
 			os.Exit(9)
 		}
-		_, _ = os.Stdout.Write(data)
-		_, _ = os.Stderr.WriteString("诊断")
+		if _, err := os.Stdout.Write(data); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stderr.WriteString("诊断"); err != nil {
+			t.Fatal(err)
+		}
 	case "env":
 		value, present := os.LookupEnv("SYSTEMROOT")
-		data, _ := json.Marshal([]any{value, present, os.Getenv("VALUE"), args[1:]})
-		_, _ = os.Stdout.Write(data)
+		data, err := json.Marshal([]any{value, present, os.Getenv("VALUE"), args[1:]})
+		require.NoError(t, err)
+		if _, err := os.Stdout.Write(data); err != nil {
+			t.Fatal(err)
+		}
 	case "spawn-loop":
-		executable, _ := os.Executable()
+		executable, err := os.Executable()
+		require.NoError(t, err)
 		deadline := time.Now().Add(5 * time.Second)
 		for time.Now().Before(deadline) {
 			//nolint:gosec // G204：辅助进程只执行自身测试二进制；路径来自当前测试生成的临时目录。
@@ -47,7 +57,7 @@ func TestWindowsHelper(t *testing.T) {
 			if err := child.Start(); err != nil {
 				os.Exit(9)
 			}
-			_ = child.Process.Release()
+			require.NoError(t, child.Process.Release())
 			time.Sleep(10 * time.Millisecond)
 		}
 	case "host-job":
@@ -61,11 +71,13 @@ func TestWindowsHelper(t *testing.T) {
 		}
 	case "marker":
 		//nolint:gosec // G703：辅助进程只执行自身测试二进制；路径来自当前测试生成的临时目录。
-		_ = os.WriteFile(args[1], []byte("executed"), 0o600)
+		require.NoError(t, os.WriteFile(args[1], []byte("executed"), 0o600))
 		time.Sleep(5 * time.Second)
 	case "handle":
-		raw, _ := strconv.ParseUint(args[1], 10, 64)
+		raw, err := strconv.ParseUint(args[1], 10, 64)
+		require.NoError(t, err)
 		// 数字句柄在子进程内可能复用；只通过父进程事件的实际信号判定继承。
+		//nolint:errcheck // 白名单测试预期该句柄不可用；句柄值可能复用，只由父进程原始事件是否被置位判定泄漏。
 		_ = windows.SetEvent(windows.Handle(raw))
 	}
 	os.Exit(0)

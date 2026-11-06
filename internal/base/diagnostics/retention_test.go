@@ -3,6 +3,7 @@ package diagnostics
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/stretchr/testify/require"
 )
@@ -61,7 +64,10 @@ func TestExpiredRunAndUnknownContent(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, unknown.Close())
 	require.NoError(t, os.WriteFile(filepath.Join(unknown.Path, "user.txt"), []byte("keep"), 0o600))
-	require.NoError(t, writeMetadataPath(unknown.Path, metadata{Version: 1, ID: unknown.ID, Started: old, Finished: old}))
+	require.NoError(
+		t,
+		writeMetadataPath(unknown.Path, metadata{Version: 1, ID: unknown.ID, Started: old, Finished: old}),
+	)
 	require.NoError(t, Cleanup(base, cfg))
 	_, err = os.Stat(filepath.Join(unknown.Path, "user.txt"))
 	require.NoError(t, err)
@@ -99,7 +105,9 @@ func TestDiagnosticLeaseHelper(t *testing.T) {
 	_, err = w.Write([]byte(strings.Repeat("x", 2*1024*1024)))
 	require.NoError(t, err)
 	fmt.Println(run.Path)
-	_, _ = io.Copy(io.Discard, os.Stdin)
+	if _, err := io.Copy(io.Discard, os.Stdin); err != nil {
+		t.Error(err)
+	}
 	require.NoError(t, run.Close())
 }
 
@@ -129,7 +137,9 @@ func TestProcessesProtectLiveRunAndReclaimKilledWriter(t *testing.T) {
 	output, err := child.StdoutPipe()
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		_ = input.Close()
+		if err := input.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
+			t.Error(err)
+		}
 	})
 	waitChild := startDiagnosticProcess(t, child)
 	line, err := bufio.NewReader(output).ReadString('\n')
@@ -201,7 +211,9 @@ func TestDiagnosticInterruptedCleanupHelper(t *testing.T) {
 		}
 		if artifactPattern.MatchString(name) {
 			fmt.Println(name)
-			_, _ = io.Copy(io.Discard, os.Stdin)
+			if _, err := io.Copy(io.Discard, os.Stdin); err != nil {
+				t.Error(err)
+			}
 		}
 		return nil
 	}))
@@ -223,7 +235,13 @@ func TestInterruptedCleanupDoesNotOrphanData(t *testing.T) {
 	expired := create()
 	require.NoError(t, expired.Close())
 	old := time.Now().Add(-48 * time.Hour)
-	require.NoError(t, writeMetadataPath(expired.Path, metadata{Version: metadataVersion, ID: expired.ID, Started: old, Finished: old}))
+	require.NoError(
+		t,
+		writeMetadataPath(
+			expired.Path,
+			metadata{Version: metadataVersion, ID: expired.ID, Started: old, Finished: old},
+		),
+	)
 	active := create()
 	defer func() {
 		require.NoError(t, active.Close())
@@ -232,9 +250,18 @@ func TestInterruptedCleanupDoesNotOrphanData(t *testing.T) {
 	require.NoError(t, unknown.Close())
 	marker := filepath.Join(unknown.Path, "user.txt")
 	require.NoError(t, os.WriteFile(marker, []byte("保留"), 0o600))
-	require.NoError(t, writeMetadataPath(unknown.Path, metadata{Version: metadataVersion, ID: unknown.ID, Started: old, Finished: old}))
+	require.NoError(
+		t,
+		writeMetadataPath(
+			unknown.Path,
+			metadata{Version: metadataVersion, ID: unknown.ID, Started: old, Finished: old},
+		),
+	)
 	// 活动目录也过期，确保保留依赖租约而非时间筛选。
-	require.NoError(t, writeMetadataPath(active.Path, metadata{Version: metadataVersion, ID: active.ID, Started: old, Finished: old}))
+	require.NoError(
+		t,
+		writeMetadataPath(active.Path, metadata{Version: metadataVersion, ID: active.ID, Started: old, Finished: old}),
+	)
 	exe, err := os.Executable()
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
@@ -248,19 +275,27 @@ func TestInterruptedCleanupDoesNotOrphanData(t *testing.T) {
 	output, err := child.StdoutPipe()
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		_ = input.Close()
+		if err := input.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
+			t.Error(err)
+		}
 	})
 	waitChild := startDiagnosticProcess(t, child)
 	ready := make(chan string, 1)
 	readDone := make(chan struct{})
 	go func() {
 		defer close(readDone)
-		line, _ := bufio.NewReader(output).ReadString('\n')
+		line, err := bufio.NewReader(output).ReadString('\n')
+		assert.NoError(t, err)
 		ready <- strings.TrimSpace(line)
 	}()
 	t.Cleanup(func() {
-		_ = input.Close()
-		_ = child.Process.Kill()
+		if err := input.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
+			t.Error(err)
+		}
+		if err := child.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+			t.Error(err)
+		}
+		//nolint:errcheck // 主测试断言进程结果；早退收尾可能产生主动终止错误，仍必须等待进程退出。
 		_ = waitChild()
 		select {
 		case <-readDone:

@@ -30,8 +30,9 @@ mise 聚合流程，领域 Go 入口只处理各自能力；参数不足、未�
 | --- | --- |
 | `mise run setup` | 安装六个固定版本的项目工具，下载模块 |
 | `mise run doctor` | 检查项目环境，报告用户工具状态 |
-| `mise run lint` | 只读检查格式、双语消息、应用配置、包文档、版本声明和 18 项静态规则 |
+| `mise run lint` | 只读检查格式、双语消息、应用配置、包文档、源码风格、版本声明和 34 项静态规则 |
 | `mise run lint:i18n` / `lint:config` | 校验双语消息目录 / 受管应用配置；均纳入 lint 和 check |
+| `mise run lint:style` | 检查具名和匿名结构体字段逐项声明；纳入 lint 和 check |
 | `mise run lint:doc` | 检查正式 Go 包的 doc.go 与包说明位置；纳入 lint 和 check |
 | `mise run lint:test` | 用真实 fixture 测试静态规则自身；仅纳入 check |
 | `mise run build` | 构建到 bin，注入版本信息 |
@@ -46,7 +47,7 @@ mise 聚合流程，领域 Go 入口只处理各自能力；参数不足、未�
 
 | 命令 | 用途 |
 | --- | --- |
-| `mise exec -- golangci-lint fmt --color=never` | 使用 gofumpt 和 goimports 格式化 |
+| `mise exec -- golangci-lint fmt --color=never` | 使用 gofumpt、goimports 和 golines 格式化 |
 | `mise exec -- golangci-lint fmt --diff --color=never` | 只读检查格式；有差异时失败 |
 | `mise exec -- go test ./...` | 单元与命令测试 |
 | `mise exec -- go test -race ./...` | 竞态检测，需要 C 编译器 |
@@ -89,7 +90,7 @@ base 不依赖 app、command、tools 或 Cobra。领域码及结果由所属模�
 运行时代码与测试不依赖开发包；工具可以复用运行时包。`tools/internal` 的导入范围由 Go 限制在 tools 子树内。
 开发工具用 `scaffold.Inspect` 静态识别唯一入口，不根据模块路径末段猜测命令名。
 
-mise 聚合完整流程，领域 Go 入口只承接自己的能力：`tools/lint` 接收 i18n/config/doc/versions/test，
+mise 聚合完整流程，领域 Go 入口只承接自己的能力：`tools/lint` 接收 i18n/config/doc/style/versions/test，
 `tools/contract` 接收 check/update，`tools/template` 接收 init/check；其他领域入口不接受位置参数。
 初始化的 `--module`、`--name` 和契约检查的 `--against` 保持原用途。参数不足、未知或多余时立即失败。
 
@@ -111,18 +112,21 @@ toolrun 和 fixture 分别共享进程调用与临时文件/Git fixture 操作�
 
 ### 排版与展开
 
-`golangci-lint fmt` 统一运行 gofumpt 和 goimports，使用默认规则，不启用额外格式选项。
+`golangci-lint fmt` 统一运行 gofumpt、goimports 和 golines。golines 以 120 列为换行目标，
+tab 按 4 列计算，不截短注释、不重排 struct tag；长字符串和 URL 不设硬性行长上限。
 gofumpt 的输出兼容 gofmt；工具版本随项目固定的 golangci-lint 提供，不另行安装。
 保存后或提交前格式化本次修改范围，`mise run lint` 和 `check` 只读检查格式。
 
 - 所有非空函数、方法和匿名函数体都展开，单句返回和转发方法也一样；空函数体可保留 `{}`。
 - 普通语句各占一行，不用分号压缩多条语句；`if` 初始化和 `for` 子句保留语言要求的分号。
 - 非空具名 struct 和 interface 的成员分行声明；空类型保留 `struct{}` 等紧凑形式。
+- 所有 struct 字段逐项声明，匿名测试表格也一样；不使用 `A, B string`，拆分时保持字段顺序、类型和 tag。
 - 简单字面量和匿名表格类型交给格式工具处理；复杂嵌套字面量逐字段展开，便于核对依赖和资源所有权。
 - 空行分隔输入校验、依赖准备、主要操作和结果处理等不同阶段；紧密相关的赋值、错误检查和使用放在一起。
-- 不设置固定行长、函数长度或空行数量。长表达式先考虑命名中间值或按职责拆分，避免为凑行数增加抽象。
+- 不设置硬性行长、函数长度或空行数量。长表达式先考虑命名中间值或按职责拆分，避免为凑行数增加抽象。
 
-函数展开、逻辑分段和组织规则由代码审查确认，格式工具不会全部代劳。例如：
+字段逐项声明由 `lint:style` 检查；funcorder 检查构造函数、公开方法和公开函数的位置，不要求字母排序。
+函数展开和逻辑分段由代码审查确认，格式工具不会全部代劳。例如：
 
 ```go
 return writeText(cmd.OutOrStdout(), func(w io.Writer) error {
@@ -164,7 +168,7 @@ package greeting
 `mise run lint:doc` 按目录解析 Go AST，不依赖当前主机的 GOOS/GOARCH，也检查平台专用文件。
 它拒绝缺失或空白的包说明、只有包名前缀与标点的占位说明、包名不一致、包说明位置错误，
 以及 `doc.go` 中的实现声明。测试夹具 `testdata`、vendor、隐藏或下划线开头目录、根目录
-bin/dist、生成代码和外部 `*_test` 包不受约束；普通 `*_test.go` 不需各自编写包说明。
+bin/dist、`docs/superpowers/` 工作记录、生成代码和外部 `*_test` 包不受约束；普通 `*_test.go` 不需各自编写包说明。
 现有 godoclint 继续检查注释格式、重复包说明和导出 API 文档，描述是否准确、有用由代码审查确认。
 该任务纳入 lint 和 check，不会安装工具或修改文件。
 
@@ -183,7 +187,7 @@ bin/dist、生成代码和外部 `*_test` 包不受约束；普通 `*_test.go` �
 | MCP 配置、验收工具或影响 MCP 的 Go/gopls 升级 | 增加 `mise run mcp:check`；Codex 客户端配置变更在受信任会话核对 `codex mcp list` 包含 gopls |
 | 打包与发布流程 | 按[发布验收](maintenance.md#升级和发布)完成 snapshot、release:verify 及发布前检查 |
 
-消息和配置编辑期间分别可用 `lint:i18n`、`lint:config` 快速反馈；它们及 `lint:doc`、`lint:versions`、
+消息和配置编辑期间分别可用 `lint:i18n`、`lint:config` 快速反馈；它们及 `lint:doc`、`lint:style`、`lint:versions`、
 `lint:test`、`template:check`、`contract:check` 已由完整 check 覆盖。MCP、漏洞扫描、发布验收及其他 OS 原生运行独立执行。
 只格式化授权的 Go 文件或目录，例如 `mise exec -- golangci-lint fmt --color=never internal/app/cli/greet.go`。
 无法执行的检查说明原因，不把配置存在、启动成功或 mock 当作真实验收。
@@ -317,17 +321,42 @@ GoLand 使用分号分隔子后缀，完整文件名也可以作为后缀匹配�
 
 ## 静态规则与开发探测
 
-`mise run lint` 检查双语消息、应用配置、包文档和版本声明，再检查格式并启用以下 18 项，生产导出 API 需中文 GoDoc；测试仅豁免 GoDoc，其他边界仍生效：
+`mise run lint` 检查双语消息、应用配置、包文档、源码风格和版本声明，再检查格式并启用以下 34 项，生产导出 API 需中文 GoDoc；测试仅豁免 GoDoc，其他边界仍生效：
 
 ```text
 errcheck govet ineffassign staticcheck unused bodyclose errorlint gosec godoclint
 contextcheck nilnesserr durationcheck nolintlint thelper usetesting goconst depguard forbidigo
+asasalint bidichk gocheckcompilerdirectives makezero unconvert predeclared testifylint revive
+funcorder gocritic fatcontext loggercheck recvcheck errname modernize containedctx
 ```
 
 局部 nolint 指明检查器并用中文解释。稳定协议和状态使用语义常量，同值不同义可各自命名。
 koanf 只可在精确的 `internal/app/config/load.go` 导入，且仅整体解码；禁用 typed/Must getter、
 Get、Raw、All 等绕过结构体的入口。zap 只在 base/logging，OTel SDK/exporter 只在 base/telemetry。
-`mise run lint:test` 在临时模块运行真实类型分析，验证违规与合规 fixture；它测试规则自身，只纳入 check，不作为普通 lint 的依赖。
+base 不得导入 app、command、tools 或 Cobra；运行时代码及其测试不得导入 tools，开发包内部可复用。
+`.golangci.yml` 纳入初始化的身份文件白名单；模块路径变更后继续匹配架构边界和 logging 包装器。
+
+errcheck 同时检查显式丢弃的错误和未检查的类型断言。清理失败应返回、告警或在测试中断言；
+已经由资源所有者报告的诊断错误可加精确中文说明，避免重复告警或改变业务退出码。
+govet 在默认项外启用 nilness、deepequalerrors、reflectvaluecompare。gocritic 使用默认稳定检查。
+loggercheck 检查 Infow、Errorw、Debugw、Warnw 和 With 的成对键值，键必须是字符串。
+Context 放在首个参数，测试辅助函数也遵守；thelper 检查 t/b/tb 命名，不强制测试参数居首。
+containedctx 约束结构体保存 Context；OTel 固定接口与 Session 生命周期之间的桥接有局部例外。
+testifylint 使用默认规则但关闭 float-compare，JSON 整数码与计数的 float64 表示继续精确比较；
+modernize 关闭 omitzero，保留 JSON 零值、nil 和空容器的省略行为。
+
+revive 仅启用以下 14 项，indent-error-flow 保留原变量作用域：
+
+```text
+blank-imports context-as-argument context-keys-type dot-imports error-return error-strings
+errorf increment-decrement indent-error-flow range receiver-naming unexported-return
+unused-parameter var-naming
+```
+
+`mise run lint:style` 直接解析所有平台的 Go AST，检查具名、匿名、泛型结构体和外部测试包，
+不限制函数参数或返回值的合并声明。扫描跳过 testdata、vendor、隐藏或下划线开头的目录与源码、
+根 bin/dist、生成代码和 docs/superpowers 工作记录；拒绝符号链接 Go 源文件。
+`mise run lint:test` 在临时模块运行真实类型分析，验证架构、koanf、日志键值和错误处理的违规与合规 fixture；模板改名后的副本也运行该检查。它测试规则自身，只纳入 check，不作为普通 lint 的依赖。
 
 `mise run lint:i18n` 检查 `internal/locales/active.en.toml` 与 `active.zh-CN.toml`：
 目录非空，消息 ID 不重复，字段与消息内容有效，模板语法正确；两种语言的 ID 和模板参数集合一致，
@@ -351,7 +380,7 @@ Get、Raw、All 等绕过结构体的入口。zap 只在 base/logging，OTel SDK
 业务 JSON、测试数据和协议/契约数据不纳入扫描。两项检查由 lint 调用并纳入 check；它们不会自动安装
 工具或修复文件。
 
-`mise exec -- golangci-lint fmt --color=never` 使用 gofumpt 和 goimports；
+`mise exec -- golangci-lint fmt --color=never` 使用 gofumpt、goimports 和 golines；
 加上 `--diff` 只展示差异并失败，不改源码。
 check 不改写源码，但会使用 Go 缓存、临时文件和 bin 产物。
 CI、缓存及平台验收见[维护清单](maintenance.md#ci-与验收证据)。

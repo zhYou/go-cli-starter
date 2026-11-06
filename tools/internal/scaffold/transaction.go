@@ -50,7 +50,15 @@ func (i *Initializer) save(root string, tx transaction) error {
 }
 
 func (i *Initializer) prepare(root, module, name string, changes []change, move *commandMove) (transaction, error) {
-	tx := transaction{Move: move, FormatVersion: 2, Module: module, Name: name, OriginalModule: TemplateModule, OriginalName: TemplateName, Phase: phasePrepared}
+	tx := transaction{
+		Move:           move,
+		FormatVersion:  2,
+		Module:         module,
+		Name:           name,
+		OriginalModule: TemplateModule,
+		OriginalName:   TemplateName,
+		Phase:          phasePrepared,
+	}
 	if err := i.preflightCommandMove(root, move); err != nil {
 		return tx, err
 	}
@@ -88,7 +96,15 @@ func (i *Initializer) prepare(root, module, name string, changes []change, move 
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return tx, err
 		}
-		file := transactionFile{Path: filepath.ToSlash(relative), Mode: item.mode, Existed: existed, Before: digest(before), After: digest(item.data), Backup: fmt.Sprintf("%s/%06d.before", journalDir, index), Staged: fmt.Sprintf("%s/%06d.after", journalDir, index)}
+		file := transactionFile{
+			Path:    filepath.ToSlash(relative),
+			Mode:    item.mode,
+			Existed: existed,
+			Before:  digest(before),
+			After:   digest(item.data),
+			Backup:  fmt.Sprintf("%s/%06d.before", journalDir, index),
+			Staged:  fmt.Sprintf("%s/%06d.after", journalDir, index),
+		}
 		for path, data := range map[string][]byte{file.Backup: before, file.Staged: item.data} {
 			if err := i.atomicWrite(change{filepath.Join(root, filepath.FromSlash(path)), data, 0o600}); err != nil {
 				return tx, err
@@ -103,7 +119,9 @@ func (i *Initializer) validateTransaction(root string, tx transaction) error {
 	if tx.FormatVersion == 1 {
 		return errors.New("请使用原版本工具恢复格式 1 的初始化日志，已保留现场")
 	}
-	if tx.FormatVersion != 2 || tx.OriginalModule != TemplateModule || tx.OriginalName != TemplateName || len(tx.Files) == 0 || !slices.Contains([]string{phasePrepared, phaseApplying, phaseCommitted}, tx.Phase) {
+	if tx.FormatVersion != 2 || tx.OriginalModule != TemplateModule || tx.OriginalName != TemplateName ||
+		len(tx.Files) == 0 ||
+		!slices.Contains([]string{phasePrepared, phaseApplying, phaseCommitted}, tx.Phase) {
 		return errors.New("恢复记录格式或阶段无效")
 	}
 	if tx.RollbackComplete && tx.Phase != phasePrepared {
@@ -133,7 +151,8 @@ func (i *Initializer) validateTransaction(root string, tx transaction) error {
 		if info, err := i.FS.Stat(path); err == nil && !info.Mode().IsRegular() {
 			return fmt.Errorf("恢复目标不是常规文件：%s", file.Path)
 		}
-		if file.Backup != fmt.Sprintf("%s/%06d.before", journalDir, index) || file.Staged != fmt.Sprintf("%s/%06d.after", journalDir, index) {
+		if file.Backup != fmt.Sprintf("%s/%06d.before", journalDir, index) ||
+			file.Staged != fmt.Sprintf("%s/%06d.after", journalDir, index) {
 			return errors.New("恢复备份路径无效")
 		}
 		for relative, want := range map[string]string{file.Backup: file.Before, file.Staged: file.After} {
@@ -189,13 +208,15 @@ func (i *Initializer) rollback(root string, tx transaction) error {
 			return err
 		}
 		if location == tx.Move.To {
-			if err := i.FS.Rename(filepath.Join(root, filepath.FromSlash(tx.Move.To)), filepath.Join(root, filepath.FromSlash(tx.Move.From))); err != nil {
+			if err := i.FS.Rename(
+				filepath.Join(root, filepath.FromSlash(tx.Move.To)),
+				filepath.Join(root, filepath.FromSlash(tx.Move.From)),
+			); err != nil {
 				return err
 			}
 		}
 	}
-	for index := len(tx.Files) - 1; index >= 0; index-- {
-		file := tx.Files[index]
+	for _, file := range slices.Backward(tx.Files) {
 		path, err := i.transactionPath(root, tx, file.Path)
 		if err != nil {
 			return err
@@ -282,7 +303,12 @@ func (i *Initializer) recover(root, module, name string) error {
 	return i.rollback(root, tx)
 }
 
-func (i *Initializer) apply(ctx context.Context, root, module, name string, changes []change, move *commandMove) ([]string, error) {
+func (i *Initializer) apply(
+	ctx context.Context,
+	root, module, name string,
+	changes []change,
+	move *commandMove,
+) ([]string, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -324,7 +350,10 @@ func (i *Initializer) apply(ctx context.Context, root, module, name string, chan
 		if err := ctx.Err(); err != nil {
 			return fail(err)
 		}
-		if err := i.FS.Rename(filepath.Join(root, filepath.FromSlash(move.From)), filepath.Join(root, filepath.FromSlash(move.To))); err != nil {
+		if err := i.FS.Rename(
+			filepath.Join(root, filepath.FromSlash(move.From)),
+			filepath.Join(root, filepath.FromSlash(move.To)),
+		); err != nil {
 			return fail(err)
 		}
 		for index, relative := range changed {

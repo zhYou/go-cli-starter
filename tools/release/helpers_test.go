@@ -76,7 +76,11 @@ func releaseArchiveBytes(t *testing.T, windows bool, binary, mode string) []byte
 	if mode == "corrupt" {
 		return []byte("损坏归档")
 	}
-	members := []archiveMember{{binary, []byte("测试二进制"), 0o755}, {"README.md", []byte("说明"), 0o644}, {"config.example.toml", []byte("[logging]\nlevel = \"info\"\n"), 0o644}}
+	members := []archiveMember{
+		{binary, []byte("测试二进制"), 0o755},
+		{"README.md", []byte("说明"), 0o644},
+		{"config.example.toml", []byte("[logging]\nlevel = \"info\"\n"), 0o644},
+	}
 	switch mode {
 	case "binary":
 		members = members[1:]
@@ -115,7 +119,12 @@ func releaseArchiveBytes(t *testing.T, windows bool, binary, mode string) []byte
 		compressed := gzip.NewWriter(&out)
 		writer := tar.NewWriter(compressed)
 		for _, member := range members {
-			header := &tar.Header{Name: member.name, Mode: int64(member.mode.Perm()), Size: int64(len(member.data)), Typeflag: tar.TypeReg}
+			header := &tar.Header{
+				Name:     member.name,
+				Mode:     int64(member.mode.Perm()),
+				Size:     int64(len(member.data)),
+				Typeflag: tar.TypeReg,
+			}
 			if member.mode&os.ModeSymlink != 0 {
 				header.Typeflag = tar.TypeSymlink
 				header.Linkname = "outside"

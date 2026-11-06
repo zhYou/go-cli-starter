@@ -24,11 +24,13 @@ func TestCommandMoveHardExitHelper(t *testing.T) {
 	fs := faultFS{
 		Fs: base,
 		rename: func(a, b string) error {
-			if point == "rollback" && a == filepath.Join(root, "cmd", TemplateName) && b == filepath.Join(root, "cmd/my-cli") {
+			if point == "rollback" && a == filepath.Join(root, "cmd", TemplateName) &&
+				b == filepath.Join(root, "cmd/my-cli") {
 				failed = true
 				return errors.New("触发回滚")
 			}
-			if b == filepath.Join(root, "cmd", TemplateName, "main.go") && (point == "apply" || point == "same-name" || failed) {
+			if b == filepath.Join(root, "cmd", TemplateName, "main.go") &&
+				(point == "apply" || point == "same-name" || failed) {
 				os.Exit(99)
 			}
 			return base.Rename(a, b)
@@ -39,7 +41,9 @@ func TestCommandMoveHardExitHelper(t *testing.T) {
 	if point == "same-name" {
 		name = TemplateName
 	}
-	_, _ = i.Initialize(context.Background(), root, "example.com/tool", name)
+	if _, err := i.Initialize(context.Background(), root, "example.com/tool", name); err != nil {
+		t.Error(err)
+	}
 	t.Fatal("未触发进程退出")
 }
 
@@ -47,12 +51,24 @@ func TestCommandMoveRecoversHardExitTemporaryFile(t *testing.T) {
 	for _, point := range []string{"apply", "rollback", "same-name"} {
 		t.Run(point, func(t *testing.T) {
 			root := projectFixture(t, TemplateModule, TemplateName)
-			require.NoError(t, os.WriteFile(filepath.Join(root, "cmd", TemplateName, "doc.go"), []byte("// Command "+TemplateName+" 提供入口。\npackage main\n"), 0o600))
+			require.NoError(
+				t,
+				os.WriteFile(
+					filepath.Join(root, "cmd", TemplateName, "doc.go"),
+					[]byte("// Command "+TemplateName+" 提供入口。\npackage main\n"),
+					0o600,
+				),
+			)
 			source := "package main\nimport _ \"" + TemplateModule + "/internal/app/cli\"\nconst appName=\"" + TemplateName + "\"\nfunc main(){}\n"
 			require.NoError(t, os.WriteFile(filepath.Join(root, "cmd", TemplateName, "main.go"), []byte(source), 0o600))
 			//nolint:gosec // G204：测试只运行当前测试二进制或固定 Git/Go 命令，参数来自临时 fixture。
 			cmd := exec.Command(os.Args[0], "-test.run=^TestCommandMoveHardExitHelper$")
-			cmd.Env = append(os.Environ(), "LAYOUT_HARD_EXIT_HELPER=1", "LAYOUT_HARD_EXIT_ROOT="+root, "LAYOUT_HARD_EXIT_POINT="+point)
+			cmd.Env = append(
+				os.Environ(),
+				"LAYOUT_HARD_EXIT_HELPER=1",
+				"LAYOUT_HARD_EXIT_ROOT="+root,
+				"LAYOUT_HARD_EXIT_POINT="+point,
+			)
 			err := cmd.Run()
 			var exit *exec.ExitError
 			require.ErrorAs(t, err, &exit)
@@ -105,7 +121,10 @@ func TestCommandMovePreflightProtectsUserFiles(t *testing.T) {
 			case "target":
 				require.NoError(t, i.FS.MkdirAll(filepath.Join(root, move.To), 0o755))
 			case "extra":
-				require.NoError(t, afero.WriteFile(i.FS, filepath.Join(root, move.From, "user.go"), []byte("人工内容"), 0o600))
+				require.NoError(
+					t,
+					afero.WriteFile(i.FS, filepath.Join(root, move.From, "user.go"), []byte("人工内容"), 0o600),
+				)
 			case "directory":
 				require.NoError(t, i.FS.MkdirAll(filepath.Join(root, move.From, "other"), 0o755))
 			}
@@ -116,7 +135,8 @@ func TestCommandMovePreflightProtectsUserFiles(t *testing.T) {
 			after, err := afero.ReadFile(i.FS, filepath.Join(root, "go.mod"))
 			require.NoError(t, err)
 			require.Equal(t, before, after)
-			ok, _ := afero.Exists(i.FS, filepath.Join(root, journalDir))
+			ok, err := afero.Exists(i.FS, filepath.Join(root, journalDir))
+			require.NoError(t, err)
 			require.False(t, ok)
 		})
 	}
@@ -153,7 +173,8 @@ func TestCommandMoveRecovery(t *testing.T) {
 			info, err := i.FS.Stat(filepath.Join(root, wantDir, "main.go"))
 			require.NoError(t, err)
 			require.Equal(t, os.FileMode(0o640), info.Mode().Perm())
-			ok, _ := afero.Exists(i.FS, filepath.Join(root, journalDir))
+			ok, err := afero.Exists(i.FS, filepath.Join(root, journalDir))
+			require.NoError(t, err)
 			require.False(t, ok)
 		})
 	}
@@ -169,27 +190,45 @@ func TestCommandMoveRecoveryRejectsExternalChanges(t *testing.T) {
 			case "neither":
 				require.NoError(t, i.FS.RemoveAll(filepath.Join(root, move.To)))
 			case "edited":
-				require.NoError(t, afero.WriteFile(i.FS, filepath.Join(root, move.To, "main.go"), []byte("人工修改"), 0o600))
+				require.NoError(
+					t,
+					afero.WriteFile(i.FS, filepath.Join(root, move.To, "main.go"), []byte("人工修改"), 0o600),
+				)
 			case "unchanged-file":
-				require.NoError(t, afero.WriteFile(i.FS, filepath.Join(root, move.To, "main_test.go"), []byte("人工修改"), 0o600))
+				require.NoError(
+					t,
+					afero.WriteFile(i.FS, filepath.Join(root, move.To, "main_test.go"), []byte("人工修改"), 0o600),
+				)
 			case "documentation":
 				require.NoError(t, afero.WriteFile(i.FS, filepath.Join(root, move.To, "doc.go"), []byte("人工修改"), 0o600))
 			case "missing-documentation":
 				require.NoError(t, i.FS.Remove(filepath.Join(root, move.To, "doc.go")))
 			case "extra":
-				require.NoError(t, afero.WriteFile(i.FS, filepath.Join(root, move.To, "extra.txt"), []byte("人工修改"), 0o600))
+				require.NoError(
+					t,
+					afero.WriteFile(i.FS, filepath.Join(root, move.To, "extra.txt"), []byte("人工修改"), 0o600),
+				)
 			case "escape":
 				file := filepath.Join(root, journalDir, "journal.json")
 				raw, err := afero.ReadFile(i.FS, file)
 				require.NoError(t, err)
-				require.NoError(t, afero.WriteFile(i.FS, file, []byte(strings.ReplaceAll(string(raw), `"cmd/my-cli"`, `"../outside"`)), 0o600))
+				require.NoError(
+					t,
+					afero.WriteFile(
+						i.FS,
+						file,
+						[]byte(strings.ReplaceAll(string(raw), `"cmd/my-cli"`, `"../outside"`)),
+						0o600,
+					),
+				)
 			}
 			module := "example.com/team/repository"
 			if mode == "conflict" {
 				module = "example.com/other"
 			}
 			require.Error(t, i.recover(root, module, "my-cli"))
-			ok, _ := afero.Exists(i.FS, filepath.Join(root, journalDir, "journal.json"))
+			ok, err := afero.Exists(i.FS, filepath.Join(root, journalDir, "journal.json"))
+			require.NoError(t, err)
 			require.True(t, ok)
 		})
 	}
@@ -249,7 +288,8 @@ func TestRecoveryRejectsV1Journal(t *testing.T) {
 	err = i.recover(root, "example.com/tool", "tool")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "原版本")
-	ok, _ := afero.Exists(i.FS, filepath.Join(root, journalDir, "journal.json"))
+	ok, err := afero.Exists(i.FS, filepath.Join(root, journalDir, "journal.json"))
+	require.NoError(t, err)
 	require.True(t, ok)
 }
 
@@ -273,7 +313,16 @@ func TestCommandMoveRecoveryRejectsDirectoryLink(t *testing.T) {
 		},
 	}
 	require.Panics(t, func() {
-		_, _ = i.apply(context.Background(), root, "example.com/tool", "my-cli", []change{{file, []byte(strings.ReplaceAll(string(data), TemplateName, "my-cli")), 0o600}}, move)
+		if _, err := i.apply(
+			context.Background(),
+			root,
+			"example.com/tool",
+			"my-cli",
+			[]change{{file, []byte(strings.ReplaceAll(string(data), TemplateName, "my-cli")), 0o600}},
+			move,
+		); err != nil {
+			t.Error(err)
+		}
 	})
 	i.FS = base
 	outside := filepath.Join(t.TempDir(), "outside")
@@ -302,7 +351,7 @@ func TestCommandMoveRollbackInterruptionIsRetryable(t *testing.T) {
 		},
 	}
 	require.Panics(t, func() {
-		_ = i.recover(root, "example.com/team/repository", "my-cli")
+		require.NoError(t, i.recover(root, "example.com/team/repository", "my-cli"))
 	})
 	i.FS = base
 	require.NoError(t, i.recover(root, "example.com/team/repository", "my-cli"))

@@ -16,7 +16,9 @@ import (
 
 // Project 是从项目文件静态读取的应用身份。
 type Project struct {
-	Module, Name, CommandPath string
+	Module      string
+	Name        string
+	CommandPath string
 }
 
 // Inspect 查找唯一命令入口，不执行项目代码。
@@ -117,12 +119,18 @@ func entryName(filename string, source []byte) (string, error) {
 						continue
 					}
 					if literal, ok := value.Values[index].(*ast.BasicLit); ok && literal.Kind == token.STRING {
-						name, _ = strconv.Unquote(literal.Value)
+						var err error
+						name, err = strconv.Unquote(literal.Value)
+						if err != nil {
+							return "", fmt.Errorf("解析 appName 失败：%w", err)
+						}
 					}
 				}
 			}
 		case *ast.FuncDecl:
-			if d.Name.Name == "main" && d.Recv == nil && d.Type.TypeParams == nil && d.Type.Params.NumFields() == 0 && d.Type.Results.NumFields() == 0 && d.Body != nil {
+			if d.Name.Name == "main" && d.Recv == nil && d.Type.TypeParams == nil && d.Type.Params.NumFields() == 0 &&
+				d.Type.Results.NumFields() == 0 &&
+				d.Body != nil {
 				main = true
 			}
 		}

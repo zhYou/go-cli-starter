@@ -19,8 +19,11 @@ import (
 
 type cleanupFaultFS struct {
 	afero.Fs
-	root, point                          string
-	rollback, failedCleanup, failedApply bool
+	root          string
+	point         string
+	rollback      bool
+	failedCleanup bool
+	failedApply   bool
 }
 
 func (f *cleanupFaultFS) Rename(a, b string) error {
@@ -101,7 +104,7 @@ func TestTerminalCleanupIsRetryable(t *testing.T) {
 				require.NoError(t, err)
 				mod, err = afero.ReadFile(base, filepath.Join(root, "go.mod"))
 				require.NoError(t, err)
-				require.True(t, strings.Contains(string(mod), "example.com/tool"))
+				require.Contains(t, string(mod), "example.com/tool")
 				ok, err := afero.Exists(base, filepath.Join(root, journalDir))
 				require.NoError(t, err)
 				require.False(t, ok)
@@ -119,7 +122,11 @@ func TestRecoveryRejectsInconsistentExistence(t *testing.T) {
 			require.NoError(t, err)
 			var doc map[string]any
 			require.NoError(t, json.Unmarshal(data, &doc))
-			file := doc["files"].([]any)[0].(map[string]any)
+			files, ok := doc["files"].([]any)
+			require.True(t, ok)
+			require.NotEmpty(t, files)
+			file, ok := files[0].(map[string]any)
+			require.True(t, ok)
 			switch mode {
 			case "false":
 				file["existed"] = false
@@ -149,13 +156,16 @@ func TestRecoveryRejectsInconsistentExistence(t *testing.T) {
 
 func TestRecoverBeforeIdentityCheck(t *testing.T) {
 	i, root := crashedTransaction(t)
-	module, _ := afero.ReadFile(i.FS, filepath.Join(root, "go.mod"))
-	require.Contains(t, string(module), "example.com/tool")
-	main, _ := afero.ReadFile(i.FS, filepath.Join(root, "cmd", TemplateName, "main.go"))
-	require.Contains(t, string(main), TemplateName)
-	_, err := i.Initialize(context.Background(), root, "example.com/tool", "tool")
+	module, err := afero.ReadFile(i.FS, filepath.Join(root, "go.mod"))
 	require.NoError(t, err)
-	main, _ = afero.ReadFile(i.FS, filepath.Join(root, "cmd", "tool", "main.go"))
+	require.Contains(t, string(module), "example.com/tool")
+	main, err := afero.ReadFile(i.FS, filepath.Join(root, "cmd", TemplateName, "main.go"))
+	require.NoError(t, err)
+	require.Contains(t, string(main), TemplateName)
+	_, err = i.Initialize(context.Background(), root, "example.com/tool", "tool")
+	require.NoError(t, err)
+	main, err = afero.ReadFile(i.FS, filepath.Join(root, "cmd", "tool", "main.go"))
+	require.NoError(t, err)
 	require.Contains(t, string(main), `"tool"`)
 }
 
@@ -169,21 +179,33 @@ func TestRecoveryRejectsEditedOrEscapingPaths(t *testing.T) {
 			case "edited":
 				require.NoError(t, afero.WriteFile(i.FS, path, []byte("人工修改"), 0o600))
 			case "escape":
-				data, _ := afero.ReadFile(i.FS, journal)
-				require.NoError(t, afero.WriteFile(i.FS, journal, []byte(strings.Replace(string(data), `"go.mod"`, `"../outside"`, 1)), 0o600))
+				data, err := afero.ReadFile(i.FS, journal)
+				require.NoError(t, err)
+				require.NoError(
+					t,
+					afero.WriteFile(
+						i.FS,
+						journal,
+						[]byte(strings.Replace(string(data), `"go.mod"`, `"../outside"`, 1)),
+						0o600,
+					),
+				)
 			case "corrupt":
 				require.NoError(t, afero.WriteFile(i.FS, journal, []byte("{"), 0o600))
 			}
-			before, _ := afero.ReadFile(i.FS, path)
+			before, err := afero.ReadFile(i.FS, path)
+			require.NoError(t, err)
 			module := "example.com/tool"
 			if mode == "conflict" {
 				module = "example.com/other"
 			}
-			_, err := i.Initialize(context.Background(), root, module, "tool")
+			_, err = i.Initialize(context.Background(), root, module, "tool")
 			require.Error(t, err)
-			after, _ := afero.ReadFile(i.FS, path)
+			after, err := afero.ReadFile(i.FS, path)
+			require.NoError(t, err)
 			require.Equal(t, before, after)
-			ok, _ := afero.Exists(i.FS, journal)
+			ok, err := afero.Exists(i.FS, journal)
+			require.NoError(t, err)
 			require.True(t, ok)
 		})
 	}
@@ -196,7 +218,8 @@ func TestRollbackFailureKeepsRecoveryData(t *testing.T) {
 	i.FS = faultFS{
 		Fs: base,
 		rename: func(a, b string) error {
-			if b == filepath.Join(root, "go.mod") || b == filepath.Join(root, "README.md") || b == filepath.Join(root, "cmd", TemplateName, "main.go") {
+			if b == filepath.Join(root, "go.mod") || b == filepath.Join(root, "README.md") ||
+				b == filepath.Join(root, "cmd", TemplateName, "main.go") {
 				targets++
 				if targets >= 2 {
 					return errors.New("写入和回滚失败")
@@ -207,7 +230,8 @@ func TestRollbackFailureKeepsRecoveryData(t *testing.T) {
 	}
 	_, err := i.Initialize(context.Background(), root, "example.com/tool", "tool")
 	require.Error(t, err)
-	ok, _ := afero.Exists(base, filepath.Join(root, ".template-init", "journal.json"))
+	ok, err := afero.Exists(base, filepath.Join(root, ".template-init", "journal.json"))
+	require.NoError(t, err)
 	require.True(t, ok)
 	i.FS = base
 	_, err = i.Initialize(context.Background(), root, "example.com/tool", "tool")
@@ -220,13 +244,16 @@ func TestWriteFailureRestoresOriginalBytes(t *testing.T) {
 		base := i.FS
 		before := map[string][]byte{}
 		for _, n := range []string{"go.mod", "cmd/" + TemplateName + "/main.go", "README.md"} {
-			before[n], _ = afero.ReadFile(base, filepath.Join(root, n))
+			data, err := afero.ReadFile(base, filepath.Join(root, n))
+			before[n] = data
+			require.NoError(t, err)
 		}
 		count := 0
 		i.FS = faultFS{
 			Fs: base,
 			rename: func(a, b string) error {
-				if b == filepath.Join(root, "go.mod") || b == filepath.Join(root, "README.md") || b == filepath.Join(root, "cmd", TemplateName, "main.go") {
+				if b == filepath.Join(root, "go.mod") || b == filepath.Join(root, "README.md") ||
+					b == filepath.Join(root, "cmd", TemplateName, "main.go") {
 					count++
 					if count == failAt {
 						return errors.New("指定写入失败")
@@ -238,7 +265,8 @@ func TestWriteFailureRestoresOriginalBytes(t *testing.T) {
 		_, err := i.Initialize(context.Background(), root, "example.com/tool", "tool")
 		require.Error(t, err)
 		for n, want := range before {
-			got, _ := afero.ReadFile(base, filepath.Join(root, n))
+			got, err := afero.ReadFile(base, filepath.Join(root, n))
+			require.NoError(t, err)
 			require.Equal(t, want, got, n)
 		}
 	}
@@ -253,10 +281,14 @@ func TestLockHelper(t *testing.T) {
 		os.Exit(3)
 	}
 	defer func() {
-		_ = unlock()
+		require.NoError(t, unlock())
 	}()
-	_, _ = os.Stdout.WriteString("就绪\n")
-	_, _ = os.Stdin.Read(make([]byte, 1))
+	if _, err := os.Stdout.WriteString("就绪\n"); err != nil {
+		t.Error(err)
+	}
+	if _, err := os.Stdin.Read(make([]byte, 1)); err != nil {
+		t.Error(err)
+	}
 }
 
 func TestConcurrentInitializationDoesNotRecoverLiveTransaction(t *testing.T) {
@@ -284,8 +316,13 @@ func TestConcurrentInitializationDoesNotRecoverLiveTransaction(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		cancel()
-		_ = in.Close()
-		_ = cmd.Process.Kill()
+		if err := in.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
+			t.Error(err)
+		}
+		if err := cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+			t.Error(err)
+		}
+		//nolint:errcheck // 主测试断言进程结果；早退收尾可能产生主动终止错误，仍必须等待进程退出。
 		_ = waitChild()
 	})
 	line, err := bufio.NewReader(out).ReadString('\n')

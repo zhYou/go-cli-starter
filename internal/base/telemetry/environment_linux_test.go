@@ -33,31 +33,7 @@ func TestIsolatedEnvironmentHelper(t *testing.T) {
 	_, span := s.Tracer.Start(t.Context(), "fixture")
 	fmt.Println("recording", span.IsRecording())
 	span.End()
-	_ = s.Close(t.Context())
-}
-
-func childEnvironment(extra ...string) []string {
-	var env []string
-	for _, entry := range os.Environ() {
-		if !strings.HasPrefix(entry, "OTEL_") {
-			env = append(env, entry)
-		}
-	}
-	return append(env, extra...)
-}
-
-func runEnvironmentHelper(t *testing.T, extra ...string) string {
-	t.Helper()
-	exe, err := os.Executable()
-	require.NoError(t, err)
-	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
-	defer cancel()
-	// #nosec G204 -- 在独立测试进程内捕获 SDK 真正的 stderr，不修改父进程全局 logger 或环境。
-	cmd := exec.CommandContext(ctx, exe, "-test.run=^TestIsolatedEnvironmentHelper$")
-	cmd.Env = childEnvironment(append(extra, environmentHelper+"=1")...)
-	output, err := cmd.CombinedOutput()
-	require.NoError(t, err, string(output))
-	return string(output)
+	require.NoError(t, s.Close(t.Context()))
 }
 
 func TestLocalTraceIgnoresRemoteExporterEnvironment(t *testing.T) {
@@ -87,4 +63,28 @@ func TestMalformedSDKEnvironmentDegradesWithoutRawOutput(t *testing.T) {
 			require.Equal(t, 1, strings.Count(output, "sanitized_trace_warning"))
 		})
 	}
+}
+
+func childEnvironment(extra ...string) []string {
+	var env []string
+	for _, entry := range os.Environ() {
+		if !strings.HasPrefix(entry, "OTEL_") {
+			env = append(env, entry)
+		}
+	}
+	return append(env, extra...)
+}
+
+func runEnvironmentHelper(t *testing.T, extra ...string) string {
+	t.Helper()
+	exe, err := os.Executable()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	// #nosec G204 -- 在独立测试进程内捕获 SDK 真正的 stderr，不修改父进程全局 logger 或环境。
+	cmd := exec.CommandContext(ctx, exe, "-test.run=^TestIsolatedEnvironmentHelper$")
+	cmd.Env = childEnvironment(append(extra, environmentHelper+"=1")...)
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(output))
+	return string(output)
 }

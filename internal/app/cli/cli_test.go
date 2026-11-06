@@ -43,7 +43,7 @@ func TestInvalidArgumentsFailWithoutOutputOrPrompt(t *testing.T) {
 func TestCancellationExitCode(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	code, out, errOut := invokeContext(t, ctx, "greet", "--name", "Codex")
+	code, out, errOut := invokeContext(ctx, t, "greet", "--name", "Codex")
 	if code != 130 || out != "" || !strings.Contains(errOut, "Operation cancelled") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, out, errOut)
 	}
@@ -135,7 +135,11 @@ func TestDiscoveryAndInvalidCallsCreateNoState(t *testing.T) {
 func TestFileTraceCorrelatesActualCommandAndBusinessLogs(t *testing.T) {
 	home := t.TempDir()
 	var out, stderr bytes.Buffer
-	env := map[string]string{"GO_CLI_STARTER_HOME": home, "GO_CLI_STARTER_TELEMETRY_EXPORTER": "file", "GO_CLI_STARTER_LOG_LEVEL": "debug"}
+	env := map[string]string{
+		"GO_CLI_STARTER_HOME":               home,
+		"GO_CLI_STARTER_TELEMETRY_EXPORTER": "file",
+		"GO_CLI_STARTER_LOG_LEVEL":          "debug",
+	}
 	code := Run(t.Context(), []string{"greet", "--name", "private-name", "--json", "--lang", "en"}, Options{
 		Out:    &out,
 		ErrOut: &stderr,
@@ -156,28 +160,36 @@ func TestFileTraceCorrelatesActualCommandAndBusinessLogs(t *testing.T) {
 	require.NotContains(t, string(logs), "private-name")
 	require.NotContains(t, string(traces), "private-name")
 	spans := map[string]map[string]any{}
-	for _, line := range bytes.Split(bytes.TrimSpace(traces), []byte("\n")) {
+	for line := range bytes.SplitSeq(bytes.TrimSpace(traces), []byte("\n")) {
 		var row map[string]any
 		require.NoError(t, json.Unmarshal(line, &row))
-		spans[row["Name"].(string)] = row
+		name, ok := row["Name"].(string)
+		require.True(t, ok)
+		spans[name] = row
 	}
 	require.Len(t, spans, 2)
 	business := spans["greeting.run"]
 	require.NotNil(t, business)
-	businessContext := business["SpanContext"].(map[string]any)
+	businessContext, ok := business["SpanContext"].(map[string]any)
+	require.True(t, ok)
 	var rootContext map[string]any
 	for name, row := range spans {
 		if name != "greeting.run" {
-			rootContext = row["SpanContext"].(map[string]any)
+			rootContext, ok = row["SpanContext"].(map[string]any)
+			require.True(t, ok)
 		}
 	}
 	require.Equal(t, rootContext["TraceID"], businessContext["TraceID"])
-	require.Equal(t, rootContext["SpanID"], business["Parent"].(map[string]any)["SpanID"])
+	parent, ok := business["Parent"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, rootContext["SpanID"], parent["SpanID"])
 	events := map[string]map[string]any{}
-	for _, line := range bytes.Split(bytes.TrimSpace(logs), []byte("\n")) {
+	for line := range bytes.SplitSeq(bytes.TrimSpace(logs), []byte("\n")) {
 		var row map[string]any
 		require.NoError(t, json.Unmarshal(line, &row))
-		events[row["event"].(string)] = row
+		event, ok := row["event"].(string)
+		require.True(t, ok)
+		events[event] = row
 	}
 	require.Equal(t, "Command started", events["command_started"]["msg"])
 	require.Equal(t, rootContext["TraceID"], events["command_started"]["trace_id"])
@@ -187,13 +199,18 @@ func TestFileTraceCorrelatesActualCommandAndBusinessLogs(t *testing.T) {
 
 func TestLogAndTraceOutputsAreIndependent(t *testing.T) {
 	for _, tc := range []struct {
-		log, trace string
-		files      []string
+		log   string
+		trace string
+		files []string
 	}{{"none", "none", nil}, {"stderr", "none", nil}, {"none", "file", []string{"trace.jsonl"}}, {"file", "none", []string{"events.jsonl"}}} {
 		t.Run(tc.log+"-"+tc.trace, func(t *testing.T) {
 			home := t.TempDir()
 			var out, stderr bytes.Buffer
-			env := map[string]string{"GO_CLI_STARTER_HOME": home, "GO_CLI_STARTER_LOGGING_OUTPUT": tc.log, "GO_CLI_STARTER_TELEMETRY_EXPORTER": tc.trace}
+			env := map[string]string{
+				"GO_CLI_STARTER_HOME":               home,
+				"GO_CLI_STARTER_LOGGING_OUTPUT":     tc.log,
+				"GO_CLI_STARTER_TELEMETRY_EXPORTER": tc.trace,
+			}
 			code := Run(t.Context(), []string{"greet", "--name", "x"}, Options{
 				Out:    &out,
 				ErrOut: &stderr,
@@ -287,8 +304,12 @@ func TestCanceledBusinessStillFlushesTrace(t *testing.T) {
 
 type overlappingStderr struct {
 	bytes.Buffer
-	entered, release                chan struct{}
-	active, overlaps, syncs, closes atomic.Int32
+	entered  chan struct{}
+	release  chan struct{}
+	active   atomic.Int32
+	overlaps atomic.Int32
+	syncs    atomic.Int32
+	closes   atomic.Int32
 }
 
 func (s *overlappingStderr) Write(p []byte) (int, error) {
@@ -319,7 +340,7 @@ func TestCLIErrorAndDiagnosticWarningShareStderrSerialization(t *testing.T) {
 	var warn func(error)
 	warningDone := make(chan struct{})
 	deps := Dependencies{
-		LoadConfig: func(config.Options) (config.Config, error) {
+		LoadConfig: func(context.Context, config.Options) (config.Config, error) {
 			cfg := config.Defaults()
 			cfg.Logging.Output = "stderr"
 			return cfg, nil

@@ -20,10 +20,10 @@ import (
 
 func invoke(t *testing.T, args ...string) (int, string, string) {
 	t.Helper()
-	return invokeContext(t, context.Background(), args...)
+	return invokeContext(context.Background(), t, args...)
 }
 
-func invokeContext(t *testing.T, ctx context.Context, args ...string) (int, string, string) {
+func invokeContext(ctx context.Context, t *testing.T, args ...string) (int, string, string) {
 	t.Helper()
 	var out, errOut bytes.Buffer
 	code := Run(ctx, args, Options{
@@ -53,7 +53,12 @@ func metadataRoot(opts Options) *cobra.Command {
 
 // isolatedOptions 显式注入配置、目录与环境；任何 argv 都不读取或写入用户状态。
 func isolatedOptions(home string, out, stderr io.Writer) Options {
-	dirs := paths.Directories{Config: home, Data: filepath.Join(home, "data"), State: filepath.Join(home, "state"), Cache: filepath.Join(home, "cache")}
+	dirs := paths.Directories{
+		Config: home,
+		Data:   filepath.Join(home, "data"),
+		State:  filepath.Join(home, "state"),
+		Cache:  filepath.Join(home, "cache"),
+	}
 	return Options{
 		Directories: &dirs,
 		Out:         out,
@@ -64,7 +69,7 @@ func isolatedOptions(home string, out, stderr io.Writer) Options {
 			}
 			return "", false
 		},
-		Dependencies: &Dependencies{LoadConfig: func(config.Options) (config.Config, error) {
+		Dependencies: &Dependencies{LoadConfig: func(context.Context, config.Options) (config.Config, error) {
 			cfg := config.Defaults()
 			cfg.Logging.Output = "none"
 			return cfg, nil

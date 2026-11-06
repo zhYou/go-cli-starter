@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/stretchr/testify/require"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
@@ -125,7 +127,9 @@ func TestFileShutdownWaitIsBounded(t *testing.T) {
 }
 
 type blockingWriter struct {
-	started, release, done chan struct{}
+	started chan struct{}
+	release chan struct{}
+	done    chan struct{}
 }
 
 func (w *blockingWriter) Write(data []byte) (int, error) {
@@ -146,7 +150,7 @@ func TestGuardedExporterCancelsWhenSessionEnds(t *testing.T) {
 	}
 	done := make(chan struct{})
 	go func() {
-		_ = guarded.ExportSpans(t.Context(), nil)
+		assert.NoError(t, guarded.ExportSpans(t.Context(), nil))
 		close(done)
 	}()
 	select {
@@ -168,7 +172,8 @@ func TestGuardedExporterCancelsWhenSessionEnds(t *testing.T) {
 }
 
 type contextExporter struct {
-	started, canceled chan struct{}
+	started  chan struct{}
+	canceled chan struct{}
 }
 
 func (e *contextExporter) ExportSpans(ctx context.Context, _ []sdktrace.ReadOnlySpan) error {

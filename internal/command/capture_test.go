@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestCapturePreservesArgsEnvironmentDirectoryAndBytes(t *testing.T) {
@@ -22,7 +24,7 @@ func TestCapturePreservesArgsEnvironmentDirectoryAndBytes(t *testing.T) {
 		t.Fatal(err)
 	}
 	var args []string
-	_ = json.Unmarshal(data[0], &args)
+	require.NoError(t, json.Unmarshal(data[0], &args))
 	if !reflect.DeepEqual(args, call.Args[3:]) {
 		t.Fatalf("argv %q", args)
 	}

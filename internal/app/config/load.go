@@ -31,12 +31,13 @@ type Config struct {
 
 // Options 声明本次调用的显式依赖与覆盖选项。
 type Options struct {
-	AppName, Path, UserConfigDir string
-	LookupEnv                    func(string) (string, bool)
-	LogLevel                     *string
-	Context                      context.Context
-	Validator                    *validation.Validator
-	Explicit                     bool
+	AppName       string
+	Path          string
+	UserConfigDir string
+	LookupEnv     func(string) (string, bool)
+	LogLevel      *string
+	Validator     *validation.Validator
+	Explicit      bool
 }
 
 // Defaults 返回本模块的默认配置。
@@ -44,21 +45,9 @@ func Defaults() Config {
 	return Config{Logging: logging.Defaults(), Diagnostics: diagnostics.Defaults(), Telemetry: telemetry.Defaults()}
 }
 
-func problem(code string, cause error, params fault.Params) error {
-	d := fault.Definition{Code: fault.Code("config." + code), Kind: fault.Configuration}
-	if cause != nil {
-		return d.Wrap(cause, fault.WithParams(params))
-	}
-	return d.New(fault.WithParams(params))
-}
-
 // Load 按显式选项 > 非空环境变量 > 唯一 TOML 文件 > 默认值解析。
-func Load(opts Options) (Config, error) {
+func Load(ctx context.Context, opts Options) (Config, error) {
 	cfg := Defaults()
-	ctx := opts.Context
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	if err := ctx.Err(); err != nil {
 		return cfg, err
 	}
@@ -215,4 +204,12 @@ func strictHook(from, to reflect.Type, value any) (any, error) {
 		}
 	}
 	return value, nil
+}
+
+func problem(code string, cause error, params fault.Params) error {
+	d := fault.Definition{Code: fault.Code("config." + code), Kind: fault.Configuration}
+	if cause != nil {
+		return d.Wrap(cause, fault.WithParams(params))
+	}
+	return d.New(fault.WithParams(params))
 }

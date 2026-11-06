@@ -23,6 +23,7 @@ func run(args []string, root string, out, errOut io.Writer) int {
 		case "check":
 			if len(args) == 1 {
 				if err := verifyTemplate(); err != nil {
+					//nolint:errcheck // 已在报告失败；stderr 不可用时保留既定失败退出码。
 					_, _ = fmt.Fprintln(errOut, "错误：", err)
 					return 1
 				}
@@ -30,6 +31,7 @@ func run(args []string, root string, out, errOut io.Writer) int {
 			}
 		}
 	}
+	//nolint:errcheck // 已在报告失败；stderr 不可用时保留既定失败退出码。
 	_, _ = fmt.Fprintln(errOut, "错误：用法：template <init --module 模块路径 --name 名称|check>")
 	return 2
 }

@@ -135,7 +135,10 @@ func TestInitializeIsIdempotentAndRejectsConflictingIdentity(t *testing.T) {
 }
 
 func TestInitializeRejectsInvalidInputsBeforeWriting(t *testing.T) {
-	for _, tc := range []struct{ module, name string }{
+	for _, tc := range []struct {
+		module string
+		name   string
+	}{
 		{"", "tool"},
 		{"example.com/tool", ""},
 		{"example.com/tool", "../tool"},

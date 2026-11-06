@@ -16,7 +16,8 @@ import (
 
 // Run 持有一个运行目录及其存活锁；关闭前调用方必须等待所有写入者结束。
 type Run struct {
-	ID, Path  string
+	ID        string
+	Path      string
 	root      *os.Root
 	lease     *flock.Flock
 	config    Config
@@ -54,7 +55,9 @@ func Open(base string, config Config, warn func(error)) (*Run, error) {
 		return nil, err
 	}
 	defer func() {
-		_ = parent.Close()
+		if err := parent.Close(); err != nil && warn != nil {
+			warn(err)
+		}
 	}()
 	id := NewID()
 	path := filepath.Join(base, id)
@@ -67,24 +70,18 @@ func Open(base string, config Config, warn func(error)) (*Run, error) {
 	}
 	file, err := root.OpenFile(leaseName, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o600)
 	if err != nil {
-		_ = root.Close()
-		return nil, err
+		return nil, errors.Join(err, root.Close())
 	}
 	if err = file.Close(); err != nil {
-		_ = root.Close()
-		return nil, err
+		return nil, errors.Join(err, root.Close())
 	}
 	lease := flock.New(filepath.Join(path, leaseName), flock.SetPermissions(0o600), flock.SetFlag(os.O_RDWR))
 	locked, err := lease.TryLock()
 	if err != nil || !locked {
-		_ = lease.Close()
-		_ = root.Close()
-		return nil, errors.Join(err, leaseunavailable.New())
+		return nil, errors.Join(err, leaseunavailable.New(), lease.Close(), root.Close())
 	}
 	if err = writeMetadata(root, metadata{Version: metadataVersion, ID: id, Started: time.Now().UTC()}); err != nil {
-		_ = lease.Close()
-		_ = root.Close()
-		return nil, err
+		return nil, errors.Join(err, lease.Close(), root.Close())
 	}
 	return &Run{
 		ID:      id,
@@ -159,8 +156,7 @@ func writeMetadata(root *os.Root, value metadata) error {
 	_, writeErr := f.Write(data)
 	err = errors.Join(writeErr, f.Sync(), f.Close())
 	if err != nil {
-		_ = root.Remove(metadataTemporaryName)
-		return err
+		return errors.Join(err, root.Remove(metadataTemporaryName))
 	}
 	return root.Rename(metadataTemporaryName, metadataName)
 }

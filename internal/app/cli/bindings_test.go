@@ -39,7 +39,12 @@ func TestMetadataRenderingFailureStopsBeforeOutput(t *testing.T) {
 				return bundle, nil
 			}
 			var out, stderr bytes.Buffer
-			code := run(context.Background(), []string{"--lang", "zh", "greet", "--help"}, Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv}, loader)
+			code := run(
+				context.Background(),
+				[]string{"--lang", "zh", "greet", "--help"},
+				Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv},
+				loader,
+			)
 			require.Equal(t, 1, code, stderr.String())
 			require.Empty(t, out.String())
 			require.Contains(t, stderr.String(), id)
@@ -50,7 +55,13 @@ func TestMetadataRenderingFailureStopsBeforeOutput(t *testing.T) {
 func TestCommandAndFlagBindingsRenderIndependently(t *testing.T) {
 	bundle := catalogWithCommandFixtures(t)
 	for _, tc := range []struct {
-		language, command, description, usage, example, flag, otherFlag string
+		language    string
+		command     string
+		description string
+		usage       string
+		example     string
+		flag        string
+		otherFlag   string
 	}{
 		{"en", "alpha", "Alpha long description", "alpha <item>", "Example alpha", "Alpha name", "Beta name"},
 		{"en", "beta", "Beta long description", "beta <item>", "Example beta", "Beta name", "Alpha name"},
@@ -62,7 +73,10 @@ func TestCommandAndFlagBindingsRenderIndependently(t *testing.T) {
 			loader := func() (*messages.Bundle, error) {
 				return bundle, nil
 			}
-			root, call, err := buildRoot(defaults(Options{Name: "testcli", Language: tc.language, Out: &out, LookupEnv: noFixtureEnv}), loader)
+			root, call, err := buildRoot(
+				defaults(Options{Name: "testcli", Language: tc.language, Out: &out, LookupEnv: noFixtureEnv}),
+				loader,
+			)
 			require.NoError(t, err)
 			for _, name := range []string{"alpha", "beta"} {
 				cmd := &cobra.Command{
@@ -74,7 +88,15 @@ func TestCommandAndFlagBindingsRenderIndependently(t *testing.T) {
 				}
 				cmd.Flags().String("name", "", "original")
 				root.AddCommand(cmd)
-				call.bindCommand(cmd, commandTexts{short: message("fixture." + name + ".short"), long: message("fixture." + name + ".long"), use: message("fixture." + name + ".use"), example: message("fixture." + name + ".example")})
+				call.bindCommand(
+					cmd,
+					commandTexts{
+						short:   message("fixture." + name + ".short"),
+						long:    message("fixture." + name + ".long"),
+						use:     message("fixture." + name + ".use"),
+						example: message("fixture." + name + ".example"),
+					},
+				)
 				call.bindFlag(cmd.Flags().Lookup("name"), message("fixture."+name+".flag"))
 				configureHelp(cmd, call)
 			}
@@ -92,7 +114,10 @@ func TestCommandAndFlagBindingsRenderIndependently(t *testing.T) {
 }
 
 func TestTranslatedUsageCannotChangeCommandName(t *testing.T) {
-	for _, tc := range []struct{ name, use string }{
+	for _, tc := range []struct {
+		name string
+		use  string
+	}{
 		{"different name", "salute --name NAME"},
 		{"leading space", " greet --name NAME"},
 		{"tab in name", "greet\t--name NAME"},
@@ -112,7 +137,12 @@ func TestTranslatedUsageCannotChangeCommandName(t *testing.T) {
 			})
 			t.Run("run", func(t *testing.T) {
 				var out, stderr bytes.Buffer
-				code := run(context.Background(), []string{"greet", "--help"}, Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv}, loader)
+				code := run(
+					context.Background(),
+					[]string{"greet", "--help"},
+					Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv},
+					loader,
+				)
 				require.Equal(t, 1, code, stderr.String())
 				require.Empty(t, out.String())
 				require.Contains(t, stderr.String(), "cli.greet_use")
@@ -138,9 +168,12 @@ func TestLongDescriptionRenderingFailureIsReturned(t *testing.T) {
 func TestChildVersionRenderFailureDoesNotMutateTree(t *testing.T) {
 	bundle := catalogFixture(t, "en", "cli.version_template", `other = '{{index .Name 1}}'`+"\n")
 	var out bytes.Buffer
-	root, call, err := buildRoot(defaults(Options{Name: "parent", Version: "v1", Out: &out, LookupEnv: noFixtureEnv}), func() (*messages.Bundle, error) {
-		return bundle, nil
-	})
+	root, call, err := buildRoot(
+		defaults(Options{Name: "parent", Version: "v1", Out: &out, LookupEnv: noFixtureEnv}),
+		func() (*messages.Bundle, error) {
+			return bundle, nil
+		},
+	)
 	require.NoError(t, err)
 	before := root.VersionTemplate()
 	child := &cobra.Command{Use: "x", Version: "v2"}

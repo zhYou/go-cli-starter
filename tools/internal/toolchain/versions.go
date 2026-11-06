@@ -47,27 +47,59 @@ func Load(root string) (VersionSet, error) {
 
 // ToolSpec 描述真实工具的版本探测命令与输出格式。
 type ToolSpec struct {
-	Name, Display, Pattern string
-	Args                   []string
+	Name    string
+	Display string
+	Pattern string
+	Args    []string
 }
 
 // Spec 返回工具的离线版本探测规格。
 func Spec(key string) (ToolSpec, error) {
 	switch key {
 	case miseProgram:
-		return ToolSpec{miseProgram, miseProgram, `(?m)^([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`, []string{versionFlag}}, nil
+		return ToolSpec{
+			miseProgram,
+			miseProgram,
+			`(?m)^([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`,
+			[]string{versionFlag},
+		}, nil
 	case "go":
 		return ToolSpec{"go", "Go", `\bgo([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`, []string{versionCommand}}, nil
 	case goplsTool:
-		return ToolSpec{goplsProgram, goplsProgram, `(?m)^golang.org/x/tools/gopls v([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`, []string{versionCommand}}, nil
+		return ToolSpec{
+			goplsProgram,
+			goplsProgram,
+			`(?m)^golang.org/x/tools/gopls v([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`,
+			[]string{versionCommand},
+		}, nil
 	case lintProgram:
-		return ToolSpec{lintProgram, lintProgram, `\bgolangci-lint has version ([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`, []string{versionCommand}}, nil
+		return ToolSpec{
+			lintProgram,
+			lintProgram,
+			`\bgolangci-lint has version ([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`,
+			[]string{versionCommand},
+		}, nil
 	case releaseProgram:
-		return ToolSpec{releaseProgram, "GoReleaser", `(?m)^GitVersion:\s+v?([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`, []string{versionFlag}}, nil
+		return ToolSpec{
+			releaseProgram,
+			"GoReleaser",
+			`(?m)^GitVersion:\s+v?([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`,
+			[]string{versionFlag},
+		}, nil
 	case govulncheckTool:
-		return ToolSpec{govulncheckProgram, govulncheckProgram, `(?m)^Scanner:\s+govulncheck@v([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`, []string{"-h"}}, nil
+		return ToolSpec{
+			govulncheckProgram,
+			govulncheckProgram,
+			`(?m)^Scanner:\s+govulncheck@v([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`,
+			[]string{"-h"},
+		}, nil
 	case "syft":
-		return ToolSpec{"syft", "Syft", `(?m)^Version:\s+v?([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`, []string{versionCommand}}, nil
+		return ToolSpec{
+			"syft",
+			"Syft",
+			`(?m)^Version:\s+v?([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`,
+			[]string{versionCommand},
+		}, nil
 	default:
 		return ToolSpec{}, fmt.Errorf("缺少工具 %s 的版本提取器", key)
 	}
@@ -107,7 +139,9 @@ func SortedTools(v VersionSet) []string {
 
 // MatchGovulncheckBuildInfo 离线核验真实 Go 可执行文件，避免 -version 访问漏洞库。
 func MatchGovulncheckBuildInfo(info *buildinfo.BuildInfo, want string) error {
-	if info.Path != "golang.org/x/vuln/cmd/govulncheck" || info.Main.Path != "golang.org/x/vuln" || info.Main.Version != "v"+want || info.Main.Replace != nil {
+	if info.Path != "golang.org/x/vuln/cmd/govulncheck" || info.Main.Path != "golang.org/x/vuln" ||
+		info.Main.Version != "v"+want ||
+		info.Main.Replace != nil {
 		return fmt.Errorf("govulncheck 与固定来源和版本 %s 不符，请运行 mise run setup", want)
 	}
 	return nil

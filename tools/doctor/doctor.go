@@ -24,13 +24,15 @@ const (
 )
 
 type doctorProbe struct {
-	key, want   string
+	key         string
+	want        string
 	spec        toolchain.ToolSpec
 	preparation error
 	optional    bool
 }
 
 func runDoctorProbes(ctx context.Context, calls []cmdexec.Invocation) []cmdexec.Result {
+	//nolint:errcheck // 每项失败已保存在 results，reportDoctorProbes 分别处理必需与可选工具，不能以批量错误改变策略。
 	results, _ := cmdexec.RunBatch(ctx, calls, cmdexec.Execution{}, cmdexec.BatchOptions{
 		Concurrency: doctorConcurrency,
 		ItemTimeout: doctorTimeout,
@@ -77,7 +79,11 @@ func reportDoctorProbes(out io.Writer, probes []doctorProbe, results []cmdexec.R
 			continue
 		}
 		if probe.key != "" && probe.key != govulncheckTool {
-			if err := toolchain.Match(probe.key, string(results[i].Stdout)+"\n"+string(results[i].Stderr), probe.want); err != nil {
+			if err := toolchain.Match(
+				probe.key,
+				string(results[i].Stdout)+"\n"+string(results[i].Stderr),
+				probe.want,
+			); err != nil {
 				problems = append(problems, err)
 				continue
 			}

@@ -36,11 +36,13 @@ type commandResultEncoder CommandResult
 
 // ToolCall 保存外部工具调用结果，不包含参数、环境或输出内容。
 type ToolCall struct {
-	Message                  string
-	Operation, Tool, Outcome string
-	ExitCode                 int
-	Duration                 time.Duration
-	Err                      error
+	Message   string
+	Operation string
+	Tool      string
+	Outcome   string
+	ExitCode  int
+	Duration  time.Duration
+	Err       error
 }
 
 // Started 记录命令已完成配置与日志初始化。
@@ -77,7 +79,20 @@ func (e commandResultEncoder) MarshalLogObject(enc zapcore.ObjectEncoder) error 
 
 // Emit 记录工具结束事件，不包含原始参数和输出。
 func (e ToolCall) Emit(l *Logger) {
-	fields := []any{"event", "tool_finished", "operation", e.Operation, fieldTool, e.Tool, "outcome", e.Outcome, fieldExitCode, e.ExitCode, fieldDuration, e.Duration}
+	fields := []any{
+		"event",
+		"tool_finished",
+		"operation",
+		e.Operation,
+		fieldTool,
+		e.Tool,
+		"outcome",
+		e.Outcome,
+		fieldExitCode,
+		e.ExitCode,
+		fieldDuration,
+		e.Duration,
+	}
 	for _, f := range errorFields(e.Err) {
 		fields = append(fields, f)
 	}

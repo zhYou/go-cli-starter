@@ -38,13 +38,13 @@ func Output(dir string, env []string, executable string, args ...string) ([]byte
 }
 
 // Verify 从实际二进制验收身份、双语契约、嵌入资源和配置优先级。
-func Verify(executable, dir, name, example, version, commit string) error {
+func Verify(executable, dir, name, example, version, commit string) (resultErr error) {
 	home, err := os.MkdirTemp(dir, "acceptance-home-*")
 	if err != nil {
 		return err
 	}
 	defer func() {
-		_ = os.RemoveAll(home)
+		resultErr = errors.Join(resultErr, os.RemoveAll(home))
 	}()
 	env := Env(name, home)
 	run := func(extra []string, args ...string) ([]byte, []byte, error) {
@@ -54,7 +54,12 @@ func Verify(executable, dir, name, example, version, commit string) error {
 	if err != nil {
 		return fmt.Errorf("执行安装版本失败：%w：%s", err, stderr)
 	}
-	var actual struct{ Name, Version, Commit, Date string }
+	var actual struct {
+		Name    string
+		Version string
+		Commit  string
+		Date    string
+	}
 	if err := json.Unmarshal(stdout, &actual); err != nil {
 		return err
 	}
@@ -64,7 +69,8 @@ func Verify(executable, dir, name, example, version, commit string) error {
 	var baseline []byte
 	for _, language := range []string{"zh-CN", "en"} {
 		stdout, stderr, err = run(nil, languageFlag, language, "--help")
-		if err != nil || len(stderr) != 0 || !bytes.Contains(stdout, []byte(name)) || !bytes.Contains(stdout, []byte(languageFlag)) {
+		if err != nil || len(stderr) != 0 || !bytes.Contains(stdout, []byte(name)) ||
+			!bytes.Contains(stdout, []byte(languageFlag)) {
 			return errors.Join(fmt.Errorf("安装帮助验收失败（%s）：%s", language, stderr), err)
 		}
 		stdout, stderr, err = run(nil, languageFlag, language, schemaCommand, greetCommand)
@@ -112,7 +118,8 @@ func Verify(executable, dir, name, example, version, commit string) error {
 		return errors.Join(fmt.Errorf("补全专属帮助验收失败：%s", stderr), err)
 	}
 	stdout, stderr, err = run(nil, "__complete", "--lang", "")
-	if err != nil || len(stderr) != 0 || !bytes.Contains(stdout, []byte("en\n")) || !bytes.Contains(stdout, []byte(":4\n")) {
+	if err != nil || len(stderr) != 0 || !bytes.Contains(stdout, []byte("en\n")) ||
+		!bytes.Contains(stdout, []byte(":4\n")) {
 		return errors.Join(fmt.Errorf("语言补全验收失败：%s", stderr), err)
 	}
 	// 发现命令不得创建诊断目录。
@@ -146,7 +153,17 @@ func Verify(executable, dir, name, example, version, commit string) error {
 	if err := acceptGreeting(stdout, stderr, err, chineseGreeting); err != nil {
 		return err
 	}
-	stdout, stderr, err = run(override, languageFlag, "en", "--log-level", "debug", greetCommand, nameFlag, acceptanceName, jsonFlag)
+	stdout, stderr, err = run(
+		override,
+		languageFlag,
+		"en",
+		"--log-level",
+		"debug",
+		greetCommand,
+		nameFlag,
+		acceptanceName,
+		jsonFlag,
+	)
 	if err != nil || !bytes.Contains(stderr, []byte("greeting_finished")) {
 		return errors.Join(fmt.Errorf("显式日志选项未覆盖环境变量：%s", stderr), err)
 	}
@@ -157,7 +174,13 @@ func Verify(executable, dir, name, example, version, commit string) error {
 	if err == nil || len(stdout) != 0 || len(stderr) == 0 {
 		return fmt.Errorf("无效环境配置未失败或污染 stdout")
 	}
-	fmt.Printf("二进制验收通过：%s，name=%s version=%s commit=%s；双语帮助/schema、TOML、环境变量与显式覆盖。\n", executable, name, version, commit)
+	fmt.Printf(
+		"二进制验收通过：%s，name=%s version=%s commit=%s；双语帮助/schema、TOML、环境变量与显式覆盖。\n",
+		executable,
+		name,
+		version,
+		commit,
+	)
 	return nil
 }
 

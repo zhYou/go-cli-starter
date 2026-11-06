@@ -14,7 +14,7 @@ import (
 
 // Dependencies 描述命令依赖；构造时复制并补齐默认值，不修改调用者对象。
 type Dependencies struct {
-	LoadConfig func(config.Options) (config.Config, error)
+	LoadConfig func(context.Context, config.Options) (config.Config, error)
 	Doctor     func(context.Context, doctor.Options) (doctor.Result, error)
 	Validator  *validation.Validator
 	Greet      func(context.Context, greeting.Options) (greeting.Result, error)
@@ -22,18 +22,20 @@ type Dependencies struct {
 	Logger     *logging.Logger
 }
 type invocation struct {
-	bundle               *messages.Bundle
-	localizer            *messages.Localizer
-	commandTexts         []commandTextBinding
-	flagTexts            []flagTextBinding
-	helpErr              error
-	reportExitCode       int
-	results              resultRegistry
-	asJSON               bool
-	configPath, logLevel string
-	deps                 Dependencies
-	logger               *logging.Logger
-	session              *session.Session
+	languageFlag   *languageValue
+	bundle         *messages.Bundle
+	localizer      *messages.Localizer
+	commandTexts   []commandTextBinding
+	flagTexts      []flagTextBinding
+	helpErr        error
+	reportExitCode int
+	results        resultRegistry
+	asJSON         bool
+	configPath     string
+	logLevel       string
+	deps           Dependencies
+	logger         *logging.Logger
+	session        *session.Session
 }
 
 func newInvocation(provided *Dependencies) *invocation {

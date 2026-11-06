@@ -19,7 +19,12 @@ import (
 // https://learn.microsoft.com/windows/win32/api/processthreadsapi/nf-processthreadsapi-updateprocthreadattribute
 const procThreadAttributeJobList = 0x0002000d
 
-func createWindows(ctx context.Context, program string, args []string, options Execution) (child *windowsChild, result error) {
+func createWindows(
+	ctx context.Context,
+	program string,
+	args []string,
+	options Execution,
+) (child *windowsChild, result error) {
 	if ctx.Err() != nil {
 		return nil, contextError(ctx)
 	}
@@ -53,7 +58,7 @@ func createWindows(ctx context.Context, program string, args []string, options E
 	}
 	defer func() {
 		if result != nil {
-			streams.close()
+			result = errors.Join(result, streams.close())
 		}
 	}()
 	job, err := newWindowsJob()
@@ -62,7 +67,7 @@ func createWindows(ctx context.Context, program string, args []string, options E
 	}
 	defer func() {
 		if result != nil && job != 0 {
-			_ = windows.CloseHandle(job)
+			result = errors.Join(result, windows.CloseHandle(job))
 		}
 	}()
 	attributes, err := windows.NewProcThreadAttributeList(2)
@@ -72,12 +77,20 @@ func createWindows(ctx context.Context, program string, args []string, options E
 	defer attributes.Delete()
 	jobs := []windows.Handle{job}
 	//nolint:gosec // G103：Win32 属性列表要求指针及精确字节长度；x/sys 和下方 KeepAlive 保证句柄切片存活到 CreateProcess 返回。
-	if err = attributes.Update(procThreadAttributeJobList, unsafe.Pointer(&jobs[0]), unsafe.Sizeof(jobs[0])); err != nil {
+	if err = attributes.Update(
+		procThreadAttributeJobList,
+		unsafe.Pointer(&jobs[0]),
+		unsafe.Sizeof(jobs[0]),
+	); err != nil {
 		return nil, err
 	}
 	handles := streams.handles
 	//nolint:gosec // G103：Win32 属性列表要求指针及精确字节长度；x/sys 和下方 KeepAlive 保证句柄切片存活到 CreateProcess 返回。
-	if err = attributes.Update(windows.PROC_THREAD_ATTRIBUTE_HANDLE_LIST, unsafe.Pointer(&handles[0]), uintptr(len(handles))*unsafe.Sizeof(handles[0])); err != nil {
+	if err = attributes.Update(
+		windows.PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+		unsafe.Pointer(&handles[0]),
+		uintptr(len(handles))*unsafe.Sizeof(handles[0]),
+	); err != nil {
 		return nil, err
 	}
 	startup := windows.StartupInfoEx{}
@@ -89,8 +102,21 @@ func createWindows(ctx context.Context, program string, args []string, options E
 		return nil, contextError(ctx)
 	}
 	var info windows.ProcessInformation
-	flags := uint32(windows.CREATE_SUSPENDED | windows.CREATE_UNICODE_ENVIRONMENT | windows.EXTENDED_STARTUPINFO_PRESENT)
-	err = windows.CreateProcess(application, commandLine, nil, nil, true, flags, &environment[0], directory, &startup.StartupInfo, &info)
+	flags := uint32(
+		windows.CREATE_SUSPENDED | windows.CREATE_UNICODE_ENVIRONMENT | windows.EXTENDED_STARTUPINFO_PRESENT,
+	)
+	err = windows.CreateProcess(
+		application,
+		commandLine,
+		nil,
+		nil,
+		true,
+		flags,
+		&environment[0],
+		directory,
+		&startup.StartupInfo,
+		&info,
+	)
 	// Update 保存的指针由 x/sys 容器保活；显式保证原生调用使用的切片寿命。
 	runtime.KeepAlive(handles)
 	runtime.KeepAlive(jobs)
@@ -98,7 +124,11 @@ func createWindows(ctx context.Context, program string, args []string, options E
 	if err != nil {
 		return nil, err
 	}
-	streams.closeChildHandles()
+	if err := streams.closeChildHandles(); err != nil {
+		ownedJob := job
+		job = 0
+		return nil, errors.Join(err, abortWindowsProcess(info, ownedJob))
+	}
 	// 独立 os.Process 持有自己的句柄，用公共 Wait 获取 ProcessState/ExitError。
 	// 根进程仍挂起且原始句柄未关闭，PID 不会在重新打开期间复用。
 	process, err := os.FindProcess(int(info.ProcessId))

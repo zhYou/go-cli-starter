@@ -23,8 +23,7 @@ func noArgs(_ *cobra.Command, args []string) error {
 
 // 根据结构化错误生成本地化提示，避免替换用户输入中的文本。
 func localizedFlagError(_ *cobra.Command, err error) error {
-	var structured *fault.Error
-	if errors.As(err, &structured) {
+	if structured, ok := errors.AsType[*fault.Error](err); ok {
 		return structured
 	}
 	var missing *pflag.NotExistError
@@ -37,7 +36,14 @@ func localizedFlagError(_ *cobra.Command, err error) error {
 	case errors.As(err, &required):
 		return usageProblem("required_flag", fault.Params{paramFlag: required.GetFlag().Name})
 	case errors.As(err, &invalid):
-		return usageProblem("invalid_flag", fault.Params{paramFlag: invalid.GetFlag().Name, paramValue: strconv.Quote(invalid.GetValue()), "Type": invalid.GetFlag().Value.Type()})
+		return usageProblem(
+			"invalid_flag",
+			fault.Params{
+				paramFlag:  invalid.GetFlag().Name,
+				paramValue: strconv.Quote(invalid.GetValue()),
+				"Type":     invalid.GetFlag().Value.Type(),
+			},
+		)
 	case errors.As(err, &syntax):
 		return usageProblem("syntax", fault.Params{paramValue: strconv.Quote(syntax.GetSpecifiedFlag())})
 	default:
@@ -128,9 +134,11 @@ func localizedHelp(cmd *cobra.Command, description bool, l *messages.Localizer) 
 		columns := tabwriter.NewWriter(&out, 0, 4, 2, ' ', 0)
 		for _, child := range cmd.Commands() {
 			if child.IsAvailableCommand() || child.Name() == commandHelp {
+				//nolint:errcheck // tabwriter 只写入内存 strings.Builder，出口不会返回错误。
 				_, _ = fmt.Fprintf(columns, "  %s\t%s\n", child.Name(), child.Short)
 			}
 		}
+		//nolint:errcheck // tabwriter 的底层为内存 strings.Builder，不会返回写入错误。
 		_ = columns.Flush()
 	}
 	writeLocalizedFlags(&out, f.text("help.flags", nil), cmd.LocalNonPersistentFlags(), f)
@@ -138,7 +146,13 @@ func localizedHelp(cmd *cobra.Command, description bool, l *messages.Localizer) 
 	writeLocalizedFlags(&out, f.text("help.global_flags", nil), cmd.PersistentFlags(), f)
 	if cmd.HasAvailableSubCommands() {
 		suffix := f.text("help.command_suffix", nil)
-		fmt.Fprintln(&out, "\n"+f.text("help.detail", map[string]any{"Command": strconv.Quote(cmd.CommandPath() + suffix + " --help")}))
+		fmt.Fprintln(
+			&out,
+			"\n"+f.text(
+				"help.detail",
+				map[string]any{"Command": strconv.Quote(cmd.CommandPath() + suffix + " --help")},
+			),
+		)
 	}
 	if f.err != nil {
 		return "", f.err
@@ -170,7 +184,9 @@ func writeLocalizedFlags(out *strings.Builder, title string, flags *pflag.FlagSe
 		if flag.DefValue != "" && flag.DefValue != "false" && flag.DefValue != "0" {
 			description += f.text("help.default", map[string]any{paramValue: strconv.Quote(flag.DefValue)})
 		}
+		//nolint:errcheck // tabwriter 只写入内存 strings.Builder，出口不会返回错误。
 		_, _ = fmt.Fprintf(columns, "  %s\t%s\n", label, description)
 	})
+	//nolint:errcheck // tabwriter 的底层为内存 strings.Builder，不会返回写入错误。
 	_ = columns.Flush()
 }

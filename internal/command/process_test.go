@@ -20,12 +20,14 @@ func TestCancellationRetainsExitAndCause(t *testing.T) {
 	ctx, cancel := context.WithCancelCause(t.Context())
 	defer cancel(nil)
 	cause := errors.New("调用者取消")
-	done := startCapture(t, ctx, call, options)
+	done := startCapture(ctx, t, call, options)
 	waitMarker(t, ready)
 	cancel(cause)
 	r := awaitCapture(t, done)
 	var exit *exec.ExitError
-	if !errors.Is(r.Err, context.Canceled) || !errors.Is(r.Err, cause) || !errors.As(r.Err, &exit) || r.Status != Canceled || r.ExitCode != exit.ExitCode() {
+	if !errors.Is(r.Err, context.Canceled) || !errors.Is(r.Err, cause) || !errors.As(r.Err, &exit) ||
+		r.Status != Canceled ||
+		r.ExitCode != exit.ExitCode() {
 		t.Fatalf("取消错误链 %+v", r)
 	}
 }
@@ -34,7 +36,13 @@ func TestInvalidExecutionDoesNotStart(t *testing.T) {
 	if err := Run(t.Context(), Invocation{}, Execution{}); err == nil {
 		t.Fatal("空程序应失败")
 	}
-	if _, err := RunBatch(t.Context(), nil, Execution{}, BatchOptions{Concurrency: -1}); err == nil || strings.Contains(err.Error(), "panic") {
+	if _, err := RunBatch(
+		t.Context(),
+		nil,
+		Execution{},
+		BatchOptions{Concurrency: -1},
+	); err == nil ||
+		strings.Contains(err.Error(), "panic") {
 		t.Fatalf("无效并发数: %v", err)
 	}
 }
@@ -57,7 +65,7 @@ func TestOwnedDescendantsStopOnEveryReturn(t *testing.T) {
 				ctx, cancel := context.WithCancel(t.Context())
 				defer cancel()
 				start := time.Now()
-				done := startCapture(t, ctx, call, options)
+				done := startCapture(ctx, t, call, options)
 				if outcome == "wait" {
 					waitMarker(t, heartbeat)
 					cancel()
@@ -68,16 +76,17 @@ func TestOwnedDescendantsStopOnEveryReturn(t *testing.T) {
 				}
 				switch outcome {
 				case "success":
-					if r.Err == nil {
+					switch {
+					case r.Err == nil:
 						if r.Status != Succeeded || r.ExitCode != 0 {
 							t.Fatalf("成功结果不完整: %+v", r)
 						}
-					} else if streams == "pipes" && errors.Is(r.Err, exec.ErrWaitDelay) {
+					case streams == "pipes" && errors.Is(r.Err, exec.ErrWaitDelay):
 						// 根进程已成功退出，后代占用管道仍可能耗尽排空宽限。
 						if r.Status != Failed || r.ExitCode != -1 {
 							t.Fatalf("管道宽限结果不一致: %+v", r)
 						}
-					} else {
+					default:
 						t.Fatalf("成功场景返回非预期错误: %+v", r)
 					}
 				case "fail":
@@ -87,7 +96,8 @@ func TestOwnedDescendantsStopOnEveryReturn(t *testing.T) {
 					}
 				case "wait":
 					var exit *exec.ExitError
-					if !errors.Is(r.Err, context.Canceled) || !errors.As(r.Err, &exit) || r.Status != Canceled || r.ExitCode != exit.ExitCode() {
+					if !errors.Is(r.Err, context.Canceled) || !errors.As(r.Err, &exit) || r.Status != Canceled ||
+						r.ExitCode != exit.ExitCode() {
 						t.Fatalf("取消结果不完整: %+v", r)
 					}
 				}
@@ -111,7 +121,10 @@ func TestCleanupDoesNotKillSibling(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		cancel()
-		_ = process.Process.Kill()
+		if err := process.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+			t.Error(err)
+		}
+		//nolint:errcheck // 主测试断言进程结果；早退收尾可能产生主动终止错误，仍必须等待进程退出。
 		_ = process.Wait()
 	})
 	waitMarker(t, path)
@@ -133,16 +146,17 @@ func TestRootExitsBeforeGrandchildHoldingPipes(t *testing.T) {
 	call, options := helper(t, "branch")
 	heartbeat := filepath.Join(options.Dir, "grandchild")
 	call.Args = append(call.Args, heartbeat, "pipes")
-	r := awaitCapture(t, startCapture(t, t.Context(), call, options))
-	if r.Err == nil {
+	r := awaitCapture(t, startCapture(t.Context(), t, call, options))
+	switch {
+	case r.Err == nil:
 		if r.Status != Succeeded || r.ExitCode != 0 {
 			t.Fatalf("根成功结果不完整: %+v", r)
 		}
-	} else if errors.Is(r.Err, exec.ErrWaitDelay) {
+	case errors.Is(r.Err, exec.ErrWaitDelay):
 		if r.Status != Failed || r.ExitCode != -1 {
 			t.Fatalf("管道宽限结果不一致: %+v", r)
 		}
-	} else {
+	default:
 		t.Fatal(r.Err)
 	}
 	assertHeartbeatStopped(t, heartbeat, 60*time.Millisecond)

@@ -73,7 +73,8 @@ func TestOriginFailureRollsBackRename(t *testing.T) {
 	i, root := memoryInitializer(t)
 	base := i.FS
 	require.NoError(t, afero.WriteFile(base, filepath.Join(root, ".template-version"), []byte("0.1.0\n"), 0o600))
-	before, _ := afero.ReadFile(base, filepath.Join(root, "go.mod"))
+	before, err := afero.ReadFile(base, filepath.Join(root, "go.mod"))
+	require.NoError(t, err)
 	i.FS = faultFS{
 		Fs: base,
 		rename: func(a, b string) error {
@@ -83,10 +84,12 @@ func TestOriginFailureRollsBackRename(t *testing.T) {
 			return base.Rename(a, b)
 		},
 	}
-	_, err := i.Initialize(context.Background(), root, "example.com/tool", "tool")
+	_, err = i.Initialize(context.Background(), root, "example.com/tool", "tool")
 	require.Error(t, err)
-	after, _ := afero.ReadFile(base, filepath.Join(root, "go.mod"))
+	after, err := afero.ReadFile(base, filepath.Join(root, "go.mod"))
+	require.NoError(t, err)
 	require.Equal(t, before, after)
-	ok, _ := afero.Exists(base, filepath.Join(root, ".template-origin.json"))
+	ok, err := afero.Exists(base, filepath.Join(root, ".template-origin.json"))
+	require.NoError(t, err)
 	require.False(t, ok)
 }

@@ -42,7 +42,16 @@ func newDoctorCommand(call *invocation) *cobra.Command {
 						return err
 					}
 					for _, check := range result.Checks {
-						text, err := call.localizer.Format("doctor.check", messages.FormatOptions{Params: map[string]any{"Name": check.Name, "Status": check.Status, "Detail": check.Detail}})
+						text, err := call.localizer.Format(
+							"doctor.check",
+							messages.FormatOptions{
+								Params: map[string]any{
+									"Name":   check.Name,
+									"Status": check.Status,
+									"Detail": check.Detail,
+								},
+							},
+						)
 						if err != nil {
 							return err
 						}

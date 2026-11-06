@@ -30,11 +30,13 @@ type CaptureOptions struct {
 
 // Result 保留原始输出及错误，供调用方先判断结果，再向 CLI stdout 提交。
 type Result struct {
-	Stdout, Stderr                   []byte
-	StdoutTruncated, StderrTruncated bool
-	ExitCode                         int
-	Err                              error
-	Status                           Status
+	Stdout          []byte
+	Stderr          []byte
+	StdoutTruncated bool
+	StderrTruncated bool
+	ExitCode        int
+	Err             error
+	Status          Status
 }
 
 // Capture 使用独立输出缓冲，保留 Execution.IO.In，不写入借用的输出流。
@@ -51,12 +53,18 @@ func Capture(ctx context.Context, call Invocation, options Execution, capture Ca
 	stdout, stderr := limitedBuffer{limit: capture.Limit}, limitedBuffer{limit: capture.Limit}
 	options.IO.Out, options.IO.ErrOut = &stdout, &stderr
 	err := Run(ctx, call, options)
-	r := Result{Stdout: stdout.data, Stderr: stderr.data, StdoutTruncated: stdout.truncated, StderrTruncated: stderr.truncated, Err: err, Status: Succeeded}
+	r := Result{
+		Stdout:          stdout.data,
+		Stderr:          stderr.data,
+		StdoutTruncated: stdout.truncated,
+		StderrTruncated: stderr.truncated,
+		Err:             err,
+		Status:          Succeeded,
+	}
 	if err != nil {
 		r.Status = Failed
 		r.ExitCode = -1
-		var exit *exec.ExitError
-		if errors.As(err, &exit) {
+		if exit, ok := errors.AsType[*exec.ExitError](err); ok {
 			r.ExitCode = exit.ExitCode()
 		}
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {

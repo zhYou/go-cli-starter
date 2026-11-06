@@ -24,6 +24,22 @@ linters:
     - goconst
     - depguard
     - forbidigo
+    - asasalint
+    - bidichk
+    - gocheckcompilerdirectives
+    - makezero
+    - unconvert
+    - predeclared
+    - testifylint
+    - revive
+    - funcorder
+    - gocritic
+    - fatcontext
+    - loggercheck
+    - recvcheck
+    - errname
+    - modernize
+    - containedctx
   exclusions:
     rules:
       # GoDoc 约束生产代码；测试名称已描述各自场景。
@@ -31,6 +47,53 @@ linters:
         linters:
           - godoclint
   settings:
+    errcheck:
+      check-blank: true
+      check-type-assertions: true
+    govet:
+      enable:
+        - nilness
+        - deepequalerrors
+        - reflectvaluecompare
+    testifylint:
+      # JSON 整数码和计数解码为 float64，继续精确比较。
+      disable:
+        - float-compare
+    funcorder:
+      constructor: true
+      struct-method: true
+      function: true
+      alphabetical: false
+    modernize:
+      # 不改变 JSON 零值、nil 与空容器的省略语义。
+      disable:
+        - omitzero
+    loggercheck:
+      require-string-key: true
+      rules:
+        - '(*github.com/zhYou/go-cli-starter/internal/base/logging.Logger).Infow'
+        - '(*github.com/zhYou/go-cli-starter/internal/base/logging.Logger).Errorw'
+        - '(*github.com/zhYou/go-cli-starter/internal/base/logging.Logger).Debugw'
+        - '(*github.com/zhYou/go-cli-starter/internal/base/logging.Logger).Warnw'
+        - '(*github.com/zhYou/go-cli-starter/internal/base/logging.Logger).With'
+    revive:
+      enable-default-rules: false
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: errorf
+        - name: increment-decrement
+        - name: indent-error-flow
+          arguments: [preserve-scope]
+        - name: range
+        - name: receiver-naming
+        - name: unexported-return
+        - name: unused-parameter
+        - name: var-naming
     goconst:
       min-len: 3
       min-occurrences: 3
@@ -42,6 +105,25 @@ linters:
       find-duplicates: false
     depguard:
       rules:
+        base-boundary:
+          files:
+            - '${base-path}/internal/base/**/*.go'
+          deny:
+            - pkg: github.com/zhYou/go-cli-starter/internal/app
+              desc: base 不得反向依赖 app
+            - pkg: github.com/zhYou/go-cli-starter/internal/command
+              desc: base 不得反向依赖 command
+            - pkg: github.com/zhYou/go-cli-starter/tools
+              desc: base 不得依赖开发工具包
+            - pkg: github.com/spf13/cobra
+              desc: base 不得依赖 CLI 框架
+        runtime-tools-boundary:
+          files:
+            - '$all'
+            - '!${base-path}/tools/**/*.go'
+          deny:
+            - pkg: github.com/zhYou/go-cli-starter/tools
+              desc: 运行时代码及测试不得依赖开发工具包
         koanf-boundary:
           # 仅豁免精确配置加载文件，同名文件与测试不能绕过边界。
           files:
@@ -84,15 +166,22 @@ linters:
     thelper:
       test:
         first: false
-        name: false
+        name: true
       benchmark:
         first: false
-        name: false
+        name: true
       tb:
         first: false
-        name: false
+        name: true
 
 formatters:
   enable:
     - gofumpt
     - goimports
+    - golines
+  settings:
+    golines:
+      max-len: 120
+      tab-len: 4
+      shorten-comments: false
+      reformat-tags: false

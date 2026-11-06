@@ -30,7 +30,15 @@ func TestCleanupPreservesUnknownFileAddedDuringRevalidation(t *testing.T) {
 	require.NoError(t, run.Close())
 	old := time.Now().Add(-48 * time.Hour)
 	// 扩大元数据读取窗口，让文件系统通知在第二次目录内容扫描后稳定插入用户文件。
-	data, err := json.Marshal(map[string]any{"version": metadataVersion, "run_id": run.ID, "started": old, "finished": old, "padding": strings.Repeat("x", 16*1024*1024)})
+	data, err := json.Marshal(
+		map[string]any{
+			"version":  metadataVersion,
+			"run_id":   run.ID,
+			"started":  old,
+			"finished": old,
+			"padding":  strings.Repeat("x", 16*1024*1024),
+		},
+	)
 	require.NoError(t, err)
 	marker := filepath.Join(run.Path, "user.txt")
 	metadataPath := filepath.Join(run.Path, metadataName)
@@ -38,7 +46,7 @@ func TestCleanupPreservesUnknownFileAddedDuringRevalidation(t *testing.T) {
 	fd, err := syscall.InotifyInit1(syscall.IN_NONBLOCK | syscall.IN_CLOEXEC)
 	require.NoError(t, err)
 	defer func() {
-		_ = syscall.Close(fd)
+		require.NoError(t, syscall.Close(fd))
 	}()
 	_, err = syscall.InotifyAddWatch(fd, metadataPath, syscall.IN_OPEN)
 	require.NoError(t, err)

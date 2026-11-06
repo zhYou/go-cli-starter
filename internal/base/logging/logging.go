@@ -22,8 +22,10 @@ type Options struct {
 
 // RunInfo 保存本次运行共有的日志上下文。
 type RunInfo struct {
-	Component, Command string
-	Version, Commit    string
+	Component string
+	Command   string
+	Version   string
+	Commit    string
 }
 
 // New 从入口传入的输出构造日志，只派生公共字段，不创建目录或持有文件所有权。
@@ -52,7 +54,16 @@ func New(info RunInfo, options Options, warn func(error)) *Logger {
 		core := zapcore.NewCore(zapcore.NewJSONEncoder(cfg), zapcore.Lock(zapcore.AddSync(options.Writer)), level)
 		logger = &Logger{sugar: zap.New(core, zap.ErrorOutput(zapcore.AddSync(warningWriter{report}))).Sugar()}
 	}
-	logger = logger.With(fieldRunID, options.RunID, fieldComponent, info.Component, fieldCommand, info.Command, fieldPID, os.Getpid())
+	logger = logger.With(
+		fieldRunID,
+		options.RunID,
+		fieldComponent,
+		info.Component,
+		fieldCommand,
+		info.Command,
+		fieldPID,
+		os.Getpid(),
+	)
 	if info.Version != "" {
 		logger = logger.With(fieldVersion, info.Version)
 	}
@@ -85,7 +96,12 @@ func errorFields(err error) []zap.Field {
 		for _, detail := range details {
 			codes = append(codes, string(detail.Code))
 		}
-		fields = append(fields, zap.String(fieldErrorCode, string(details[0].Code)), zap.Strings(fieldErrorCodes, codes), zap.Any(fieldErrorParams, details[0].Params))
+		fields = append(
+			fields,
+			zap.String(fieldErrorCode, string(details[0].Code)),
+			zap.Strings(fieldErrorCodes, codes),
+			zap.Any(fieldErrorParams, details[0].Params),
+		)
 	}
 	return fields
 }

@@ -30,7 +30,8 @@ func TestEmbeddedCatalogAndSharedBundle(t *testing.T) {
 			if i%2 != 0 {
 				lang = "zh-CN"
 			}
-			translations[i], errors[i] = bundles[i].Localizer(lang).Format("greeting.message", messages.FormatOptions{Params: map[string]any{"Name": "Ada"}})
+			translations[i], errors[i] = bundles[i].Localizer(lang).
+				Format("greeting.message", messages.FormatOptions{Params: map[string]any{"Name": "Ada"}})
 		})
 	}
 	wg.Wait()

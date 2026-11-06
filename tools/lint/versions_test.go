@@ -12,18 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func versionFixture(t *testing.T) string {
-	t.Helper()
-	root := t.TempDir()
-	for _, name := range []string{"mise.toml", "go.mod", "README.md", "AGENTS.md", ".github/workflows/ci.yml", ".github/workflows/release.yml"} {
-		dest := filepath.Join(root, name)
-		//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
-		require.NoError(t, os.MkdirAll(filepath.Dir(dest), 0o755))
-		require.NoError(t, fixture.CopyFile(filepath.Join("../..", name), dest))
-	}
-	return root
-}
-
 func TestVersionsWithoutLock(t *testing.T) {
 	require.Error(t, toolchain.Match("go", "go version go1.27.30 linux/amd64", "1.27.3"))
 	require.NoError(t, toolchain.Match("go", "go version go1.27.3 linux/amd64", "1.27.3"))
@@ -50,7 +38,16 @@ func TestVersionsRejectNonExactToolVersion(t *testing.T) {
 	for _, version := range []string{"latest", "0.24", "0.24.0-rc.1", "0.24.0+patched"} {
 		t.Run(version, func(t *testing.T) {
 			root := versionFixture(t)
-			require.NoError(t, os.WriteFile(filepath.Join(root, "mise.toml"), []byte("min_version = \"2026.10.21\"\n[tools]\n\"go:golang.org/x/tools/gopls\" = \""+version+"\"\n"), 0o600))
+			require.NoError(
+				t,
+				os.WriteFile(
+					filepath.Join(root, "mise.toml"),
+					[]byte(
+						"min_version = \"2026.10.21\"\n[tools]\n\"go:golang.org/x/tools/gopls\" = \""+version+"\"\n",
+					),
+					0o600,
+				),
+			)
 			require.ErrorContains(t, checkVersions(root), "必须固定稳定的精确版本")
 		})
 	}
@@ -63,7 +60,10 @@ func TestVersionsRejectGoplsDocumentationMismatch(t *testing.T) {
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	//nolint:gosec // G703：只修改当前测试临时目录内的文档 fixture。
-	require.NoError(t, os.WriteFile(path, []byte(strings.Replace(string(data), "| gopls | 0.24.0 |", "| gopls | 0.24.1 |", 1)), 0o600))
+	require.NoError(
+		t,
+		os.WriteFile(path, []byte(strings.Replace(string(data), "| gopls | 0.24.0 |", "| gopls | 0.24.1 |", 1)), 0o600),
+	)
 	require.ErrorContains(t, checkVersions(root), "README 工具 gopls")
 }
 
@@ -74,7 +74,14 @@ func TestVersionsRejectCIMismatch(t *testing.T) {
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	//nolint:gosec // G703：只修改临时 fixture 的固定 CI 配置，用于验证版本不一致。
-	require.NoError(t, os.WriteFile(path, []byte(strings.ReplaceAll(string(data), "version: 2026.10.21", "version: 2026.10.20")), 0o600))
+	require.NoError(
+		t,
+		os.WriteFile(
+			path,
+			[]byte(strings.ReplaceAll(string(data), "version: 2026.10.21", "version: 2026.10.20")),
+			0o600,
+		),
+	)
 	require.ErrorContains(t, checkVersions(root), "CI mise 版本不一致")
 }
 
@@ -90,7 +97,10 @@ func TestHistoricalVersionTextIsNotCurrentDeclaration(t *testing.T) {
 	data, err := os.ReadFile(file)
 	require.NoError(t, err)
 	//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
-	require.NoError(t, os.WriteFile(file, []byte(strings.Replace(string(data), "| Go | 1.27.3 |", "| Go | 1.27.30 |", 1)), 0o600))
+	require.NoError(
+		t,
+		os.WriteFile(file, []byte(strings.Replace(string(data), "| Go | 1.27.3 |", "| Go | 1.27.30 |", 1)), 0o600),
+	)
 	require.Error(t, checkVersions(root))
 }
 
@@ -129,4 +139,16 @@ func TestVersionsGoToolchain(t *testing.T) {
 			}
 		})
 	}
+}
+
+func versionFixture(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	for _, name := range []string{"mise.toml", "go.mod", "README.md", "AGENTS.md", ".github/workflows/ci.yml", ".github/workflows/release.yml"} {
+		dest := filepath.Join(root, name)
+		//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
+		require.NoError(t, os.MkdirAll(filepath.Dir(dest), 0o755))
+		require.NoError(t, fixture.CopyFile(filepath.Join("../..", name), dest))
+	}
+	return root
 }

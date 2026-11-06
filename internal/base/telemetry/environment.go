@@ -41,7 +41,7 @@ func validateSDKEnvironment() error {
 		return invalid()
 	}
 	if attributes := strings.TrimSpace(os.Getenv("OTEL_RESOURCE_ATTRIBUTES")); attributes != "" {
-		for _, pair := range strings.Split(attributes, ",") {
+		for pair := range strings.SplitSeq(attributes, ",") {
 			_, value, ok := strings.Cut(pair, "=")
 			if !ok {
 				return invalid()

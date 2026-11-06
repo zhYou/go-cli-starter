@@ -2,7 +2,7 @@ package validation
 
 import (
 	"context"
-	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/go-playground/validator/v10"
@@ -15,7 +15,8 @@ func TestValidationChineseFields(t *testing.T) {
 	}
 	v := New(func(engine *validator.Validate) {
 		engine.RegisterStructValidation(func(sl validator.StructLevel) {
-			r := sl.Current().Interface().(request)
+			r, ok := reflect.TypeAssert[request](sl.Current())
+			require.True(t, ok)
 			if r.Name == "禁止" {
 				sl.ReportError(r.Name, "--name", "Name", "reserved", "")
 			}
@@ -26,5 +27,5 @@ func TestValidationChineseFields(t *testing.T) {
 	require.NoError(t, v.Struct(context.Background(), request{"Codex"}))
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	require.True(t, errors.Is(v.Struct(ctx, request{}), context.Canceled))
+	require.ErrorIs(t, v.Struct(ctx, request{}), context.Canceled)
 }
