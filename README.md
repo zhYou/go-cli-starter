@@ -24,26 +24,35 @@ mise run check
 ## 本地环境
 
 [安装 mise](https://mise.jdx.dev/getting-started.html)。mise、Git、gh、Codex、RTK 和 superpowers 由用户维护；
-项目只安装 `mise.toml` 声明的六个固定版本工具。
+项目只安装 `mise.toml` 声明的固定版本工具、运行环境和插件。
 
 <!-- tool-versions:start -->
 
 预装工具的版本门槛：
 
-| 工具 | 固定版本 |
-| --- | --- |
+| 工具                              | 固定版本   |
+| --------------------------------- | ---------- |
 | mise（本地最低版本、CI 固定版本） | 2026.10.21 |
 
 开发工具：
 
-| 工具 | 固定版本 |
-| --- | --- |
-| Go | 1.27.3 |
-| golangci-lint | 2.15.0 |
-| GoReleaser | 2.19.0 |
-| govulncheck | 1.9.0 |
-| Syft | 1.55.0 |
-| gopls | 0.24.0 |
+| 工具                 | 固定版本 |
+| -------------------- | -------- |
+| Go                   | 1.27.3   |
+| golangci-lint        | 2.15.0   |
+| GoReleaser           | 2.19.0   |
+| govulncheck          | 1.9.0    |
+| Syft                 | 1.55.0   |
+| gopls                | 0.24.0   |
+| Node.js              | 26.13.0  |
+| Python               | 3.15.2   |
+| uv                   | 0.13.7   |
+| Prettier             | 3.9.10   |
+| @prettier/plugin-xml | 3.4.2    |
+| prettier-plugin-toml | 4.1.0    |
+| markdownlint-cli2    | 0.24.0   |
+| yamllint             | 1.38.0   |
+| pre-commit-hooks     | 6.0.0    |
 
 <!-- tool-versions:end -->
 
@@ -85,12 +94,12 @@ GO_CLI_STARTER_HOME="$(mktemp -d)" ./bin/go-cli-starter greet --name Codex --jso
 - `schema [命令路径...]` 始终输出 JSON，包含命令树、参数、默认值和退出码；greet、version、doctor 提供 Draft 2020-12 结果结构。结果允许新增字段，配置文件仍拒绝未知键。
 - 帮助是文本，补全是原生 shell 脚本，不受 `--json` 影响。验证真实退出码请用构建后的程序，`go run` 会包装非零退出码。
 
-| 退出码 | 含义 |
-| --- | --- |
-| 0 | 成功 |
-| 1 | 运行或配置错误 |
-| 2 | 命令或参数错误 |
-| 130 | 信号或 context 取消 |
+| 退出码 | 含义                |
+| ------ | ------------------- |
+| 0      | 成功                |
+| 1      | 运行或配置错误      |
+| 2      | 命令或参数错误      |
+| 130    | 信号或 context 取消 |
 
 ## doctor 与 shell 补全
 
@@ -129,6 +138,7 @@ exporter = "none" # none、file
 帮助、schema 描述、结果、错误及日志使用所选语言；命令、选项、JSON 字段、枚举和退出码保持稳定，第三方诊断可保留原文。
 帮助、version、completion、schema 不读取配置或创建诊断目录，坏配置下仍可发现命令。不支持运行时翻译覆盖或 `[i18n]` 配置。
 
+<!-- prettier-ignore -->
 | 平台 | 配置目录 | 数据 / 状态 / 缓存 |
 | --- | --- | --- |
 | Linux | `$XDG_CONFIG_HOME/go-cli-starter`，默认 `~/.config/go-cli-starter` | 对应 XDG 根；默认 `~/.local/share`、`~/.local/state`、`~/.cache` 下的应用目录 |
@@ -159,12 +169,14 @@ GO_CLI_STARTER_HOME="$example_home" ./bin/go-cli-starter greet --name Codex --la
 优先使用已有 task；直接调用项目纳管工具使用 `mise exec -- <命令>`，Git、gh 等其他命令直接执行。
 task 内由 mise 提供工具环境，无需额外包装。
 
-| 命令 | 用途 |
-| --- | --- |
-| `mise run setup` / `mise run doctor` | 显式准备并检查环境 |
-| `mise run build` | 构建到 bin，注入版本信息 |
-| `mise run check` | 完整源码、测试、构建、契约与模板验收 |
-| `mise run template:init --module <模块路径> --name <命令名>` | 初始化模板身份 |
+| 命令                                                         | 用途                                             |
+| ------------------------------------------------------------ | ------------------------------------------------ |
+| `mise run setup` / `mise run doctor`                         | 显式准备并检查环境                               |
+| `mise run build`                                             | 构建到 bin，注入版本信息                         |
+| `mise run fmt`                                               | 显式格式化 Go 和 JSON、XML、TOML、Markdown、YAML |
+| `mise run lint`                                              | 只读检查 Go、五类文本、资源和声明                |
+| `mise run check`                                             | 完整源码、测试、构建、契约与模板验收             |
+| `mise run template:init --module <模块路径> --name <命令名>` | 初始化模板身份                                   |
 
 完整任务表、直接工具命令和按改动选择的检查见[开发说明](docs/development.md#开发命令)。
 本地检查不等于全部 CI；平台运行、发布、安全和托管要求见[维护清单](docs/maintenance.md)。
@@ -177,15 +189,15 @@ task 内由 mise 提供工具环境，无需额外包装。
 
 ## 文档导航
 
-| 文档 | 内容 |
-| --- | --- |
-| [协作约定](AGENTS.md) | 智能体入口、命令、工作区、交付与保护 |
-| [设计指南](docs/design-guidelines.md) | 架构、CLI 契约、API 示例与所有权 |
-| [开发说明](docs/development.md) | 完整命令、验证、测试组织与工具维护 |
-| [兼容性规则](docs/compatibility.md) | 机器接口与变更记录 |
-| [模板升级](docs/template-upgrades.md) | 来源记录、旧事务和迁移步骤 |
-| [维护清单](docs/maintenance.md) | 托管配置、CI、发布与验收证据 |
-| [安全报告](SECURITY.md) | 目标项目须填写的私密报告入口 |
-| [项目待办](docs/backlog.md) | 明确要求记录的探索想法 |
+| 文档                                  | 内容                                 |
+| ------------------------------------- | ------------------------------------ |
+| [协作约定](AGENTS.md)                 | 智能体入口、命令、工作区、交付与保护 |
+| [设计指南](docs/design-guidelines.md) | 架构、CLI 契约、API 示例与所有权     |
+| [开发说明](docs/development.md)       | 完整命令、验证、测试组织与工具维护   |
+| [兼容性规则](docs/compatibility.md)   | 机器接口与变更记录                   |
+| [模板升级](docs/template-upgrades.md) | 来源记录、旧事务和迁移步骤           |
+| [维护清单](docs/maintenance.md)       | 托管配置、CI、发布与验收证据         |
+| [安全报告](SECURITY.md)               | 目标项目须填写的私密报告入口         |
+| [项目待办](docs/backlog.md)           | 明确要求记录的探索想法               |
 
 模板版本为 0.3.0；Claude Code 和 OpenCode 支持列在待办中，TUI 和 CLI 自身的 MCP 服务暂不在范围内。
