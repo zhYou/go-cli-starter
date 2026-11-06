@@ -18,6 +18,10 @@
 `text=auto eol=lf` 约束 Git 提交和检出，包括 Windows；二进制文件由 Git 自动识别。
 调整换行规则时，确认工作区只有本次修改，再执行 `git add --renormalize .`，审查差异后提交。
 
+命令调用遵循[协作约定](../AGENTS.md#从这里开始)：已有 mise task 的操作优先使用 `mise run <task>`；
+直接调用项目 `mise.toml` 的 `[tools]` 纳管工具时使用 `mise exec -- <命令>`，其他命令直接执行。
+task 内由 mise 提供工具环境，无需额外包装。
+
 首次使用及工具版本或 Go 模块变更后显式运行 `mise run setup`，然后运行 `mise run doctor`。
 setup 只按显式清单安装六个项目工具并下载模块。普通任务与 exec 的自动安装均关闭，
 `GOTOOLCHAIN=local` 禁止 Go 隐式下载工具链。缺工具应报错，检查不能兼任安装、升级或修复。
@@ -140,8 +144,8 @@ Session 关闭顺序、借用资源和永久阻塞 IO 的边界见设计指南�
 `fuzz_test.go` 维护包级 fuzz 入口和 seeds，`benchmark_test.go` 维护包级 benchmark，普通行为测试按实现归位。
 
 通过真实子进程验证程序契约的集成测试集中在 `test/integration/integration_test.go`，
-共享 helper 放在同包的 `helpers_test.go`。集成测试随 `go test ./...` 默认执行，也可用
-`go test ./test/integration` 单独运行；目录和文件名是本项目约定，Go 没有专用的集成测试命名规则。
+共享 helper 放在同包的 `helpers_test.go`。集成测试随 `mise exec -- go test ./...` 默认执行，也可用
+`mise exec -- go test ./test/integration` 单独运行；目录和文件名是本项目约定，Go 没有专用的集成测试命名规则。
 
 集中消息目录损坏场景由 `test/integration/integration_test.go` 使用 Go overlay 运行 greeting、Session 和
 command 三个包的 `TestCorruptCatalogProcess`，worker 分别位于同名的 greeting、session 和 errors 测试文件。

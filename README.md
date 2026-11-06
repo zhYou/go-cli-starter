@@ -210,7 +210,10 @@ RTK 和 superpowers 使用用户目录中的安装。模板不复制全局技能
 ## 开发命令
 
 mise 负责流程依赖，Go 工具按领域实现检查和验收。`lint` 检查当前源码、资源和版本声明，
-`check` 在此基础上完成测试、构建、契约与模板验收：
+`check` 在此基础上完成测试、构建、契约与模板验收。
+
+已有 mise task 的操作优先使用 `mise run <task>`，task 内由 mise 提供工具环境，无需额外包装。
+未由项目 `mise.toml` 的 `[tools]` 纳管的命令（如 `git`、`gh`、`codex`、`rtk` 和常用 shell 命令）直接执行。
 
 | 命令 | 用途 |
 | --- | --- |
@@ -229,7 +232,8 @@ mise 负责流程依赖，Go 工具按领域实现检查和验收。`lint` 检�
 | `mise run mcp:check` | 验证 gopls MCP 的实际连接和诊断 |
 | `mise run release:verify` | 验证发布归档，并隔离安装宿主程序 |
 
-原生工具通过 `mise exec --` 执行，无需 shell 激活；这些命令不另设任务别名：
+直接调用项目 `mise.toml` 的 `[tools]` 纳管工具时，使用 `mise exec -- <命令>`，无需 shell 激活。
+以下命令不另设任务别名：
 
 | 命令 | 用途 |
 | --- | --- |

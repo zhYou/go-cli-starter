@@ -6,8 +6,12 @@
   [设计指南](docs/design-guidelines.md)，Go 官方文档和锁定版本源码是库行为依据。
 - 默认使用中文交流，文档和注释使用中文；CLI 的帮助、日志和错误默认英文，并提供中文。
   命令名、选项名、环境变量、JSON 字段、枚举值和协议标识保持原样。
-- 在仓库根目录通过 mise 执行命令。先运行 `mise run setup`，再运行
-  `mise run doctor`。首次使用及工具版本或 Go 模块变更后运行 setup。日常检查不得隐式安装、升级或修复环境。
+- 在仓库根目录执行项目命令。已有 mise task 的操作优先使用 `mise run <task>`。
+  直接调用工具时，以项目 `mise.toml` 的 `[tools]` 为纳管清单：纳管工具使用
+  `mise exec -- <命令>`，其他命令（如 `git`、`gh`、`codex`、`rtk` 和常用 shell 命令）直接执行。
+  task 内由 mise 提供工具环境，无需额外包装。
+- 首次使用及工具版本或 Go 模块变更后先运行 `mise run setup`，再运行
+  `mise run doctor`。日常检查不得隐式安装、升级或修复环境。
   需要 Git 和 mise 2026.10.21 或更新版本。
 - 复用用户级 RTK 和 superpowers，遵循其已安装的说明，不在项目中复制安装，
   不写入个人路径。
