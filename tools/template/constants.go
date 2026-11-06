@@ -1,6 +1,7 @@
 package main
 
 const (
+	templateCheckHome  = ".template-check-home"
 	developmentCommit  = "none"
 	developmentVersion = "dev"
 	configExample      = "configs/config.example.toml"

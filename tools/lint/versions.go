@@ -36,7 +36,8 @@ func checkVersions(root string) error {
 		// 未显式声明时，Go 使用与 go 指令同版本的隐式工具链。
 		goToolchain = "go" + module.Go.Version
 	}
-	if module.Go == nil || goToolchain != "go"+goVersion || semver.Compare("v"+module.Go.Version, "v"+goVersion) > 0 || semver.MajorMinor("v"+module.Go.Version) != semver.MajorMinor("v"+goVersion) {
+	if module.Go == nil || goToolchain != "go"+goVersion || semver.Compare("v"+module.Go.Version, "v"+goVersion) > 0 ||
+		semver.MajorMinor("v"+module.Go.Version) != semver.MajorMinor("v"+goVersion) {
 		return fmt.Errorf("模块最低 Go 版本、工具链与 mise 不一致")
 	}
 	//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。

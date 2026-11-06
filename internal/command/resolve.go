@@ -5,14 +5,15 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 )
 
 const windowsOS = "windows"
 
 func envValue(env []string, key string) string {
-	for i := len(env) - 1; i >= 0; i-- {
-		name, value, ok := strings.Cut(env[i], "=")
+	for _, e := range slices.Backward(env) {
+		name, value, ok := strings.Cut(e, "=")
 		if ok && (name == key || runtime.GOOS == windowsOS && strings.EqualFold(name, key)) {
 			return value
 		}
@@ -21,7 +22,8 @@ func envValue(env []string, key string) string {
 }
 
 func resolve(program, dir string, env []string) (string, error) {
-	if filepath.IsAbs(program) || strings.ContainsRune(program, os.PathSeparator) || runtime.GOOS == windowsOS && strings.ContainsAny(program, `/\:`) {
+	if filepath.IsAbs(program) || strings.ContainsRune(program, os.PathSeparator) ||
+		runtime.GOOS == windowsOS && strings.ContainsAny(program, `/\:`) {
 		path := program
 		if !filepath.IsAbs(path) {
 			var err error
@@ -72,7 +74,7 @@ func resolveWindowsExecutable(program string, env []string) (string, error) {
 	if raw == "" {
 		raw = ".com;.exe;.bat;.cmd"
 	}
-	for _, extension := range strings.Split(strings.ToLower(raw), ";") {
+	for extension := range strings.SplitSeq(strings.ToLower(raw), ";") {
 		if extension == "" {
 			continue
 		}

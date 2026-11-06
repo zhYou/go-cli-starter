@@ -31,7 +31,7 @@ type windowsChild struct {
 func (child *windowsChild) wait(ctx context.Context, delay time.Duration) (result error) {
 	defer func() {
 		result = errors.Join(result, windows.CloseHandle(child.info.Thread), windows.CloseHandle(child.info.Process))
-		child.streams.close()
+		result = errors.Join(result, child.streams.close())
 	}()
 	child.streams.start()
 	rootDone := make(chan struct{})

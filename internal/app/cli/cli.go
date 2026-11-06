@@ -23,10 +23,14 @@ import (
 
 // Options 提供进程依赖；每次调用均创建新的命令树。
 type Options struct {
-	Name, Version, Commit, Date string
-	In                          io.Reader
-	Out, ErrOut                 io.Writer
-	ConfigDir                   string
+	Name      string
+	Version   string
+	Commit    string
+	Date      string
+	In        io.Reader
+	Out       io.Writer
+	ErrOut    io.Writer
+	ConfigDir string
 	// Directories 显式覆写应用目录，供嵌入调用及测试隔离；ConfigDir 仅选择配置目录。
 	Directories  *paths.Directories
 	Language     string
@@ -51,12 +55,16 @@ func run(ctx context.Context, args []string, opts Options, loadBundle func() (*m
 	//nolint:contextcheck // Cobra 构造阶段不执行请求，下面 ExecuteContextC 才注入调用者 ctx。
 	root, call, err := buildRoot(opts, loadBundle, args...)
 	if root == nil {
+		//nolint:errcheck // 已在报告启动失败；stderr 再失败无法递归报告，保留失败退出码。
 		_, _ = fmt.Fprintf(opts.ErrOut, "Error: %v\n", err)
 		return 1
 	}
 	defer func() {
 		if call.session != nil {
-			call.session.Finish(ctx, logging.CommandResult{ExitCode: code, Duration: time.Since(started), Err: executionErr})
+			call.session.Finish(
+				ctx,
+				logging.CommandResult{ExitCode: code, Duration: time.Since(started), Err: executionErr},
+			)
 		}
 	}()
 	if err == nil {
@@ -69,16 +77,19 @@ func run(ctx context.Context, args []string, opts Options, loadBundle func() (*m
 			shadowOptions.Language = call.localizer.Language()
 			shadowOptions.Out, shadowOptions.ErrOut = io.Discard, io.Discard
 			//nolint:contextcheck // 仅构造独立解析树；实际请求仍由 ExecuteContextC 注入调用者 ctx。
-			shadow, _, setupErr := buildRoot(shadowOptions, func() (*messages.Bundle, error) {
+			shadow, shadowCall, setupErr := buildRoot(shadowOptions, func() (*messages.Bundle, error) {
 				return call.bundle, nil
 			})
 			if setupErr != nil {
 				err = fault.Wrap(fault.Runtime, "", setupErr)
 			} else {
-				value := shadow.PersistentFlags().Lookup(flagLanguage).Value.(*languageValue)
+				value := shadowCall.languageFlag
 				value.completing, value.preselected = true, true
 				if !validCompletionInput(shadow, args, index) {
-					if writeErr := writeBytes(opts.Out, fmt.Appendf(nil, ":%d\n", cobra.ShellCompDirectiveError|cobra.ShellCompDirectiveNoFileComp)); writeErr != nil {
+					if writeErr := writeBytes(
+						opts.Out,
+						fmt.Appendf(nil, ":%d\n", cobra.ShellCompDirectiveError|cobra.ShellCompDirectiveNoFileComp),
+					); writeErr != nil {
 						err = fault.Wrap(fault.Runtime, "", writeErr)
 					} else {
 						return 0
@@ -107,10 +118,15 @@ func run(ctx context.Context, args []string, opts Options, loadBundle func() (*m
 		if errors.Is(err, context.DeadlineExceeded) {
 			message = call.localizer.Text("cli.deadline", nil)
 		}
+		//nolint:errcheck // 错误输出失败不能覆盖原始业务错误或取消退出码。
 		_, _ = fmt.Fprintln(opts.ErrOut, call.localizer.Text("cli.error", map[string]any{paramMessage: message}))
 		return 130
 	}
-	_, _ = fmt.Fprintln(opts.ErrOut, call.localizer.Text("cli.error", map[string]any{paramMessage: call.localizer.Render(err)}))
+	//nolint:errcheck // 错误出口失败不能覆盖已确定的业务退出码，也不能递归报告。
+	_, _ = fmt.Fprintln(
+		opts.ErrOut,
+		call.localizer.Text("cli.error", map[string]any{paramMessage: call.localizer.Render(err)}),
+	)
 	return exitCode(err)
 }
 
@@ -132,7 +148,11 @@ func defaults(opts Options) Options {
 	return opts
 }
 
-func buildRoot(opts Options, loadBundle func() (*messages.Bundle, error), args ...string) (*cobra.Command, *invocation, error) {
+func buildRoot(
+	opts Options,
+	loadBundle func() (*messages.Bundle, error),
+	args ...string,
+) (*cobra.Command, *invocation, error) {
 	call := newInvocation(opts.Dependencies)
 	bundle, err := loadBundle()
 	if err != nil {
@@ -161,6 +181,7 @@ func buildRoot(opts Options, loadBundle func() (*messages.Bundle, error), args .
 	root.PersistentFlags().StringVar(&call.configPath, flagConfig, "", "从指定的 TOML 文件读取配置")
 	root.PersistentFlags().StringVar(&call.logLevel, flagLogLevel, defaultLogLevel, "日志级别：debug、info、warn、error")
 	languageFlagValue := &languageValue{call: call, root: root, preselected: len(args) > 0}
+	call.languageFlag = languageFlagValue
 	root.PersistentFlags().Var(languageFlagValue, flagLanguage, "显示语言")
 	root.PersistentFlags().Lookup(flagLanguage).DefValue = languageEnglish
 	root.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
@@ -177,20 +198,46 @@ func buildRoot(opts Options, loadBundle func() (*messages.Bundle, error), args .
 		if cmd.Flags().Changed(flagLogLevel) {
 			override = &call.logLevel
 		}
-		cfg, err := call.deps.LoadConfig(config.Options{AppName: opts.Name, Path: call.configPath, Explicit: cmd.Flags().Changed(flagConfig), UserConfigDir: opts.ConfigDir, Context: cmd.Context(), Validator: call.deps.Validator, LookupEnv: opts.LookupEnv, LogLevel: override})
+		cfg, err := call.deps.LoadConfig(
+			cmd.Context(),
+			config.Options{
+				AppName:       opts.Name,
+				Path:          call.configPath,
+				Explicit:      cmd.Flags().Changed(flagConfig),
+				UserConfigDir: opts.ConfigDir,
+				Validator:     call.deps.Validator,
+				LookupEnv:     opts.LookupEnv,
+				LogLevel:      override,
+			},
+		)
 		if err != nil {
 			return (fault.Definition{Code: "cli.config_failed", Kind: fault.Configuration}).Wrap(err)
 		}
-		ctx, owned := session.Begin(cmd.Context(), cfg, logging.RunInfo{Component: opts.Name, Command: cmd.CommandPath(), Version: opts.Version, Commit: opts.Commit}, session.Options{
-			Paths:          paths.Options{AppName: opts.Name, LookupEnv: opts.LookupEnv},
-			Directories:    opts.Directories,
-			Stderr:         opts.ErrOut,
-			ExternalLogger: call.deps.Logger,
-			NewLogger:      call.deps.NewLogger,
-			Localizer:      call.localizer,
-		}, func(err error) {
-			_, _ = fmt.Fprintln(opts.ErrOut, call.localizer.Text("cli.warning", map[string]any{paramMessage: call.localizer.Render(err)}))
-		})
+		ctx, owned := session.Begin(
+			cmd.Context(),
+			cfg,
+			logging.RunInfo{
+				Component: opts.Name,
+				Command:   cmd.CommandPath(),
+				Version:   opts.Version,
+				Commit:    opts.Commit,
+			},
+			session.Options{
+				Paths:          paths.Options{AppName: opts.Name, LookupEnv: opts.LookupEnv},
+				Directories:    opts.Directories,
+				Stderr:         opts.ErrOut,
+				ExternalLogger: call.deps.Logger,
+				NewLogger:      call.deps.NewLogger,
+				Localizer:      call.localizer,
+			},
+			func(err error) {
+				//nolint:errcheck // 警告出口不可用时不能递归告警，也不改变业务结果。
+				_, _ = fmt.Fprintln(
+					opts.ErrOut,
+					call.localizer.Text("cli.warning", map[string]any{paramMessage: call.localizer.Render(err)}),
+				)
+			},
+		)
 		call.session = owned
 		call.logger = owned.Logger
 		cmd.SetContext(ctx)
@@ -257,7 +304,10 @@ func buildRoot(opts Options, loadBundle func() (*messages.Bundle, error), args .
 		},
 		short: message("cli.completion"),
 	})
-	for _, binding := range []struct{ flag, id string }{
+	for _, binding := range []struct {
+		flag string
+		id   string
+	}{
 		{flagJSON, "cli.json"}, {flagConfig, "cli.config"}, {flagLogLevel, "cli.log_level"}, {flagLanguage, "cli.lang"},
 	} {
 		call.bindFlag(root.PersistentFlags().Lookup(binding.flag), message(binding.id))
@@ -293,7 +343,8 @@ func skipsConfig(cmd, root *cobra.Command) bool {
 		return true
 	}
 	for c := cmd; c != nil; c = c.Parent() {
-		if c.Name() == commandCompletion || c.Name() == cobra.ShellCompRequestCmd || c.Name() == cobra.ShellCompNoDescRequestCmd {
+		if c.Name() == commandCompletion || c.Name() == cobra.ShellCompRequestCmd ||
+			c.Name() == cobra.ShellCompNoDescRequestCmd {
 			return true
 		}
 	}
@@ -306,7 +357,14 @@ func validateFlags(cmd *cobra.Command, call *invocation) error {
 		switch f.Value.String() {
 		case "debug", defaultLogLevel, "warn", "error":
 		default:
-			return usageProblem("invalid_flag", fault.Params{paramFlag: flagLogLevel, paramValue: strconv.Quote(f.Value.String()), "Type": "debug|info|warn|error"})
+			return usageProblem(
+				"invalid_flag",
+				fault.Params{
+					paramFlag:  flagLogLevel,
+					paramValue: strconv.Quote(f.Value.String()),
+					"Type":     "debug|info|warn|error",
+				},
+			)
 		}
 	}
 
@@ -319,7 +377,10 @@ func validateFlags(cmd *cobra.Command, call *invocation) error {
 	if len(missing) > 0 {
 		return usageProblem("required", fault.Params{"Flags": strings.Join(missing, ", ")})
 	}
-	rules := []struct{ annotation, id string }{
+	rules := []struct {
+		annotation string
+		id         string
+	}{
 		{"cobra_annotation_required_if_others_set", "together"},
 		{"cobra_annotation_one_required", "one"},
 		{"cobra_annotation_mutually_exclusive", "exclusive"},
@@ -349,9 +410,13 @@ func validateFlags(cmd *cobra.Command, call *invocation) error {
 				if !present {
 					continue
 				}
-				invalid := rule.id == "together" && count > 0 && count < len(names) || rule.id == "one" && count == 0 || rule.id == "exclusive" && count > 1
+				invalid := rule.id == "together" && count > 0 && count < len(names) || rule.id == "one" && count == 0 ||
+					rule.id == "exclusive" && count > 1
 				if invalid && failure == nil {
-					failure = usageProblem("group", fault.Params{"Flags": group, "Rule": call.localizer.Text("cli.group_"+rule.id, nil)})
+					failure = usageProblem(
+						"group",
+						fault.Params{"Flags": group, "Rule": call.localizer.Text("cli.group_"+rule.id, nil)},
+					)
 				}
 			}
 		})

@@ -52,13 +52,13 @@ func RunBatch(parent context.Context, calls []Invocation, execution Execution, o
 			itemCtx := ctx
 			stop := func() {}
 			if options.ItemTimeout > 0 {
-				itemCtx, stop = context.WithTimeoutCause(ctx, options.ItemTimeout, itemDeadlineCause{})
+				itemCtx, stop = context.WithTimeoutCause(ctx, options.ItemTimeout, itemDeadlineError{})
 			}
 			defer stop()
 			results[i] = Capture(itemCtx, call, execution, options.Capture)
 			// 独立 cause 标记避免与同时到来的父期限/内部 fail-fast 取消混淆。
 			//nolint:errorlint // 独立 cause 哨兵用于区分本项期限与批量取消，必须比较精确身份。
-			if results[i].Status == Skipped && context.Cause(itemCtx) == (itemDeadlineCause{}) {
+			if results[i].Status == Skipped && context.Cause(itemCtx) == (itemDeadlineError{}) {
 				results[i].Status = Canceled
 			}
 			if results[i].Err != nil {
@@ -74,6 +74,7 @@ func RunBatch(parent context.Context, calls []Invocation, execution Execution, o
 			return nil
 		})
 	}
+	//nolint:errcheck // worker 始终返回 nil；业务错误按输入顺序从 results 聚合，保留 fail-fast 首因。
 	_ = group.Wait()
 	var failures []error
 	for i := range results {
@@ -123,12 +124,12 @@ func withoutCancellation(err error) error {
 }
 
 // 保留标准 deadline 错误链，同时识别本项自行到期；不引入可变全局状态。
-type itemDeadlineCause struct{}
+type itemDeadlineError struct{}
 
-func (itemDeadlineCause) Error() string {
+func (itemDeadlineError) Error() string {
 	return context.DeadlineExceeded.Error()
 }
 
-func (itemDeadlineCause) Unwrap() error {
+func (itemDeadlineError) Unwrap() error {
 	return context.DeadlineExceeded
 }

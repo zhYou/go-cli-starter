@@ -11,34 +11,6 @@ import (
 	"github.com/zhYou/go-cli-starter/tools/internal/fixture"
 )
 
-func textFixture(t *testing.T) string {
-	t.Helper()
-	root := t.TempDir()
-	for _, name := range []string{"mise.toml", ".prettierrc.cjs", ".prettierignore", ".markdownlint-cli2.yaml", ".yamllint.yaml", ".editorconfig", ".gitignore"} {
-		require.NoError(t, fixture.CopyFile(filepath.Join("../..", name), filepath.Join(root, name)))
-	}
-	require.NoError(t, fixture.PrepareGit(root))
-	return root
-}
-
-func textTask(t *testing.T, root string, args ...string) (string, error) {
-	t.Helper()
-	//nolint:gosec // G204：只在本次临时副本执行固定 mise 任务及测试给定的独立参数。
-	cmd := exec.CommandContext(t.Context(), "mise", append([]string{"run"}, args...)...)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "MISE_TRUSTED_CONFIG_PATHS="+root, "GO_CLI_STARTER_HOME="+filepath.Join(root, ".test-home"))
-	output, err := cmd.CombinedOutput()
-	return string(output), err
-}
-
-func writeTextFixture(t *testing.T, root, name, value string) string {
-	t.Helper()
-	path := filepath.Join(root, filepath.FromSlash(name))
-	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
-	require.NoError(t, os.WriteFile(path, []byte(value), 0o600))
-	return path
-}
-
 func TestTextFormattingSelectionAndReadOnlyCheck(t *testing.T) {
 	root := textFixture(t)
 	first := writeTextFixture(t, root, "目录 with spaces/first.json", `{"value":1}`)
@@ -65,7 +37,10 @@ func TestTextFormattingSelectionAndReadOnlyCheck(t *testing.T) {
 }
 
 func TestTextSyntaxRejectsInvalidDocuments(t *testing.T) {
-	for _, tt := range []struct{ name, value string }{
+	for _, tt := range []struct {
+		name  string
+		value string
+	}{
 		{"bad.json", `{"value": }`},
 		{"duplicate.json", `{"value":1,"value":2}`},
 		{".hidden/config.toml", "value = 1\nvalue = 2\n"},
@@ -84,7 +59,11 @@ func TestTextSyntaxRejectsInvalidDocuments(t *testing.T) {
 }
 
 func TestTextLintChecksStructureAfterFormatting(t *testing.T) {
-	for _, tt := range []struct{ name, value, diagnostic string }{
+	for _, tt := range []struct {
+		name       string
+		value      string
+		diagnostic string
+	}{
 		{"duplicate.json", `{"value":1,"value":2}`, "Duplicate key"},
 		{"bad.yaml", "value: 1\nvalue: 2\n", "duplication of key"},
 		{"bad.md", "# 标题\n\n### 跳级标题\n", "MD001"},
@@ -164,4 +143,36 @@ func readTextFixture(t *testing.T, path string) []byte {
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	return data
+}
+
+func textFixture(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	for _, name := range []string{"mise.toml", ".prettierrc.cjs", ".prettierignore", ".markdownlint-cli2.yaml", ".yamllint.yaml", ".editorconfig", ".gitignore"} {
+		require.NoError(t, fixture.CopyFile(filepath.Join("../..", name), filepath.Join(root, name)))
+	}
+	require.NoError(t, fixture.PrepareGit(root))
+	return root
+}
+
+func textTask(t *testing.T, root string, args ...string) (string, error) {
+	t.Helper()
+	//nolint:gosec // G204：只在本次临时副本执行固定 mise 任务及测试给定的独立参数。
+	cmd := exec.CommandContext(t.Context(), "mise", append([]string{"run"}, args...)...)
+	cmd.Dir = root
+	cmd.Env = append(
+		os.Environ(),
+		"MISE_TRUSTED_CONFIG_PATHS="+root,
+		"GO_CLI_STARTER_HOME="+filepath.Join(root, ".test-home"),
+	)
+	output, err := cmd.CombinedOutput()
+	return string(output), err
+}
+
+func writeTextFixture(t *testing.T, root, name, value string) string {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(name))
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
+	require.NoError(t, os.WriteFile(path, []byte(value), 0o600))
+	return path
 }

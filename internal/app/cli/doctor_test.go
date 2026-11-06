@@ -64,7 +64,9 @@ func TestDoctorCompletedFailureKeepsReport(t *testing.T) {
 				Dependencies: &Dependencies{Doctor: func(context.Context, doctor.Options) (doctor.Result, error) {
 					return doctor.Result{
 						RequiredAvailable: !required,
-						Checks:            []doctor.Check{{Name: "fixture", Status: doctor.StatusFailed, Detail: "unavailable", Required: required}},
+						Checks: []doctor.Check{
+							{Name: "fixture", Status: doctor.StatusFailed, Detail: "unavailable", Required: required},
+						},
 					}, nil
 				}},
 			})
@@ -104,9 +106,14 @@ func TestDoctorFailuresDoNotCommitOutput(t *testing.T) {
 	}
 	bundle := catalogFixture(t, "en", "doctor.empty", `other = "{{.Missing}}"`+"\n")
 	var out, stderr bytes.Buffer
-	code := run(context.Background(), []string{"doctor"}, Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv}, func() (*messages.Bundle, error) {
-		return bundle, nil
-	})
+	code := run(
+		context.Background(),
+		[]string{"doctor"},
+		Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv},
+		func() (*messages.Bundle, error) {
+			return bundle, nil
+		},
+	)
 	require.Equal(t, 1, code)
 	require.Empty(t, out.String())
 	require.NotEmpty(t, stderr.String())
@@ -116,18 +123,22 @@ func TestDoctorDoesNotReadConfigCreateStateOrRunForSchema(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "absent")
 	for _, args := range [][]string{{"doctor", "--json"}, {"doctor", "--help"}, {"schema", "doctor"}} {
 		var out, stderr bytes.Buffer
-		code := Run(context.Background(), append([]string{"--config", filepath.Join(root, "missing.toml")}, args...), Options{
-			Name:   "sample",
-			Out:    &out,
-			ErrOut: &stderr,
-			LookupEnv: func(key string) (string, bool) {
-				return root, key == "SAMPLE_HOME"
+		code := Run(
+			context.Background(),
+			append([]string{"--config", filepath.Join(root, "missing.toml")}, args...),
+			Options{
+				Name:   "sample",
+				Out:    &out,
+				ErrOut: &stderr,
+				LookupEnv: func(key string) (string, bool) {
+					return root, key == "SAMPLE_HOME"
+				},
+				Dependencies: &Dependencies{LoadConfig: func(context.Context, config.Options) (config.Config, error) {
+					t.Fatal("doctor must not load config")
+					return config.Config{}, nil
+				}},
 			},
-			Dependencies: &Dependencies{LoadConfig: func(config.Options) (config.Config, error) {
-				t.Fatal("doctor must not load config")
-				return config.Config{}, nil
-			}},
-		})
+		)
 		require.Zero(t, code, stderr.String())
 		require.Empty(t, stderr.String())
 		_, err := os.Stat(root)

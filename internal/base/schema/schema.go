@@ -34,7 +34,9 @@ func FromType(t reflect.Type, override json.RawMessage) (json.RawMessage, error)
 		if err != nil {
 			return nil, fmt.Errorf("推导结果结构失败，请提供显式覆盖：%w", err)
 		}
-		openStructs(schema)
+		if err := openStructs(schema); err != nil {
+			return nil, fmt.Errorf("开放结果结构失败：%w", err)
+		}
 	}
 	schema.Schema = Draft
 	if _, err := schema.Resolve(nil); err != nil {
@@ -50,7 +52,8 @@ func checkEncoding(t reflect.Type, seen map[reflect.Type]bool) error {
 	seen[t] = true
 	marshaler := reflect.TypeFor[json.Marshaler]()
 	textMarshaler := reflect.TypeFor[encoding.TextMarshaler]()
-	if t.Implements(marshaler) || reflect.PointerTo(t).Implements(marshaler) || t.Implements(textMarshaler) || reflect.PointerTo(t).Implements(textMarshaler) {
+	if t.Implements(marshaler) || reflect.PointerTo(t).Implements(marshaler) || t.Implements(textMarshaler) ||
+		reflect.PointerTo(t).Implements(textMarshaler) {
 		return fmt.Errorf("类型 %s 使用自定义 JSON 编码，需要显式结果结构", t)
 	}
 	if t.Kind() == reflect.Slice && t.Elem().Kind() == reflect.Uint8 {
@@ -74,12 +77,15 @@ func checkEncoding(t reflect.Type, seen map[reflect.Type]bool) error {
 	return nil
 }
 
-func openStructs(s *jsonschema.Schema) {
+func openStructs(s *jsonschema.Schema) error {
 	if s == nil {
-		return
+		return nil
 	}
 	if s.AdditionalProperties != nil {
-		raw, _ := json.Marshal(s.AdditionalProperties)
+		raw, err := json.Marshal(s.AdditionalProperties)
+		if err != nil {
+			return err
+		}
 		if string(raw) == "false" {
 			s.AdditionalProperties = &jsonschema.Schema{}
 		} else {
@@ -87,17 +93,28 @@ func openStructs(s *jsonschema.Schema) {
 				s.Type = ""
 				s.Types = []string{"object", "null"}
 			}
-			openStructs(s.AdditionalProperties)
+			if err := openStructs(s.AdditionalProperties); err != nil {
+				return err
+			}
 		}
 	}
 	for _, property := range s.Properties {
-		openStructs(property)
+		if err := openStructs(property); err != nil {
+			return err
+		}
 	}
 	for _, def := range s.Defs {
-		openStructs(def)
+		if err := openStructs(def); err != nil {
+			return err
+		}
 	}
-	openStructs(s.Items)
+	if err := openStructs(s.Items); err != nil {
+		return err
+	}
 	for _, sub := range s.AnyOf {
-		openStructs(sub)
+		if err := openStructs(sub); err != nil {
+			return err
+		}
 	}
+	return nil
 }

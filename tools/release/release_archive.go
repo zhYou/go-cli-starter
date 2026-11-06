@@ -13,7 +13,7 @@ import (
 )
 
 // validateArchive 读取真实归档，核对用户解压后需要的根目录文件。
-func validateArchive(path, binary string) error {
+func validateArchive(path, binary string) (resultErr error) {
 	required := map[string]bool{binary: false, "README.md": false, "config.example.toml": false}
 	accept := func(name string, regular, nonempty bool) error {
 		canonical := archivepath.Clean(strings.ReplaceAll(name, `\`, "/"))
@@ -30,13 +30,14 @@ func validateArchive(path, binary string) error {
 		required[name] = true
 		return nil
 	}
-	if strings.HasSuffix(path, ".zip") {
+	switch {
+	case strings.HasSuffix(path, ".zip"):
 		archive, err := zip.OpenReader(path)
 		if err != nil {
 			return fmt.Errorf("读取 zip 归档失败：%w", err)
 		}
 		defer func() {
-			_ = archive.Close()
+			resultErr = errors.Join(resultErr, archive.Close())
 		}()
 		for _, file := range archive.File {
 			if err := accept(file.Name, file.Mode().IsRegular(), file.UncompressedSize64 > 0); err != nil {
@@ -53,21 +54,21 @@ func validateArchive(path, binary string) error {
 				return fmt.Errorf("读取归档文件失败：%w", err)
 			}
 		}
-	} else if strings.HasSuffix(path, ".tar.gz") {
+	case strings.HasSuffix(path, ".tar.gz"):
 		//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
 		file, err := os.Open(path)
 		if err != nil {
 			return err
 		}
 		defer func() {
-			_ = file.Close()
+			resultErr = errors.Join(resultErr, file.Close())
 		}()
 		compressed, err := gzip.NewReader(file)
 		if err != nil {
 			return fmt.Errorf("读取 gzip 归档失败：%w", err)
 		}
 		defer func() {
-			_ = compressed.Close()
+			resultErr = errors.Join(resultErr, compressed.Close())
 		}()
 		archive := tar.NewReader(compressed)
 		for {
@@ -91,7 +92,7 @@ func validateArchive(path, binary string) error {
 		if _, err := io.Copy(io.Discard, compressed); err != nil {
 			return fmt.Errorf("归档压缩数据损坏：%w", err)
 		}
-	} else {
+	default:
 		return fmt.Errorf("不支持的发布归档格式：%s", path)
 	}
 	for name, found := range required {

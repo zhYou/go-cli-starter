@@ -60,7 +60,9 @@ func pythonPackageVersion(prefix, name string) (string, error) {
 	normalized := strings.ReplaceAll(name, "-", "_")
 	for _, base := range []string{prefix, filepath.Join(prefix, name)} {
 		for _, library := range []string{"lib/python*/site-packages", "Lib/site-packages"} {
-			matches, err := filepath.Glob(filepath.Join(base, filepath.FromSlash(library), normalized+"-*.dist-info", "METADATA"))
+			matches, err := filepath.Glob(
+				filepath.Join(base, filepath.FromSlash(library), normalized+"-*.dist-info", "METADATA"),
+			)
 			if err != nil {
 				return "", err
 			}

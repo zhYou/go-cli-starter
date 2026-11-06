@@ -44,7 +44,9 @@ func TestJSONMarshalFailureLeavesOutputEmpty(t *testing.T) {
 func TestTextRenderFailureLeavesOutputEmpty(t *testing.T) {
 	var out bytes.Buffer
 	require.Error(t, writeText(&out, func(w io.Writer) error {
-		_, _ = io.WriteString(w, "局部结果")
+		if _, err := io.WriteString(w, "局部结果"); err != nil {
+			t.Error(err)
+		}
 		return errors.New("渲染失败")
 	}))
 	require.Zero(t, out.Len())

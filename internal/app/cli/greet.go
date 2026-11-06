@@ -18,7 +18,10 @@ func newGreetCommand(call *invocation) *cobra.Command {
 			if err := noArgs(cmd, args); err != nil {
 				return err
 			}
-			return (greeting.Options{Name: name, Localizer: call.localizer}).Validate(cmd.Context(), call.deps.Validator)
+			return (greeting.Options{Name: name, Localizer: call.localizer}).Validate(
+				cmd.Context(),
+				call.deps.Validator,
+			)
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx, span := call.session.Tracer.Start(cmd.Context(), "greeting.run")

@@ -20,18 +20,20 @@ func readContractBase(ctx context.Context, ref string) ([]byte, bool, error) {
 		return nil, false, fmt.Errorf("无效的 Git 基准引用")
 	}
 	//nolint:gosec // G204：开发工具读取显式项目文件或执行固定 Git 子命令，不经过 shell，不是外部服务入口。
-	resolved, err := exec.CommandContext(ctx, gitProgram, gitRevParse, "--verify", "--end-of-options", ref+"^{commit}").Output()
+	resolved, err := exec.CommandContext(ctx, gitProgram, gitRevParse, "--verify", "--end-of-options", ref+"^{commit}").
+		Output()
 	if err != nil {
 		return nil, false, fmt.Errorf("无法解析 Git 基准：%w", err)
 	}
 	commit := strings.TrimSpace(string(resolved))
 	//nolint:gosec // G204：开发任务显式执行固定工具及拆分参数，不经过 shell；参数来自仓库或调用者。
-	entries, err := exec.CommandContext(ctx, gitProgram, "ls-tree", "-z", commit, "--", contractFile, legacyContractFile).Output()
+	entries, err := exec.CommandContext(ctx, gitProgram, "ls-tree", "-z", commit, "--", contractFile, legacyContractFile).
+		Output()
 	if err != nil {
 		return nil, false, fmt.Errorf("读取 Git 基准文件清单失败：%w", err)
 	}
 	modes := map[string]string{}
-	for _, entry := range bytes.Split(entries, []byte{0}) {
+	for entry := range bytes.SplitSeq(entries, []byte{0}) {
 		if len(entry) == 0 {
 			continue
 		}

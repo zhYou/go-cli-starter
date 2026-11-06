@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -15,7 +16,9 @@ import (
 )
 
 func releaseFile(dist, name string) (string, error) {
-	if name == "" || filepath.Base(name) != name || !regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`).MatchString(name) || name == ".." {
+	if name == "" || filepath.Base(name) != name ||
+		!regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`).MatchString(name) ||
+		name == ".." {
 		return "", fmt.Errorf("不安全的发布路径 %q", name)
 	}
 	path := filepath.Join(dist, name)
@@ -40,7 +43,7 @@ func checkReleaseSnapshot(dist string) error {
 	return err
 }
 
-func validateReleaseSnapshot(dist string) (*releaseSnapshot, error) {
+func validateReleaseSnapshot(dist string) (_ *releaseSnapshot, resultErr error) {
 	path, err := releaseFile(dist, "checksums.txt")
 	if err != nil {
 		return nil, err
@@ -51,7 +54,7 @@ func validateReleaseSnapshot(dist string) (*releaseSnapshot, error) {
 		return nil, err
 	}
 	defer func() {
-		_ = file.Close()
+		resultErr = errors.Join(resultErr, file.Close())
 	}()
 	checksums := map[string]string{}
 	scanner := bufio.NewScanner(file)
@@ -92,7 +95,9 @@ func validateReleaseSnapshot(dist string) (*releaseSnapshot, error) {
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
-	pattern := regexp.MustCompile("^" + regexp.QuoteMeta(appName) + `_(.+)_(linux|darwin|windows)_(amd64|arm64)\.(tar\.gz|zip)$`)
+	pattern := regexp.MustCompile(
+		"^" + regexp.QuoteMeta(appName) + `_(.+)_(linux|darwin|windows)_(amd64|arm64)\.(tar\.gz|zip)$`,
+	)
 	targets := map[string]bool{}
 	version := ""
 	for name := range checksums {
@@ -158,7 +163,11 @@ func validateSPDX(path, archive string) error {
 		return err
 	}
 	uri, err := url.Parse(doc.Namespace)
-	if err != nil || !uri.IsAbs() || !strings.HasPrefix(doc.Version, "SPDX-2.") || doc.ID != "SPDXRef-DOCUMENT" || doc.Name != archive || len(doc.Creation.Creators) == 0 || doc.Creation.Created == "" || len(doc.Packages) == 0 {
+	if err != nil || !uri.IsAbs() || !strings.HasPrefix(doc.Version, "SPDX-2.") || doc.ID != "SPDXRef-DOCUMENT" ||
+		doc.Name != archive ||
+		len(doc.Creation.Creators) == 0 ||
+		doc.Creation.Created == "" ||
+		len(doc.Packages) == 0 {
 		return fmt.Errorf("归档 %s 的 SPDX 文档结构或身份无效", archive)
 	}
 	for _, p := range doc.Packages {

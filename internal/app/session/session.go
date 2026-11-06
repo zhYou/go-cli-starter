@@ -45,7 +45,6 @@ type Session struct {
 	telemetry   *telemetry.Session
 	span        trace.Span
 	once        sync.Once
-	ctx         context.Context
 	mu          sync.Mutex
 	finishing   bool
 	work        sync.WaitGroup
@@ -53,7 +52,13 @@ type Session struct {
 }
 
 // Begin 仅在参数及配置全部校验后调用；诊断失败只告警，不改变业务结果。
-func Begin(ctx context.Context, config appconfig.Config, info logging.RunInfo, opts Options, warn func(error)) (context.Context, *Session) {
+func Begin(
+	ctx context.Context,
+	config appconfig.Config,
+	info logging.RunInfo,
+	opts Options,
+	warn func(error),
+) (context.Context, *Session) {
 	// 直接嵌入 Session 的回调也可能写原始 stderr；与日志出口使用同一写锁。
 	var stderrLock sync.Mutex
 	serializedWarn := func(err error) {
@@ -111,44 +116,41 @@ func Begin(ctx context.Context, config appconfig.Config, info logging.RunInfo, o
 	if factory == nil {
 		factory = logging.New
 	}
-	s.Logger = factory(info, logging.Options{Config: config.Logging, Writer: logWriter, External: opts.ExternalLogger, RunID: id}, loggingWarn)
+	s.Logger = factory(
+		info,
+		logging.Options{Config: config.Logging, Writer: logWriter, External: opts.ExternalLogger, RunID: id},
+		loggingWarn,
+	)
 	var traceWriter io.Writer
 	if config.Telemetry.Exporter == telemetry.File {
 		traceWriter = s.writer(diagnostics.TraceFile, traceWarn)
 	}
-	s.telemetry = telemetry.Start(ctx, config.Telemetry, telemetry.Info{Service: info.Component, Version: info.Version, RunID: id}, traceWriter, traceWarn)
+	s.telemetry = telemetry.Start(
+		ctx,
+		config.Telemetry,
+		telemetry.Info{Service: info.Component, Version: info.Version, RunID: id},
+		traceWriter,
+		traceWarn,
+	)
 	s.Tracer = s.telemetry.Tracer
 	ctx, s.span = s.Tracer.Start(ctx, info.Component+"."+info.Command)
-	s.ctx = ctx
 	s.Logger = s.Logger.WithContext(ctx)
 	s.Logger.Infow(diagnosticText(s.localizer, "session.started"), "event", "command_started")
 	return ctx, s
 }
 
 // Go 在关闭前登记并启动工作。返回 false 表示 Finish 已开始，工作不会执行。
-// 调用方的任务须自行尊重 Context；Finish 等待这些工作真正结束后才关闭资源。
-func (s *Session) Go(work func(context.Context)) bool {
+// 任务接收调用方显式传入的 Context，并须自行尊重取消；Finish 等待这些工作真正结束后才关闭资源。
+func (s *Session) Go(ctx context.Context, work func(context.Context)) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.finishing || work == nil {
 		return false
 	}
 	s.work.Go(func() {
-		work(s.ctx)
+		work(ctx)
 	})
 	return true
-}
-
-func (s *Session) writer(name string, warn func(error)) io.Writer {
-	if s.files == nil {
-		return nil
-	}
-	w, err := s.files.Writer(name)
-	if err != nil {
-		warn(err)
-		return nil
-	}
-	return w
 }
 
 // Finish 幂等地等工作结束、记结果、结束根 span、用独立超时排空 Trace，再同步关闭自有文件。
@@ -168,11 +170,13 @@ func (s *Session) Finish(ctx context.Context, result logging.CommandResult) {
 			}
 		}
 		s.span.End()
+		//nolint:errcheck // telemetry.Close 已向会话告警回调报告，诊断失败不改变业务结果。
 		_ = s.telemetry.Close(ctx)
 		if s.ownsLogger {
 			s.warnLogging(s.Logger.Sync())
 		}
 		if s.files != nil {
+			//nolint:errcheck // diagnostics.Run.Close 已通过 filesWarn 报告，避免重复告警。
 			_ = s.files.Close()
 		}
 	})
@@ -194,4 +198,16 @@ func diagnosticText(localizer *messages.Localizer, id string) string {
 		return "Operation failed [" + id + "]"
 	}
 	return localizer.Text(id, nil)
+}
+
+func (s *Session) writer(name string, warn func(error)) io.Writer {
+	if s.files == nil {
+		return nil
+	}
+	w, err := s.files.Writer(name)
+	if err != nil {
+		warn(err)
+		return nil
+	}
+	return w
 }

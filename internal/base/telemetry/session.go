@@ -15,7 +15,9 @@ import (
 
 // Info 提供本次命令的资源关联信息，不收集环境或参数。
 type Info struct {
-	Service, Version, RunID string
+	Service string
+	Version string
+	RunID   string
 }
 
 // Session 持有私有 provider；writer 由 diagnostics 会话持有。
@@ -130,6 +132,7 @@ func (s *Session) Close(ctx context.Context) error {
 	return s.closeErr
 }
 
+//nolint:containedctx // SDK 固定 ExportSpans 接口无法携带 Session 生命周期；此桥接用于中断关闭后的导出。
 type guardedExporter struct {
 	sdktrace.SpanExporter
 	warn     func(error)

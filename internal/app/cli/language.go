@@ -59,6 +59,7 @@ func selectLanguage(root *cobra.Command, args []string, env string) (string, err
 	}
 	// 与 Execute 使用相同的命令查找，子命令选项也可能位于命令名之前。
 	// Find 不执行选项 Set；查找错误留给实际执行路径处理。
+	//nolint:errcheck // 仅预选错误呈现语言，查找错误留给实际 Execute 路径处理。
 	current, scan, _ := root.Find(args)
 	findFlag := func(name string, short bool) *pflag.Flag {
 		return commandFlag(current, name, short)
@@ -69,8 +70,8 @@ func selectLanguage(root *cobra.Command, args []string, env string) (string, err
 		if arg == "--" {
 			break
 		}
-		if strings.HasPrefix(arg, "--") {
-			name, value, hasValue := strings.Cut(strings.TrimPrefix(arg, "--"), "=")
+		if after, ok := strings.CutPrefix(arg, "--"); ok {
+			name, value, hasValue := strings.Cut(after, "=")
 			flag := findFlag(name, false)
 			if flag == nil {
 				continue
@@ -148,6 +149,7 @@ func (v *languageValue) Set(s string) error {
 
 // completionRequest 只识别顶层协议命令，使用选项元数据跳过参数值。
 func completionRequest(root *cobra.Command, args []string) (int, bool) {
+	//nolint:errcheck // 这里只定位补全协议命令，实际参数错误由独立解析树及 Execute 处理。
 	target, _, _ := root.Find(args)
 	if target == nil {
 		target = root
@@ -161,7 +163,8 @@ func completionRequest(root *cobra.Command, args []string) (int, bool) {
 		if arg == "--" {
 			return 0, false
 		}
-		if strings.HasPrefix(arg, "--") {
+		switch {
+		case strings.HasPrefix(arg, "--"):
 			name, _, equals := strings.Cut(arg[2:], "=")
 			flag := lookup(name, false)
 			if flag == nil {
@@ -170,7 +173,7 @@ func completionRequest(root *cobra.Command, args []string) (int, bool) {
 			if !equals && flag.NoOptDefVal == "" {
 				i++
 			}
-		} else if strings.HasPrefix(arg, "-") && arg != "-" {
+		case strings.HasPrefix(arg, "-") && arg != "-":
 			for j := 1; j < len(arg); j++ {
 				flag := lookup(arg[j:j+1], true)
 				if flag == nil {
@@ -187,7 +190,7 @@ func completionRequest(root *cobra.Command, args []string) (int, bool) {
 					break
 				}
 			}
-		} else {
+		default:
 			return i, arg == cobra.ShellCompRequestCmd || arg == cobra.ShellCompNoDescRequestCmd
 		}
 	}

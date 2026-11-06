@@ -27,7 +27,9 @@ func TestDefaultLanguageIsEnglishAndIgnoresSystemLocale(t *testing.T) {
 
 func TestLanguageOverrideDoesNotRenderUnselectedMetadata(t *testing.T) {
 	for _, tc := range []struct {
-		missing, selected, want string
+		missing  string
+		selected string
+		want     string
 	}{
 		{"en", "zh", "用法："},
 		{"zh-CN", "en", "Usage:"},
@@ -38,12 +40,17 @@ func TestLanguageOverrideDoesNotRenderUnselectedMetadata(t *testing.T) {
 				return bundle, nil
 			}
 			var out, stderr bytes.Buffer
-			code := run(context.Background(), []string{"--lang", tc.missing, "--lang", tc.selected, "greet", "--help"}, Options{
-				Out:       &out,
-				ErrOut:    &stderr,
-				Language:  tc.missing,
-				LookupEnv: noFixtureEnv,
-			}, loader)
+			code := run(
+				context.Background(),
+				[]string{"--lang", tc.missing, "--lang", tc.selected, "greet", "--help"},
+				Options{
+					Out:       &out,
+					ErrOut:    &stderr,
+					Language:  tc.missing,
+					LookupEnv: noFixtureEnv,
+				},
+				loader,
+			)
 			require.Zero(t, code, stderr.String())
 			require.Contains(t, out.String(), tc.want)
 			require.Empty(t, stderr.String())
@@ -100,7 +107,7 @@ func TestRequiredAndGroupsBeforeConfiguration(t *testing.T) {
 			Out:    &bytes.Buffer{},
 			ErrOut: &bytes.Buffer{},
 			Dependencies: &Dependencies{
-				LoadConfig: func(config.Options) (config.Config, error) {
+				LoadConfig: func(context.Context, config.Options) (config.Config, error) {
 					count++
 					return config.Config{}, nil
 				},
@@ -133,7 +140,7 @@ func TestRequiredAndGroupsBeforeConfiguration(t *testing.T) {
 
 func TestLanguagePrecedenceAndIsolation(t *testing.T) {
 	var wg sync.WaitGroup
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		wg.Go(func() {
 			var out, stderr bytes.Buffer
 			args := []string{"greet", "--name", "Ada"}
@@ -187,12 +194,16 @@ func TestMetadataLanguageScanForNewFlags(t *testing.T) {
 
 func TestInvalidExplicitValuesNeverLoadConfig(t *testing.T) {
 	count := 0
-	deps := Dependencies{LoadConfig: func(config.Options) (config.Config, error) {
+	deps := Dependencies{LoadConfig: func(context.Context, config.Options) (config.Config, error) {
 		count++
 		return config.Defaults(), nil
 	}}
 	var out, stderr bytes.Buffer
-	code := Run(context.Background(), []string{"greet", "--name", "Ada", "--log-level", "noisy"}, Options{Dependencies: &deps, Out: &out, ErrOut: &stderr})
+	code := Run(
+		context.Background(),
+		[]string{"greet", "--name", "Ada", "--log-level", "noisy"},
+		Options{Dependencies: &deps, Out: &out, ErrOut: &stderr},
+	)
 	require.Equal(t, 2, code)
 	require.Zero(t, count)
 	require.Empty(t, out.String())
@@ -242,11 +253,12 @@ func TestLanguageSelectionWithFlagsBeforeCommand(t *testing.T) {
 
 func TestLanguageSelectionMatchesTargetFlagMetadata(t *testing.T) {
 	for _, tc := range []struct {
-		name         string
-		args         []string
-		source, lang string
-		toggle       bool
-		positional   []string
+		name       string
+		args       []string
+		source     string
+		lang       string
+		toggle     bool
+		positional []string
 	}{
 		{"前置长选项", []string{"--source", "--lang=de", "extra"}, "--lang=de", "zh-CN", false, nil},
 		{"前置短选项", []string{"-s", "--lang=de", "extra"}, "--lang=de", "zh-CN", false, nil},

@@ -14,7 +14,7 @@ func TestRotationPreservesWholeRecordsAndBoundsBackups(t *testing.T) {
 	root, err := os.OpenRoot(t.TempDir())
 	require.NoError(t, err)
 	defer func() {
-		_ = root.Close()
+		require.NoError(t, root.Close())
 	}()
 	w, err := newWriter(root, EventsFile, 12, 2)
 	require.NoError(t, err)
@@ -50,7 +50,7 @@ func TestOversizeRecordIsNotSplit(t *testing.T) {
 	root, err := os.OpenRoot(t.TempDir())
 	require.NoError(t, err)
 	defer func() {
-		_ = root.Close()
+		require.NoError(t, root.Close())
 	}()
 	w, err := newWriter(root, TraceFile, 4, 0)
 	require.NoError(t, err)

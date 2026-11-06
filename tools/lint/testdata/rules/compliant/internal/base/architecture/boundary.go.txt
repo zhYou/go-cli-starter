@@ -1,0 +1,2 @@
+package architecture
+import _ "{{MODULE}}/internal/base/logging"

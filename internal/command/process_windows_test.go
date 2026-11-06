@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"golang.org/x/sys/windows"
 )
 
@@ -39,7 +41,7 @@ func TestWindowsCancelAfterResumeAndDuringSpawn(t *testing.T) {
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
-			done := startCapture(t, ctx, call, options)
+			done := startCapture(ctx, t, call, options)
 			waitMarker(t, marker)
 			cancel()
 			result := awaitCapture(t, done)
@@ -68,7 +70,7 @@ func TestWindowsUnexpectedSuspendCountStopsBeforeBusiness(t *testing.T) {
 	if uint32(previous) == 0xffffffff {
 		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
-		_ = child.wait(ctx, DefaultWaitDelay)
+		require.ErrorIs(t, child.wait(ctx, DefaultWaitDelay), context.Canceled)
 		t.Fatal(suspendErr)
 	}
 	err = child.wait(t.Context(), DefaultWaitDelay)
@@ -87,10 +89,12 @@ func TestWindowsDrainDeadlineClosesOnlyOwnedPipes(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		_ = borrowed.Close()
+		require.NoError(t, borrowed.Close())
 	}()
 	defer func() {
-		_ = writer.Close()
+		if err := writer.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
+			t.Error(err)
+		}
 	}()
 	call, options := helper(t, "exit")
 	// 包装为 Reader，真实文件读取在 goroutine 中进行，驱动 WaitDelay 分支。
@@ -98,7 +102,9 @@ func TestWindowsDrainDeadlineClosesOnlyOwnedPipes(t *testing.T) {
 	options.WaitDelay = 10 * time.Millisecond
 	released := make(chan struct{})
 	timer := time.AfterFunc(500*time.Millisecond, func() {
-		_ = writer.Close()
+		if err := writer.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
+			t.Error(err)
+		}
 		close(released)
 	})
 	defer timer.Stop()
@@ -122,15 +128,23 @@ func TestWindowsResumeFailureCleansSuspendedProcess(t *testing.T) {
 	}
 	var restricted windows.Handle
 	current := windows.CurrentProcess()
-	err = windows.DuplicateHandle(current, child.info.Thread, current, &restricted, windows.THREAD_QUERY_INFORMATION, false, 0)
+	err = windows.DuplicateHandle(
+		current,
+		child.info.Thread,
+		current,
+		&restricted,
+		windows.THREAD_QUERY_INFORMATION,
+		false,
+		0,
+	)
 	if err != nil {
 		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
-		_ = child.wait(ctx, DefaultWaitDelay)
+		require.ErrorIs(t, child.wait(ctx, DefaultWaitDelay), context.Canceled)
 		t.Fatal(err)
 	}
 	// 保留真实线程，但移除 Resume 所需权限，以真实系统错误驱动失败路径。
-	_ = windows.CloseHandle(child.info.Thread)
+	require.NoError(t, windows.CloseHandle(child.info.Thread))
 	child.info.Thread = restricted
 	err = child.wait(t.Context(), DefaultWaitDelay)
 	var exit *exec.ExitError
@@ -152,28 +166,38 @@ func TestWindowsTerminationFailureClosesJobBeforeWaiting(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer child.streams.close()
+			defer func() {
+				require.NoError(t, child.streams.close())
+			}()
 			current := windows.CurrentProcess()
 			var restricted, rescue windows.Handle
 			// JOB_OBJECT_QUERY (0x0004) 不含 JOB_OBJECT_TERMINATE；保留真实 Job 的 kill-on-close。
 			if err = windows.DuplicateHandle(current, child.job, current, &restricted, 0x0004, false, 0); err != nil {
 				ctx, cancel := context.WithCancel(t.Context())
 				cancel()
-				_ = child.wait(ctx, DefaultWaitDelay)
+				require.ErrorIs(t, child.wait(ctx, DefaultWaitDelay), context.Canceled)
 				t.Fatal(err)
 			}
 			// 独立救援句柄让回归在旧实现死锁时仍可终止 helper，不触碰已关闭后可能复用的原始句柄。
-			if err = windows.DuplicateHandle(current, child.info.Process, current, &rescue, 0, false, windows.DUPLICATE_SAME_ACCESS); err != nil {
-				_ = windows.CloseHandle(restricted)
+			if err = windows.DuplicateHandle(
+				current,
+				child.info.Process,
+				current,
+				&rescue,
+				0,
+				false,
+				windows.DUPLICATE_SAME_ACCESS,
+			); err != nil {
+				require.NoError(t, windows.CloseHandle(restricted))
 				ctx, cancel := context.WithCancel(t.Context())
 				cancel()
-				_ = child.wait(ctx, DefaultWaitDelay)
+				require.ErrorIs(t, child.wait(ctx, DefaultWaitDelay), context.Canceled)
 				t.Fatal(err)
 			}
 			defer func() {
-				_ = windows.CloseHandle(rescue)
+				require.NoError(t, windows.CloseHandle(rescue))
 			}()
-			_ = windows.CloseHandle(child.job)
+			require.NoError(t, windows.CloseHandle(child.job))
 			child.job = restricted
 			ctx, cancel := context.WithCancel(t.Context())
 			cancel()
@@ -184,7 +208,7 @@ func TestWindowsTerminationFailureClosesJobBeforeWaiting(t *testing.T) {
 				}
 			} else {
 				// 模拟尚未获得独立 os.Process 等待句柄的创建中止；执行正式 abort 收尾函数。
-				_ = child.process.Release()
+				require.NoError(t, child.process.Release())
 				finish = func() error {
 					return abortWindowsProcess(child.info, child.job)
 				}
@@ -210,7 +234,11 @@ func TestWindowsTerminationFailureClosesJobBeforeWaiting(t *testing.T) {
 			if errors.Is(err, windows.ERROR_INVALID_HANDLE) {
 				t.Fatalf("重复关闭原生句柄: %v", err)
 			}
-			if status, waitErr := windows.WaitForSingleObject(rescue, 0); waitErr != nil || status != windows.WAIT_OBJECT_0 {
+			if status, waitErr := windows.WaitForSingleObject(
+				rescue,
+				0,
+			); waitErr != nil ||
+				status != windows.WAIT_OBJECT_0 {
 				t.Fatalf("收尾返回后根进程仍存活: status=%d err=%v", status, waitErr)
 			}
 			var exitCode uint32

@@ -19,7 +19,9 @@ func TestChineseHelpRegardlessOfLocale(t *testing.T) {
 	t.Setenv("LC_ALL", "en_US.UTF-8")
 	for _, args := range [][]string{{}, {"--help"}, {"greet", "--help"}, {"help", "greet"}, {"version", "--help"}, {"schema", "--help"}, {"completion", "--help"}, {"help", "--help"}} {
 		code, out, errOut := invoke(t, append([]string{"--lang", "zh"}, args...)...)
-		if code != 0 || errOut != "" || !strings.Contains(out, "用法：") || !strings.Contains(out, "显示帮助") || !strings.Contains(out, "日志级别") || !strings.Contains(out, "默认值") {
+		if code != 0 || errOut != "" || !strings.Contains(out, "用法：") || !strings.Contains(out, "显示帮助") ||
+			!strings.Contains(out, "日志级别") ||
+			!strings.Contains(out, "默认值") {
 			t.Errorf("参数=%v 退出码=%d 标准输出=%q 标准错误=%q", args, code, out, errOut)
 		}
 		for _, english := range []string{"Usage:", "Available Commands:", "Flags:", "Global Flags:", "help for", "(default", "[command]", "NAME"} {
@@ -42,7 +44,12 @@ func TestCorruptCatalogStopsBeforeHelpOutput(t *testing.T) {
 			_, _, err := buildRoot(defaults(Options{LookupEnv: noFixtureEnv}), loader)
 			require.ErrorContains(t, err, "active.en.toml")
 			var out, stderr bytes.Buffer
-			code := run(context.Background(), []string{"--help"}, Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv}, loader)
+			code := run(
+				context.Background(),
+				[]string{"--help"},
+				Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv},
+				loader,
+			)
 			require.Equal(t, 1, code, stderr.String())
 			require.Empty(t, out.String())
 			require.Contains(t, stderr.String(), "active.en.toml")
@@ -52,7 +59,9 @@ func TestCorruptCatalogStopsBeforeHelpOutput(t *testing.T) {
 
 func TestHelpRenderingFailureIsRuntimeAndLeavesStdoutEmpty(t *testing.T) {
 	for _, tc := range []struct {
-		name, language, replacement string
+		name        string
+		language    string
+		replacement string
 	}{
 		{"missing translation", "en", ""},
 		{"template execution error", "en", "other = \"prefix {{index . 1}} suffix\"\n"},
@@ -65,7 +74,12 @@ func TestHelpRenderingFailureIsRuntimeAndLeavesStdoutEmpty(t *testing.T) {
 				return bundle, nil
 			}
 			var out, stderr bytes.Buffer
-			code := run(context.Background(), []string{"--lang", tc.language, "--help"}, Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv}, loader)
+			code := run(
+				context.Background(),
+				[]string{"--lang", tc.language, "--help"},
+				Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv},
+				loader,
+			)
 			require.Equal(t, 1, code, stderr.String())
 			require.Empty(t, out.String())
 			require.Contains(t, stderr.String(), "help.usage")
@@ -136,7 +150,11 @@ func TestExistingHelpAndVersionFlagsKeepTheirDescriptions(t *testing.T) {
 }
 
 func TestDefaultHelpAndVersionFlagsAreLocalized(t *testing.T) {
-	for _, tc := range []struct{ lang, help, version string }{
+	for _, tc := range []struct {
+		lang    string
+		help    string
+		version string
+	}{
 		{"en", "Show help", "Show version information"},
 		{"zh", "显示帮助", "显示版本信息"},
 	} {

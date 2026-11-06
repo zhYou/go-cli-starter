@@ -1,0 +1,2 @@
+package allowed
+import _ "{{MODULE}}/tools/dev"

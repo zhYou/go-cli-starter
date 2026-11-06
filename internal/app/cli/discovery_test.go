@@ -135,14 +135,18 @@ func TestCompletionNeverLoadsConfigurationOrCreatesState(t *testing.T) {
 	home := filepath.Join(t.TempDir(), "absent")
 	for _, args := range [][]string{{"completion", "bash"}, {"help", "completion", "bash"}, {"__complete", "help", ""}, {"__complete", "--lang=e", "--log-level", ""}} {
 		var out, stderr bytes.Buffer
-		code := Run(context.Background(), append([]string{"--config", filepath.Join(home, "missing.toml")}, args...), Options{
-			Name:   "sample",
-			Out:    &out,
-			ErrOut: &stderr,
-			LookupEnv: func(key string) (string, bool) {
-				return home, key == "SAMPLE_HOME"
+		code := Run(
+			context.Background(),
+			append([]string{"--config", filepath.Join(home, "missing.toml")}, args...),
+			Options{
+				Name:   "sample",
+				Out:    &out,
+				ErrOut: &stderr,
+				LookupEnv: func(key string) (string, bool) {
+					return home, key == "SAMPLE_HOME"
+				},
 			},
-		})
+		)
 		require.Zero(t, code, stderr.String())
 		require.Empty(t, stderr.String())
 		_, err := os.Stat(home)

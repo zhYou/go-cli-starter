@@ -45,7 +45,7 @@ run = "go run ./tools/build"
 # lint 检查当前源码、资源和声明；lint:test 验证规则自身，只纳入 check。
 [tasks.lint]
 description = "只读检查格式、源码、双语资源、配置、包文档和版本声明"
-depends = ["lint:i18n", "lint:config", "lint:doc", "lint:versions", "lint:text"]
+depends = ["lint:i18n", "lint:config", "lint:doc", "lint:style", "lint:versions", "lint:text"]
 run = ["golangci-lint fmt --diff --color=never", "golangci-lint run --allow-serial-runners"]
 
 [tasks."lint:i18n"]
@@ -59,6 +59,10 @@ run = "go run ./tools/lint config"
 [tasks."lint:doc"]
 description = "检查各平台正式 Go 包的 doc.go 布局与有效包说明"
 run = "go run ./tools/lint doc"
+
+[tasks."lint:style"]
+description = "检查结构体字段逐项声明"
+run = "go run ./tools/lint style"
 
 [tasks."lint:versions"]
 description = "检查工具、模块、CI 和文档的版本声明一致性"

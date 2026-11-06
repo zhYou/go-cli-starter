@@ -13,6 +13,8 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/stretchr/testify/require"
+
 	"golang.org/x/sys/windows"
 )
 
@@ -63,7 +65,8 @@ func TestWindowsEnvironmentAndArgumentEscaping(t *testing.T) {
 				env = append(env, item)
 			}
 		}
-		options.Env = append(env, "", "VALUE=old", "vAlUe=new", "")
+		env = append(env, "", "VALUE=old", "vAlUe=new", "")
+		options.Env = env
 		if explicitEmpty {
 			options.Env = append(options.Env, "SystemRoot=")
 		}
@@ -81,9 +84,9 @@ func TestWindowsEnvironmentAndArgumentEscaping(t *testing.T) {
 		}
 		var root, value string
 		var gotArgs []string
-		_ = json.Unmarshal(raw[0], &root)
-		_ = json.Unmarshal(raw[2], &value)
-		_ = json.Unmarshal(raw[3], &gotArgs)
+		require.NoError(t, json.Unmarshal(raw[0], &root))
+		require.NoError(t, json.Unmarshal(raw[2], &value))
+		require.NoError(t, json.Unmarshal(raw[3], &gotArgs))
 		if root != expected || string(raw[1]) != "true" || value != "new" || !reflect.DeepEqual(gotArgs, args) {
 			t.Fatalf("环境/argv: %s", r.Stdout)
 		}
@@ -91,18 +94,27 @@ func TestWindowsEnvironmentAndArgumentEscaping(t *testing.T) {
 }
 
 func TestWindowsHandleWhitelistAndCleanup(t *testing.T) {
-	event, err := windows.CreateEvent(&windows.SecurityAttributes{Length: uint32(unsafe.Sizeof(windows.SecurityAttributes{})), InheritHandle: 1}, 0, 0, nil)
+	event, err := windows.CreateEvent(
+		&windows.SecurityAttributes{Length: uint32(unsafe.Sizeof(windows.SecurityAttributes{})), InheritHandle: 1},
+		0,
+		0,
+		nil,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		_ = windows.CloseHandle(event)
+		require.NoError(t, windows.CloseHandle(event))
 	}()
 	call, options := windowsHelper(t, "handle", strconv.FormatUint(uint64(event), 10))
 	if err = Run(t.Context(), call, options); err != nil {
 		t.Fatalf("泄漏了无关可继承句柄: %v", err)
 	}
-	if status, waitErr := windows.WaitForSingleObject(event, 0); waitErr != nil || status != uint32(windows.WAIT_TIMEOUT) {
+	if status, waitErr := windows.WaitForSingleObject(
+		event,
+		0,
+	); waitErr != nil ||
+		status != uint32(windows.WAIT_TIMEOUT) {
 		t.Fatalf("继承了白名单外事件: status=%d err=%v", status, waitErr)
 	}
 	baseline := processHandleCount(t)

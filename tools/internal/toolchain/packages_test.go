@@ -9,7 +9,12 @@ import (
 )
 
 func TestInstalledPackageVersions(t *testing.T) {
-	for _, layout := range []struct{ key, relative, data, version string }{
+	for _, layout := range []struct {
+		key      string
+		relative string
+		data     string
+		version  string
+	}{
 		{"npm:markdownlint-cli2", "node_modules/markdownlint-cli2/package.json", `{"name":"markdownlint-cli2","version":"0.24.0"}`, "0.24.0"},
 		{"npm:@prettier/plugin-xml", "node_modules/@prettier/plugin-xml/package.json", `{"name":"@prettier/plugin-xml","version":"3.4.2"}`, "3.4.2"},
 		{"npm:prettier-plugin-toml", "lib/node_modules/prettier-plugin-toml/package.json", `{"name":"prettier-plugin-toml","version":"4.1.0"}`, "4.1.0"},

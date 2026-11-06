@@ -19,7 +19,8 @@ func TestVersionJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &got); err != nil {
 		t.Fatal(err)
 	}
-	if code != 0 || got["version"] != "v1.2.3" || got["commit"] != "abc123" || got["name"] != "testcli" || errOut != "" {
+	if code != 0 || got["version"] != "v1.2.3" || got["commit"] != "abc123" || got["name"] != "testcli" ||
+		errOut != "" {
 		t.Fatalf("code=%d result=%v stderr=%q", code, got, errOut)
 	}
 }
@@ -30,7 +31,12 @@ func TestVersionRenderingFailureLeavesStdoutEmpty(t *testing.T) {
 		return bundle, nil
 	}
 	var out, stderr bytes.Buffer
-	code := run(context.Background(), []string{"version"}, Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv}, loader)
+	code := run(
+		context.Background(),
+		[]string{"version"},
+		Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv},
+		loader,
+	)
 	require.Equal(t, 1, code, stderr.String())
 	require.Empty(t, out.String())
 	require.Contains(t, stderr.String(), "cli.version_text")
@@ -38,7 +44,13 @@ func TestVersionRenderingFailureLeavesStdoutEmpty(t *testing.T) {
 
 // 翻译中的合法字面模板分隔符及元数据必须只渲染一次。
 func TestVersionFlagRendersLiteralTextOnce(t *testing.T) {
-	for _, tc := range []struct{ name, template, nameValue, version, want string }{
+	for _, tc := range []struct {
+		name      string
+		template  string
+		nameValue string
+		version   string
+		want      string
+	}{
 		{"opening delimiter", `prefix {{"{{"}}`, "app", "v1", "prefix {{\n"},
 		{"literal field", `prefix {{"{{.Missing}}"}}`, "app", "v1", "prefix {{.Missing}}\n"},
 		{"actual metadata", `{{.Name}} {{.Version}}`, "app{{.Name}}", "v{{.Missing}}", "app{{.Name}} v{{.Missing}}\n"},
@@ -49,9 +61,20 @@ func TestVersionFlagRendersLiteralTextOnce(t *testing.T) {
 			var out, stderr bytes.Buffer
 			var code int
 			require.NotPanics(t, func() {
-				code = run(context.Background(), []string{"--version"}, Options{Name: tc.nameValue, Version: tc.version, Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv}, func() (*messages.Bundle, error) {
-					return bundle, nil
-				})
+				code = run(
+					context.Background(),
+					[]string{"--version"},
+					Options{
+						Name:      tc.nameValue,
+						Version:   tc.version,
+						Out:       &out,
+						ErrOut:    &stderr,
+						LookupEnv: noFixtureEnv,
+					},
+					func() (*messages.Bundle, error) {
+						return bundle, nil
+					},
+				)
 			})
 			require.Zero(t, code, stderr.String())
 			require.Equal(t, tc.want, out.String())
@@ -63,9 +86,14 @@ func TestVersionFlagRendersLiteralTextOnce(t *testing.T) {
 func TestVersionFlagRenderingFailureLeavesStdoutEmpty(t *testing.T) {
 	bundle := catalogFixture(t, "en", "cli.version_template", "other = \"prefix {{.Missing}}\"\n")
 	var out, stderr bytes.Buffer
-	code := run(context.Background(), []string{"--version"}, Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv}, func() (*messages.Bundle, error) {
-		return bundle, nil
-	})
+	code := run(
+		context.Background(),
+		[]string{"--version"},
+		Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv},
+		func() (*messages.Bundle, error) {
+			return bundle, nil
+		},
+	)
 	require.Equal(t, 1, code, stderr.String())
 	require.Empty(t, out.String())
 	require.Contains(t, stderr.String(), "cli.version_template")
@@ -82,11 +110,19 @@ func TestVersionUsesExecutingCommandMetadata(t *testing.T) {
 		{[]string{"child{{.Name}}", "grandchild", "--version"}, "prefix {{ grandchild grand-v3\n"},
 	} {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
-			bundle := catalogFixture(t, "en", "cli.version_template", "other = "+strconv.Quote(`prefix {{"{{"}} {{.Name}} {{.Version}}`)+"\n")
+			bundle := catalogFixture(
+				t,
+				"en",
+				"cli.version_template",
+				"other = "+strconv.Quote(`prefix {{"{{"}} {{.Name}} {{.Version}}`)+"\n",
+			)
 			var out bytes.Buffer
-			root, call, err := buildRoot(defaults(Options{Name: "parent", Version: "parent-v1", Out: &out, LookupEnv: noFixtureEnv}), func() (*messages.Bundle, error) {
-				return bundle, nil
-			})
+			root, call, err := buildRoot(
+				defaults(Options{Name: "parent", Version: "parent-v1", Out: &out, LookupEnv: noFixtureEnv}),
+				func() (*messages.Bundle, error) {
+					return bundle, nil
+				},
+			)
 			require.NoError(t, err)
 			child := &cobra.Command{
 				Use:     "child{{.Name}}",

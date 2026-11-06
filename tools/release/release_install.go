@@ -27,7 +27,7 @@ func verifyRelease(dist string) error {
 	return verifyArchiveInstall(dist, snapshot)
 }
 
-func verifyArchiveInstall(dist string, snapshot *releaseSnapshot) error {
+func verifyArchiveInstall(dist string, snapshot *releaseSnapshot) (resultErr error) {
 	metadataPath, err := releaseFile(dist, "metadata.json")
 	if err != nil {
 		return err
@@ -38,8 +38,9 @@ func verifyArchiveInstall(dist string, snapshot *releaseSnapshot) error {
 		return err
 	}
 	var metadata struct {
-		Name            string `json:"project_name"`
-		Version, Commit string
+		Name    string `json:"project_name"`
+		Version string
+		Commit  string
 	}
 	if err := json.Unmarshal(data, &metadata); err != nil {
 		return err
@@ -98,7 +99,7 @@ func verifyArchiveInstall(dist string, snapshot *releaseSnapshot) error {
 		return err
 	}
 	defer func() {
-		_ = os.RemoveAll(root)
+		resultErr = errors.Join(resultErr, os.RemoveAll(root))
 	}()
 	archiveURL := (&url.URL{Scheme: "file", Path: filepath.ToSlash(archive)}).String()
 	// 错误摘要必须先在全新 data/cache 中失败；正确安装使用另一套目录，避免缓存掩盖校验。
@@ -111,7 +112,13 @@ func verifyArchiveInstall(dist string, snapshot *releaseSnapshot) error {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return err
 		}
-		config := fmt.Sprintf("[settings]\nauto_install = false\nexec_auto_install = false\n[tools.\"http:%s\"]\nversion = %q\nurl = %q\nchecksum = %q\n", appName, metadata.Version, archiveURL, "sha256:"+expected)
+		config := fmt.Sprintf(
+			"[settings]\nauto_install = false\nexec_auto_install = false\n[tools.\"http:%s\"]\nversion = %q\nurl = %q\nchecksum = %q\n",
+			appName,
+			metadata.Version,
+			archiveURL,
+			"sha256:"+expected,
+		)
 		if err := os.WriteFile(filepath.Join(dir, "mise.toml"), []byte(config), 0o600); err != nil {
 			return err
 		}
@@ -176,5 +183,17 @@ func isolatedMiseEnv(dir string) []string {
 	} {
 		env = append(env, key+"="+filepath.Join(dir, suffix))
 	}
-	return append(env, "PWD="+dir, "MISE_CEILING_PATHS="+filepath.Dir(dir), "MISE_TRUSTED_CONFIG_PATHS="+dir, "MISE_YES=1", "MISE_COLOR=0", "MISE_AUTO_INSTALL=0", "MISE_EXEC_AUTO_INSTALL=0", "MISE_NOT_FOUND_AUTO_INSTALL=0", "MISE_SELF_UPDATE_AVAILABLE=0", paths.EnvPrefix(appName)+"_HOME="+filepath.Join(dir, "app-home"))
+	return append(
+		env,
+		"PWD="+dir,
+		"MISE_CEILING_PATHS="+filepath.Dir(dir),
+		"MISE_TRUSTED_CONFIG_PATHS="+dir,
+		"MISE_YES=1",
+		"MISE_COLOR=0",
+		"MISE_AUTO_INSTALL=0",
+		"MISE_EXEC_AUTO_INSTALL=0",
+		"MISE_NOT_FOUND_AUTO_INSTALL=0",
+		"MISE_SELF_UPDATE_AVAILABLE=0",
+		paths.EnvPrefix(appName)+"_HOME="+filepath.Join(dir, "app-home"),
+	)
 }

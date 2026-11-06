@@ -43,7 +43,12 @@ func TestBatchFirstCauseSurvivesCleanup(t *testing.T) {
 			finished := make(chan struct{})
 			go func() {
 				defer close(finished)
-				items, err := RunBatch(ctx, []Invocation{call, failure, call}, options, BatchOptions{Concurrency: 2, FailFast: true})
+				items, err := RunBatch(
+					ctx,
+					[]Invocation{call, failure, call},
+					options,
+					BatchOptions{Concurrency: 2, FailFast: true},
+				)
 				done <- outcome{items, err}
 			}()
 			t.Cleanup(func() {
@@ -81,11 +86,13 @@ func TestBatchFirstCauseSurvivesCleanup(t *testing.T) {
 			if !errors.As(result.items[1].Err, &exit) || exit.ExitCode() != 7 {
 				t.Fatalf("未保留真实失败: %+v", result.items)
 			}
-			if result.items[0].Status != Canceled || !errors.Is(result.items[0].Err, context.Canceled) || result.items[2].Status != Skipped {
+			if result.items[0].Status != Canceled || !errors.Is(result.items[0].Err, context.Canceled) ||
+				result.items[2].Status != Skipped {
 				t.Fatalf("单项状态/错误链: %+v", result.items)
 			}
 			if failureFirst {
-				if result.err == nil || errors.Is(result.err, context.Canceled) || errors.Is(result.err, context.DeadlineExceeded) {
+				if result.err == nil || errors.Is(result.err, context.Canceled) ||
+					errors.Is(result.err, context.DeadlineExceeded) {
 					t.Fatalf("后到父取消覆盖普通首因: %v", result.err)
 				}
 				if !errors.As(result.err, &exit) || exit.ExitCode() != 7 {
@@ -107,7 +114,12 @@ func TestBatchImmediateItemDeadlineIsNotSkipped(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			call, options := helper(t, "bytes")
-			results, err := RunBatch(t.Context(), []Invocation{call, call, call}, options, BatchOptions{Concurrency: 1, ItemTimeout: time.Nanosecond, FailFast: failFast})
+			results, err := RunBatch(
+				t.Context(),
+				[]Invocation{call, call, call},
+				options,
+				BatchOptions{Concurrency: 1, ItemTimeout: time.Nanosecond, FailFast: failFast},
+			)
 			if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				t.Fatalf("自身期限应汇总为普通失败: %v", err)
 			}
@@ -118,7 +130,8 @@ func TestBatchImmediateItemDeadlineIsNotSkipped(t *testing.T) {
 					}
 					continue
 				}
-				if result.Status != Canceled || !errors.Is(result.Err, context.DeadlineExceeded) || len(result.Stdout) != 0 {
+				if result.Status != Canceled || !errors.Is(result.Err, context.DeadlineExceeded) ||
+					len(result.Stdout) != 0 {
 					t.Fatalf("获名额后的自身期限被吞掉: %+v", result)
 				}
 			}
@@ -151,7 +164,7 @@ func TestBatchOrderCollectAll(t *testing.T) {
 	failed.Args = []string{"-test.run=^TestHelperProcess$", "--", "exit"}
 	items := []Invocation{first, failed, second}
 	// 顺序与 collect-all 由文件门闩控制，不对成功进程施加短期限。
-	done := startBatch(t, t.Context(), items, options, BatchOptions{Concurrency: 1})
+	done := startBatch(t.Context(), t, items, options, BatchOptions{Concurrency: 1})
 	waitMarker(t, firstReady)
 	if err := os.WriteFile(firstGate, nil, 0o600); err != nil {
 		t.Fatal(err)
@@ -165,22 +178,36 @@ func TestBatchOrderCollectAll(t *testing.T) {
 	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("整体分类 %v", err)
 	}
-	if results[0].Status != Succeeded || string(results[0].Stdout) != "first" || results[1].Status != Failed || results[1].ExitCode != 7 || results[2].Status != Succeeded || string(results[2].Stdout) != "second" {
+	if results[0].Status != Succeeded || string(results[0].Stdout) != "first" || results[1].Status != Failed ||
+		results[1].ExitCode != 7 ||
+		results[2].Status != Succeeded ||
+		string(results[2].Stdout) != "second" {
 		t.Fatalf("顺序 %+v", results)
 	}
 }
 
 func TestBatchItemTimeoutStartsAfterSlot(t *testing.T) {
 	blocked, options := helper(t, "gate-output")
-	blocked.Args = append(blocked.Args, filepath.Join(options.Dir, "ready"), filepath.Join(options.Dir, "never-release"), "never")
+	blocked.Args = append(
+		blocked.Args,
+		filepath.Join(options.Dir, "ready"),
+		filepath.Join(options.Dir, "never-release"),
+		"never",
+	)
 	next := blocked
 	next.Args = []string{"-test.run=^TestHelperProcess$", "--", "sleep", "0s", "after"}
 	// 第一项等待永不打开的门闩并用尽期限，下一项获得名额后才开始自己的计时。
-	results, err := RunBatch(t.Context(), []Invocation{blocked, next}, options, BatchOptions{Concurrency: 1, ItemTimeout: time.Second})
+	results, err := RunBatch(
+		t.Context(),
+		[]Invocation{blocked, next},
+		options,
+		BatchOptions{Concurrency: 1, ItemTimeout: time.Second},
+	)
 	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("整体分类 %v", err)
 	}
-	if results[0].Status != Canceled || !errors.Is(results[0].Err, context.DeadlineExceeded) || len(results[0].Stdout) != 0 {
+	if results[0].Status != Canceled || !errors.Is(results[0].Err, context.DeadlineExceeded) ||
+		len(results[0].Stdout) != 0 {
 		t.Fatalf("单项超时 %+v", results[0])
 	}
 	if results[1].Status != Succeeded || results[1].Err != nil || string(results[1].Stdout) != "after" {
@@ -192,7 +219,12 @@ func TestBatchFailFastAndParentCancellation(t *testing.T) {
 	fail, options := helper(t, "exit")
 	sleep := fail
 	sleep.Args = []string{"-test.run=^TestHelperProcess$", "--", "sleep", "1m", "never"}
-	results, err := RunBatch(t.Context(), []Invocation{fail, sleep, sleep}, options, BatchOptions{Concurrency: 1, FailFast: true})
+	results, err := RunBatch(
+		t.Context(),
+		[]Invocation{fail, sleep, sleep},
+		options,
+		BatchOptions{Concurrency: 1, FailFast: true},
+	)
 	if err == nil || errors.Is(err, context.Canceled) || results[1].Status != Skipped || results[2].Status != Skipped {
 		t.Fatalf("fail-fast %v %+v", err, results)
 	}
@@ -209,11 +241,15 @@ func TestBatchConcurrencyBound(t *testing.T) {
 	items := make([]Invocation, 6)
 	for i := range items {
 		items[i] = call
-		items[i].Args = append(append([]string{}, call.Args...), filepath.Join(options.Dir, fmt.Sprintf("ready-%d", i)), filepath.Join(options.Dir, fmt.Sprintf("gate-%d", i/2)))
+		items[i].Args = append(
+			append([]string{}, call.Args...),
+			filepath.Join(options.Dir, fmt.Sprintf("ready-%d", i)),
+			filepath.Join(options.Dir, fmt.Sprintf("gate-%d", i/2)),
+		)
 	}
-	done := startBatch(t, t.Context(), items, options, BatchOptions{Concurrency: 2})
-	for wave := 0; wave < 3; wave++ {
-		for slot := 0; slot < 2; slot++ {
+	done := startBatch(t.Context(), t, items, options, BatchOptions{Concurrency: 2})
+	for wave := range 3 {
+		for slot := range 2 {
 			waitMarker(t, filepath.Join(options.Dir, fmt.Sprintf("ready-%d", wave*2+slot)))
 		}
 		if err := os.WriteFile(filepath.Join(options.Dir, fmt.Sprintf("gate-%d", wave)), nil, 0o600); err != nil {
@@ -255,7 +291,13 @@ func TestConcurrentFailFastKeepsItemCauseOnly(t *testing.T) {
 	failure.Args = append(failure.Args, failureReady, gate)
 	sleeping := failure
 	sleeping.Args = []string{"-test.run=^TestHelperProcess$", "--", "ready-sleep", ready, "1m", "never"}
-	done := startBatch(t, t.Context(), []Invocation{sleeping, failure, sleeping}, options, BatchOptions{Concurrency: 2, FailFast: true})
+	done := startBatch(
+		t.Context(),
+		t,
+		[]Invocation{sleeping, failure, sleeping},
+		options,
+		BatchOptions{Concurrency: 2, FailFast: true},
+	)
 	waitMarker(t, ready)
 	waitMarker(t, failureReady)
 	if err := os.WriteFile(gate, nil, 0o600); err != nil {
@@ -264,10 +306,14 @@ func TestConcurrentFailFastKeepsItemCauseOnly(t *testing.T) {
 	result := awaitBatch(t, done)
 	results, err := result.items, result.err
 	var exit *exec.ExitError
-	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || !errors.As(err, &exit) || exit.ExitCode() != 7 {
+	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) ||
+		!errors.As(err, &exit) ||
+		exit.ExitCode() != 7 {
 		t.Fatalf("整体错误 %v", err)
 	}
-	if results[0].Status != Canceled || !errors.Is(results[0].Err, context.Canceled) || results[1].Status != Failed || results[1].ExitCode != 7 || results[2].Status != Skipped {
+	if results[0].Status != Canceled || !errors.Is(results[0].Err, context.Canceled) || results[1].Status != Failed ||
+		results[1].ExitCode != 7 ||
+		results[2].Status != Skipped {
 		t.Fatalf("派生取消 %+v", results)
 	}
 }
@@ -279,12 +325,15 @@ func TestActiveParentCancelStopsQueueAndRetainsCause(t *testing.T) {
 	ctx, cancel := context.WithCancelCause(t.Context())
 	defer cancel(nil)
 	cause := errors.New("父调用终止")
-	done := startBatch(t, ctx, []Invocation{call, call, call}, options, BatchOptions{Concurrency: 1})
+	done := startBatch(ctx, t, []Invocation{call, call, call}, options, BatchOptions{Concurrency: 1})
 	waitMarker(t, ready)
 	cancel(cause)
 	result := awaitBatch(t, done)
 	results, err := result.items, result.err
-	if !errors.Is(err, context.Canceled) || !errors.Is(err, cause) || results[0].Status != Canceled || !errors.Is(results[0].Err, cause) || results[1].Status != Skipped || results[2].Status != Skipped {
+	if !errors.Is(err, context.Canceled) || !errors.Is(err, cause) || results[0].Status != Canceled ||
+		!errors.Is(results[0].Err, cause) ||
+		results[1].Status != Skipped ||
+		results[2].Status != Skipped {
 		t.Fatalf("父取消 %v %+v", err, results)
 	}
 }

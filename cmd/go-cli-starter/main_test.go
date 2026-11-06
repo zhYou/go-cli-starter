@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -12,6 +13,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/stretchr/testify/require"
 	"github.com/zhYou/go-cli-starter/internal/app/cli"
@@ -29,18 +32,22 @@ func TestSignalHelper(t *testing.T) {
 		notify = func() (context.Context, context.CancelFunc) {
 			ctx, cancel := context.WithCancel(context.Background())
 			go func() {
-				_, _ = os.Stdin.Read(make([]byte, 1))
+				if _, err := os.Stdin.Read(make([]byte, 1)); err != nil {
+					t.Error(err)
+				}
 				cancel()
 			}()
 			return ctx, cancel
 		}
 	}
 	deps := cli.Dependencies{
-		LoadConfig: func(config.Options) (config.Config, error) {
+		LoadConfig: func(context.Context, config.Options) (config.Config, error) {
 			return config.Defaults(), nil
 		},
 		Greet: func(ctx context.Context, _ greeting.Options) (greeting.Result, error) {
-			_, _ = io.WriteString(os.Stderr, "就绪\n")
+			if _, err := io.WriteString(os.Stderr, "就绪\n"); err != nil {
+				t.Error(err)
+			}
 			<-ctx.Done()
 			return greeting.Result{}, ctx.Err()
 		},
@@ -61,7 +68,8 @@ func TestMainSignalCancellation(t *testing.T) {
 			environment = append(environment, entry)
 		}
 	}
-	cmd.Env = append(environment, "CLI_SIGNAL_HELPER=1", prefix+"HOME="+t.TempDir())
+	environment = append(environment, "CLI_SIGNAL_HELPER=1", prefix+"HOME="+t.TempDir())
+	cmd.Env = environment
 	cmd.WaitDelay = time.Second
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -81,8 +89,16 @@ func TestMainSignalCancellation(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		cancel()
-		_ = stdin.Close()
-		_ = cmd.Process.Kill()
+		if err := stdin.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
+			t.Error(err)
+		}
+		// Wait 已完成时 Windows 会释放句柄；此时不再重复终止进程。
+		if cmd.ProcessState == nil {
+			if err := cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+				t.Error(err)
+			}
+		}
+		//nolint:errcheck // 主测试断言进程结果；早退收尾可能产生主动终止错误，仍必须等待进程退出。
 		_ = waitChild()
 		select {
 		case <-readDone:
@@ -94,7 +110,8 @@ func TestMainSignalCancellation(t *testing.T) {
 	ready := make(chan string, 1)
 	go func() {
 		defer close(readDone)
-		line, _ := reader.ReadString('\n')
+		line, err := reader.ReadString('\n')
+		assert.NoError(t, err)
 		ready <- line
 	}()
 	select {

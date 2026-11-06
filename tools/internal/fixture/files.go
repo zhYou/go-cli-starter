@@ -1,6 +1,7 @@
 package fixture
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -8,7 +9,7 @@ import (
 )
 
 // CopyFile 只复制普通文件并保留权限，不覆盖已存在的目标。
-func CopyFile(source, target string) error {
+func CopyFile(source, target string) (resultErr error) {
 	info, err := os.Lstat(source)
 	if err != nil {
 		return err
@@ -26,7 +27,7 @@ func CopyFile(source, target string) error {
 		return err
 	}
 	defer func() {
-		_ = in.Close()
+		resultErr = errors.Join(resultErr, in.Close())
 	}()
 	//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
 	out, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL, info.Mode().Perm())

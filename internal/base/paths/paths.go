@@ -12,13 +12,17 @@ import (
 
 // Directories 保存应用私有配置、数据、状态与缓存目录。
 type Directories struct {
-	Config, Data, State, Cache string
+	Config string
+	Data   string
+	State  string
+	Cache  string
 }
 
 // Options 声明本次调用的显式依赖与覆盖选项。
 type Options struct {
-	AppName, GOOS string
-	LookupEnv     func(string) (string, bool)
+	AppName   string
+	GOOS      string
+	LookupEnv func(string) (string, bool)
 }
 
 // EnvPrefix 从应用名生成稳定的环境变量前缀。
@@ -43,9 +47,7 @@ func Resolve(opts Options) (Directories, error) {
 		}
 		return v
 	}
-	join := func(parts ...string) string {
-		return path.Join(parts...)
-	}
+	join := path.Join
 	absolute := func(s string) bool {
 		return strings.HasPrefix(s, "/")
 	}
@@ -65,17 +67,20 @@ func Resolve(opts Options) (Directories, error) {
 			if len(normalized) > 2 && normalized[1] == ':' && normalized[2] == '/' {
 				return normalized[0] >= 'A' && normalized[0] <= 'Z' || normalized[0] >= 'a' && normalized[0] <= 'z'
 			}
-			if strings.HasPrefix(normalized, "//") {
-				parts := strings.Split(strings.TrimPrefix(normalized, "//"), "/")
+			if after, ok := strings.CutPrefix(normalized, "//"); ok {
+				parts := strings.Split(after, "/")
 				return len(parts) >= 2 && parts[0] != "" && parts[1] != ""
 			}
 			return false
 		}
 	}
 	fail := func(field string) (Directories, error) {
-		return Directories{}, (fault.Definition{Code: "paths.absolute", Kind: fault.Configuration}).New(fault.WithParams(fault.Params{"Field": field}))
+		return Directories{}, (fault.Definition{Code: "paths.absolute", Kind: fault.Configuration}).New(
+			fault.WithParams(fault.Params{"Field": field}),
+		)
 	}
-	if opts.AppName == "" || opts.AppName == "." || opts.AppName == ".." || strings.ContainsAny(opts.AppName, "/"+string(rune(92))) {
+	if opts.AppName == "" || opts.AppName == "." || opts.AppName == ".." ||
+		strings.ContainsAny(opts.AppName, "/"+string(rune(92))) {
 		return fail("AppName")
 	}
 	homeKey := EnvPrefix(opts.AppName) + "_HOME"
@@ -94,7 +99,12 @@ func Resolve(opts Options) (Directories, error) {
 		if !absolute(local) {
 			return fail("LOCALAPPDATA")
 		}
-		return Directories{join(roaming, opts.AppName), join(local, opts.AppName, dataDirectory), join(local, opts.AppName, stateDirectory), join(local, opts.AppName, cacheDirectory)}, nil
+		return Directories{
+			join(roaming, opts.AppName),
+			join(local, opts.AppName, dataDirectory),
+			join(local, opts.AppName, stateDirectory),
+			join(local, opts.AppName, cacheDirectory),
+		}, nil
 	}
 	home := env(homeEnvironment)
 	if platform == "darwin" {
@@ -102,9 +112,17 @@ func Resolve(opts Options) (Directories, error) {
 			return fail(homeEnvironment)
 		}
 		support := join(home, "Library", "Application Support", opts.AppName)
-		return Directories{support, join(support, dataDirectory), join(support, stateDirectory), join(home, "Library", "Caches", opts.AppName)}, nil
+		return Directories{
+			support,
+			join(support, dataDirectory),
+			join(support, stateDirectory),
+			join(home, "Library", "Caches", opts.AppName),
+		}, nil
 	}
-	roots := []struct{ env, suffix string }{{"XDG_CONFIG_HOME", ".config"}, {"XDG_DATA_HOME", ".local/share"}, {"XDG_STATE_HOME", ".local/state"}, {"XDG_CACHE_HOME", ".cache"}}
+	roots := []struct {
+		env    string
+		suffix string
+	}{{"XDG_CONFIG_HOME", ".config"}, {"XDG_DATA_HOME", ".local/share"}, {"XDG_STATE_HOME", ".local/state"}, {"XDG_CACHE_HOME", ".cache"}}
 	values := make([]string, 4)
 	for i, root := range roots {
 		value := env(root.env)

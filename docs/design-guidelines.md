@@ -82,10 +82,10 @@ var override *string
 if cmd.Flags().Changed("log-level") {
     override = &logLevel
 }
-cfg, err := config.Load(config.Options{
+cfg, err := config.Load(cmd.Context(), config.Options{
     AppName: "go-cli-starter", Path: configPath,
     Explicit: cmd.Flags().Changed("config"), LogLevel: override,
-    LookupEnv: lookupEnv, Context: cmd.Context(), Validator: validator,
+    LookupEnv: lookupEnv, Validator: validator,
 })
 ```
 
@@ -192,7 +192,7 @@ call.logger.WithContext(ctx).Debugw(call.localizer.Text("cli.greet_log", nil), "
 工具事件只记录操作、程序名、结果、耗时与结构化错误，不记录 argv、环境和原始输出。
 新领域事件可实现 `logging.Event` 的 Emit 方法。日志门面没有 Fatal/Panic，业务不得绕过入口退出进程。
 
-并发工作通过 `Session.Go(func(context.Context)) bool` 登记；Finish 开始后拒绝新任务。
+并发工作通过 `Session.Go(context.Context, func(context.Context)) bool` 登记，工作接收本次显式传入的 Context；Finish 开始后拒绝新任务。
 工作须尊重 Context 并自行结束。Finish 幂等等待已登记工作，记录结束事件，结束根 span，
 用 `context.WithoutCancel` 加独立 shutdown_timeout 排空 Trace，再 Sync 自有 logger、关闭自有文件。
 不能在业务取消后直接复用已取消 ctx 进行导出，也不能丢下工作后提前关闭 writer。

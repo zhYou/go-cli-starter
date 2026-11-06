@@ -65,7 +65,10 @@ func describeCommand(cmd *cobra.Command, registry *resultRegistry) commandSchema
 				return
 			}
 			required := len(flag.Annotations[cobra.BashCompOneRequiredFlag]) > 0
-			result.Flags = append(result.Flags, flagSchema{flag.Name, flag.Value.Type(), flag.Usage, flag.DefValue, required, inherited})
+			result.Flags = append(
+				result.Flags,
+				flagSchema{flag.Name, flag.Value.Type(), flag.Usage, flag.DefValue, required, inherited},
+			)
 		}
 	}
 	cmd.LocalFlags().VisitAll(add(false))

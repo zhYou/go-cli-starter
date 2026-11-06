@@ -22,15 +22,29 @@ const TemplateName = "go-cli-starter"
 // 模板只管理这些文件中的应用标识。
 // 初始化项目时保留本实现及其测试夹具，避免改动初始化基准。
 var managedFiles = []string{
+	".golangci.yml",
 	"cmd/" + TemplateName + "/doc.go",
 	"internal/app/cli/completion_protocol.go",
-	"internal/app/cli/completion_protocol_test.go", "internal/app/cli/doctor.go", "internal/app/cli/doctor_test.go",
-	".github/workflows/ci.yml", ".github/workflows/release.yml",
-	"tools/internal/acceptance/acceptance.go", "tools/release/constants.go", "tools/release/release_install.go",
-	"tools/doctor/doctor.go", "tools/doctor/doctor_test.go", "tools/lint/rules.go", "internal/app/cli/fuzz_test.go",
-	"internal/app/cli/bindings.go", "internal/app/cli/version.go",
-	"internal/locales/catalog.go", "internal/locales/catalog_test.go",
-	"tools/lint/config.go", "tools/lint/config_test.go", "tools/lint/i18n.go", "tools/lint/i18n_test.go",
+	"internal/app/cli/completion_protocol_test.go",
+	"internal/app/cli/doctor.go",
+	"internal/app/cli/doctor_test.go",
+	".github/workflows/ci.yml",
+	".github/workflows/release.yml",
+	"tools/internal/acceptance/acceptance.go",
+	"tools/release/constants.go",
+	"tools/release/release_install.go",
+	"tools/doctor/doctor.go",
+	"tools/doctor/doctor_test.go",
+	"tools/lint/rules.go",
+	"internal/app/cli/fuzz_test.go",
+	"internal/app/cli/bindings.go",
+	"internal/app/cli/version.go",
+	"internal/locales/catalog.go",
+	"internal/locales/catalog_test.go",
+	"tools/lint/config.go",
+	"tools/lint/config_test.go",
+	"tools/lint/i18n.go",
+	"tools/lint/i18n_test.go",
 	"internal/command/batch.go",
 	"internal/command/errors.go",
 	"internal/command/process.go",
@@ -48,15 +62,24 @@ var managedFiles = []string{
 	"internal/base/logging/logging.go",
 	"internal/base/telemetry/errors.go",
 	"internal/base/telemetry/session.go",
-	"internal/app/cli/language.go", "internal/app/cli/language_test.go", "internal/app/cli/help.go", "internal/app/cli/discovery.go",
-	"internal/base/messages/messages.go", "internal/base/messages/messages_test.go",
-	"internal/base/paths/paths.go", "internal/base/paths/paths_test.go",
+	"internal/app/cli/language.go",
+	"internal/app/cli/language_test.go",
+	"internal/app/cli/help.go",
+	"internal/app/cli/discovery.go",
+	"internal/base/messages/messages.go",
+	"internal/base/messages/messages_test.go",
+	"internal/base/paths/paths.go",
+	"internal/base/paths/paths_test.go",
 
-	moduleFile, "cmd/" + TemplateName + "/main.go", "cmd/" + TemplateName + "/main_test.go", "internal/app/cli/cli.go",
+	moduleFile,
+	"cmd/" + TemplateName + "/main.go",
+	"cmd/" + TemplateName + "/main_test.go",
+	"internal/app/cli/cli.go",
 	"internal/app/cli/errors.go",
 	"test/integration/integration_test.go",
 	"test/integration/testdata/process/language.txtar",
-	"test/integration/testdata/process/configuration.txtar", "test/integration/testdata/process/discovery.txtar",
+	"test/integration/testdata/process/configuration.txtar",
+	"test/integration/testdata/process/discovery.txtar",
 	"test/integration/testdata/process/usage.txtar",
 	"tools/contract/contracts_test.go",
 	"tools/contract/contracts.go",
@@ -72,9 +95,18 @@ var managedFiles = []string{
 	"internal/base/validation/validation.go",
 	"internal/app/cli/output_test.go",
 	"internal/app/cli/errors_test.go",
-	"internal/base/fault/error_test.go", "tools/template/init.go",
-	"tools/build/build.go", "tools/template/template.go", "mise.toml", ".goreleaser.yaml", "README.md", "AGENTS.md",
-	"configs/config.example.toml", "docs/development.md", "docs/template-upgrades.md", "docs/design-guidelines.md",
+	"internal/base/fault/error_test.go",
+	"tools/template/init.go",
+	"tools/build/build.go",
+	"tools/template/template.go",
+	"mise.toml",
+	".goreleaser.yaml",
+	"README.md",
+	"AGENTS.md",
+	"configs/config.example.toml",
+	"docs/development.md",
+	"docs/template-upgrades.md",
+	"docs/design-guidelines.md",
 	"internal/app/cli/benchmark_test.go",
 	"internal/app/cli/bindings_test.go",
 	"internal/app/cli/help_test.go",
@@ -119,9 +151,9 @@ func Identity(root string) (string, string, error) {
 }
 
 // Initialize 以事务方式重命名模板，并返回变更文件列表。
-func (original *Initializer) Initialize(ctx context.Context, root, module, name string) ([]string, error) {
-	copy := original.defaults()
-	i := &copy
+func (i *Initializer) Initialize(ctx context.Context, root, module, name string) (_ []string, resultErr error) {
+	working := i.defaults()
+	i = &working
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -131,7 +163,7 @@ func (original *Initializer) Initialize(ctx context.Context, root, module, name 
 	if !validModule.MatchString(module) || strings.HasSuffix(module, "/") {
 		return nil, errors.New("无效的 Go 模块路径")
 	}
-	for _, part := range strings.Split(module, "/") {
+	for part := range strings.SplitSeq(module, "/") {
 		if part == "" || part == "." || part == ".." {
 			return nil, errors.New("无效的 Go 模块路径片段")
 		}
@@ -159,7 +191,7 @@ func (original *Initializer) Initialize(ctx context.Context, root, module, name 
 		return nil, err
 	}
 	defer func() {
-		_ = unlock()
+		resultErr = errors.Join(resultErr, unlock())
 	}()
 	if err := i.recover(root, module, name); err != nil {
 		return nil, err
@@ -174,7 +206,14 @@ func (original *Initializer) Initialize(ctx context.Context, root, module, name 
 	if currentModule != TemplateModule || currentName != TemplateName {
 		return nil, errors.New("项目已初始化，拒绝替换现有标识")
 	}
-	replacer := strings.NewReplacer(TemplateModule, module, TemplateName, name, "GO_CLI_STARTER", strings.ToUpper(strings.ReplaceAll(name, "-", "_")))
+	replacer := strings.NewReplacer(
+		TemplateModule,
+		module,
+		TemplateName,
+		name,
+		"GO_CLI_STARTER",
+		strings.ToUpper(strings.ReplaceAll(name, "-", "_")),
+	)
 	var changes []change
 	// 写入文件前先检查所有目标路径。
 	for _, relative := range managedFiles {

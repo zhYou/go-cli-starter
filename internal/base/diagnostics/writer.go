@@ -10,14 +10,16 @@ import (
 
 // Writer 串行写入完整记录，按软阈值轮转，持有自己打开的文件。
 type Writer struct {
-	mu                sync.Mutex
-	root              *os.Root
-	name              string
-	file              *os.File
-	limit, size       int64
-	backups, sequence int
-	closed            bool
-	closeErr          error
+	mu       sync.Mutex
+	root     *os.Root
+	name     string
+	file     *os.File
+	limit    int64
+	size     int64
+	backups  int
+	sequence int
+	closed   bool
+	closeErr error
 }
 
 func newWriter(root *os.Root, name string, limit int64, backups int) (*Writer, error) {
@@ -46,6 +48,27 @@ func (w *Writer) Write(p []byte) (int, error) {
 	n, err := w.file.Write(p)
 	w.size += int64(n)
 	return n, err
+}
+
+// Sync 同步当前文件，关闭后返回 os.ErrClosed。
+func (w *Writer) Sync() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.closed {
+		return os.ErrClosed
+	}
+	return w.file.Sync()
+}
+
+// Close 同步并关闭一次，重复调用返回首次结果。
+func (w *Writer) Close() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if !w.closed {
+		w.closed = true
+		w.closeErr = errors.Join(w.file.Sync(), w.file.Close())
+	}
+	return w.closeErr
 }
 
 func (w *Writer) rotate() error {
@@ -78,25 +101,4 @@ func (w *Writer) rotate() error {
 
 func (w *Writer) segment(sequence int) string {
 	return fmt.Sprintf("%s.%06d.jsonl", strings.TrimSuffix(w.name, ".jsonl"), sequence)
-}
-
-// Sync 同步当前文件，关闭后返回 os.ErrClosed。
-func (w *Writer) Sync() error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	if w.closed {
-		return os.ErrClosed
-	}
-	return w.file.Sync()
-}
-
-// Close 同步并关闭一次，重复调用返回首次结果。
-func (w *Writer) Close() error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	if !w.closed {
-		w.closed = true
-		w.closeErr = errors.Join(w.file.Sync(), w.file.Close())
-	}
-	return w.closeErr
 }

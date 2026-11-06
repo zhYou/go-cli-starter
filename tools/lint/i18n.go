@@ -14,9 +14,10 @@ import (
 
 // templateValue 跟踪根对象与可证明的字符串字面量；未知值不能用于判断根参数。
 type templateValue struct {
-	known, root bool
-	literal     string
-	isLiteral   bool
+	known     bool
+	root      bool
+	literal   string
+	isLiteral bool
 }
 
 type templateAnalyzer struct {
@@ -232,14 +233,23 @@ func (a *templateAnalyzer) collect(node parse.Node, rootDot bool, aliases map[st
 	}
 }
 
-func (a *templateAnalyzer) collectBranches(body, alternative *parse.ListNode, bodyRoot, elseRoot bool, aliases map[string]templateValue) {
+func (a *templateAnalyzer) collectBranches(
+	body, alternative *parse.ListNode,
+	bodyRoot, elseRoot bool,
+	aliases map[string]templateValue,
+) {
 	a.depth++
 	a.collect(body, bodyRoot, maps.Clone(aliases))
 	a.collect(alternative, elseRoot, maps.Clone(aliases))
 	a.depth--
 }
 
-func (a *templateAnalyzer) collectCommand(command *parse.CommandNode, rootDot bool, aliases map[string]templateValue, previous *templateValue) {
+func (a *templateAnalyzer) collectCommand(
+	command *parse.CommandNode,
+	rootDot bool,
+	aliases map[string]templateValue,
+	previous *templateValue,
+) {
 	for _, arg := range command.Args {
 		a.collect(arg, rootDot, aliases)
 	}
@@ -276,7 +286,12 @@ func (a *templateAnalyzer) collectCommand(command *parse.CommandNode, rootDot bo
 }
 
 // bindAliases 跟踪根别名和字面量；禁止跨分支修改外层变量。
-func (a *templateAnalyzer) bindAliases(pipe *parse.PipeNode, rootDot bool, aliases map[string]templateValue, control bool) {
+func (a *templateAnalyzer) bindAliases(
+	pipe *parse.PipeNode,
+	rootDot bool,
+	aliases map[string]templateValue,
+	control bool,
+) {
 	if pipe == nil || len(pipe.Decl) == 0 {
 		return
 	}
@@ -328,7 +343,12 @@ func pipeValue(pipe *parse.PipeNode, rootDot bool, aliases map[string]templateVa
 	return *previous
 }
 
-func commandValue(command *parse.CommandNode, rootDot bool, aliases map[string]templateValue, previous *templateValue) templateValue {
+func commandValue(
+	command *parse.CommandNode,
+	rootDot bool,
+	aliases map[string]templateValue,
+	previous *templateValue,
+) templateValue {
 	if len(command.Args) == 1 && previous == nil {
 		return nodeValue(command.Args[0], rootDot, aliases)
 	}

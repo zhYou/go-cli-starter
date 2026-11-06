@@ -38,7 +38,10 @@ func ReadOrigin(fs afero.Fs, root string) (Origin, error) {
 	if err := json.Unmarshal(data, &origin); err != nil {
 		return origin, err
 	}
-	if origin.FormatVersion != 1 || origin.Template != TemplateModule || !semver.IsValid("v"+origin.TemplateVersion) || origin.SourceCommit == "" || origin.Module == "" || origin.Name == "" {
+	if origin.FormatVersion != 1 || origin.Template != TemplateModule || !semver.IsValid("v"+origin.TemplateVersion) ||
+		origin.SourceCommit == "" ||
+		origin.Module == "" ||
+		origin.Name == "" {
 		return origin, fmt.Errorf("模板来源记录无效")
 	}
 	return origin, nil
@@ -77,7 +80,12 @@ func (i *Initializer) origin(ctx context.Context, root, module, name string) (Or
 	if remote != "https://github.com/zhYou/go-cli-starter" && remote != "git@github.com:zhYou/go-cli-starter" {
 		return origin, nil
 	}
-	if run(gitShow, "HEAD:.template-version") != version || !strings.Contains(run(gitShow, "HEAD:go.mod"), "module "+TemplateModule) || !strings.Contains(run(gitShow, "HEAD:cmd/"+TemplateName+"/main.go"), "appName = "+fmt.Sprintf("%q", TemplateName)) {
+	if run(gitShow, "HEAD:.template-version") != version ||
+		!strings.Contains(run(gitShow, "HEAD:go.mod"), "module "+TemplateModule) ||
+		!strings.Contains(
+			run(gitShow, "HEAD:cmd/"+TemplateName+"/main.go"),
+			"appName = "+fmt.Sprintf("%q", TemplateName),
+		) {
 		return origin, nil
 	}
 	commit := run("rev-parse", "HEAD")

@@ -41,7 +41,10 @@ func TestTemplateLintUsesCopiedTaskAndPropagatesFailure(t *testing.T) {
 			dir := t.TempDir()
 			report := filepath.Join(dir, "lint-report")
 			t.Setenv("LINT_FIXTURE_REPORT", report)
-			config := fmt.Sprintf("[settings]\nauto_install = false\nexec_auto_install = false\ntask.run_auto_install = false\n[tasks.lint]\nrun = %q\n", filepath.FromSlash("./"+probeName))
+			config := fmt.Sprintf(
+				"[settings]\nauto_install = false\nexec_auto_install = false\ntask.run_auto_install = false\n[tasks.lint]\nrun = %q\n",
+				filepath.FromSlash("./"+probeName),
+			)
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "mise.toml"), []byte(config), 0o600))
 			source := fmt.Sprintf(`package main
 import "os"
@@ -116,7 +119,10 @@ func TestTemplateMetadataAndGuidesSurviveRename(t *testing.T) {
 	}
 	//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "docs"), 0o755))
-	require.NoError(t, fixture.CopyFile("../../docs/template-upgrades.md", filepath.Join(dir, "docs/template-upgrades.md")))
+	require.NoError(
+		t,
+		fixture.CopyFile("../../docs/template-upgrades.md", filepath.Join(dir, "docs/template-upgrades.md")),
+	)
 	_, err := scaffold.Initialize(dir, "example.com/copied/tool", "copied")
 	require.NoError(t, err)
 	origin, err := scaffold.ReadOrigin(afero.NewOsFs(), dir)
@@ -136,11 +142,25 @@ func TestInstallVersionLikeCommandNames(t *testing.T) {
 	for _, name := range []string{"v0", "v1", "v02"} {
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
-			require.NoError(t, os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/installfixture\n\ngo 1.27.0\n"), 0o600))
+			require.NoError(
+				t,
+				os.WriteFile(
+					filepath.Join(root, "go.mod"),
+					[]byte("module example.com/installfixture\n\ngo 1.27.0\n"),
+					0o600,
+				),
+			)
 			dir := filepath.Join(root, "cmd", name)
 			//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
 			require.NoError(t, os.MkdirAll(dir, 0o755))
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\nconst appName=\""+name+"\"\nfunc main(){}\n"), 0o600))
+			require.NoError(
+				t,
+				os.WriteFile(
+					filepath.Join(dir, "main.go"),
+					[]byte("package main\nconst appName=\""+name+"\"\nfunc main(){}\n"),
+					0o600,
+				),
+			)
 			require.NoError(t, fixture.PrepareGit(root))
 			project, err := scaffold.Inspect(root)
 			require.NoError(t, err)

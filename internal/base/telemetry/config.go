@@ -21,5 +21,12 @@ type Config struct {
 
 // Defaults 返回默认关闭、启用时有界导出的配置。
 func Defaults() Config {
-	return Config{Exporter: None, ExportTimeout: time.Second, ShutdownTimeout: time.Second, QueueSize: 2048, BatchSize: 512, BatchInterval: 5 * time.Second}
+	return Config{
+		Exporter:        None,
+		ExportTimeout:   time.Second,
+		ShutdownTimeout: time.Second,
+		QueueSize:       2048,
+		BatchSize:       512,
+		BatchInterval:   5 * time.Second,
+	}
 }

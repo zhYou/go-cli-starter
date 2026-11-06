@@ -40,7 +40,8 @@ func TestReleaseSnapshotRejectsMissingOrMismatchedSBOM(t *testing.T) {
 			case "escape":
 				data = append(data, []byte(strings.Repeat("0", 64)+"  ../outside\n")...)
 			case "wrong-document":
-				raw, _ := json.Marshal(map[string]any{"spdxVersion": "SPDX-2.3", "name": "wrong"})
+				raw, err := json.Marshal(map[string]any{"spdxVersion": "SPDX-2.3", "name": "wrong"})
+				require.NoError(t, err)
 				//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 				require.NoError(t, os.WriteFile(filepath.Join(dir, sbom), raw, 0o600))
 				sum := sha256.Sum256(raw)

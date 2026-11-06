@@ -23,7 +23,7 @@ func prepareWindowsIO(streams iostreams.IOStreams) (result *windowsIO, err error
 	result = &windowsIO{}
 	defer func() {
 		if err != nil {
-			result.close()
+			err = errors.Join(err, result.close())
 		}
 	}()
 	input, err := result.input(streams.In)
@@ -55,7 +55,8 @@ func prepareWindowsIO(streams iostreams.IOStreams) (result *windowsIO, err error
 }
 
 func sameWindowsWriter(a, b io.Writer) bool {
-	return reflect.TypeOf(a) == reflect.TypeOf(b) && reflect.TypeOf(a) != nil && reflect.TypeOf(a).Comparable() && a == b
+	return reflect.TypeOf(a) == reflect.TypeOf(b) && reflect.TypeOf(a) != nil && reflect.TypeOf(a).Comparable() &&
+		a == b
 }
 
 func duplicateWindowsHandle(source windows.Handle) (windows.Handle, error) {
@@ -86,21 +87,19 @@ func (streams *windowsIO) input(reader io.Reader) (windows.Handle, error) {
 	if err != nil {
 		return 0, err
 	}
-	handle, err := duplicateWindowsFile(read)
-	_ = read.Close()
+	handle, err := duplicateWindowsPipeEnd(read)
 	if err != nil {
-		_ = write.Close()
-		return 0, err
+		return 0, errors.Join(err, closeWindowsPipe(write))
 	}
 	streams.pipes = append(streams.pipes, write)
 	streams.copies = append(streams.copies, func() error {
 		_, copyErr := io.Copy(write, reader)
-		_ = write.Close()
+		closeErr := closeWindowsPipe(write)
 		// 子进程提前关闭输入与 os/exec 的 stdin 复制语义一致。
 		if errors.Is(copyErr, windows.ERROR_BROKEN_PIPE) || errors.Is(copyErr, windows.ERROR_NO_DATA) {
-			return nil
+			return closeErr
 		}
-		return copyErr
+		return errors.Join(copyErr, closeErr)
 	})
 	return handle, nil
 }
@@ -114,26 +113,20 @@ func (streams *windowsIO) output(writer io.Writer) (windows.Handle, error) {
 		if err != nil {
 			return 0, err
 		}
-		defer func() {
-			_ = file.Close()
-		}()
-		return duplicateWindowsFile(file)
+		return duplicateWindowsPipeEnd(file)
 	}
 	read, write, err := os.Pipe()
 	if err != nil {
 		return 0, err
 	}
-	handle, err := duplicateWindowsFile(write)
-	_ = write.Close()
+	handle, err := duplicateWindowsPipeEnd(write)
 	if err != nil {
-		_ = read.Close()
-		return 0, err
+		return 0, errors.Join(err, closeWindowsPipe(read))
 	}
 	streams.pipes = append(streams.pipes, read)
 	streams.copies = append(streams.copies, func() error {
 		_, copyErr := io.Copy(writer, read)
-		_ = read.Close()
-		return copyErr
+		return errors.Join(copyErr, closeWindowsPipe(read))
 	})
 	return handle, nil
 }
@@ -160,7 +153,7 @@ func (streams *windowsIO) wait(delay time.Duration) error {
 			result = errors.Join(result, err)
 		case <-timer.C:
 			for _, pipe := range streams.pipes {
-				_ = pipe.Close()
+				result = errors.Join(result, closeWindowsPipe(pipe))
 			}
 			// 不关闭借用 reader/writer；任意永久阻塞的自定义 IO 与 os/exec 有相同限制。
 			for ; remaining > 0; remaining-- {
@@ -172,16 +165,41 @@ func (streams *windowsIO) wait(delay time.Duration) error {
 	return result
 }
 
-func (streams *windowsIO) closeChildHandles() {
+func (streams *windowsIO) closeChildHandles() error {
+	var problems []error
 	for _, handle := range streams.handles {
-		_ = windows.CloseHandle(handle)
+		problems = append(problems, windows.CloseHandle(handle))
 	}
 	streams.handles = nil
+	return errors.Join(problems...)
 }
 
-func (streams *windowsIO) close() {
-	streams.closeChildHandles()
+func (streams *windowsIO) close() error {
+	problems := []error{streams.closeChildHandles()}
 	for _, pipe := range streams.pipes {
-		_ = pipe.Close()
+		problems = append(problems, closeWindowsPipe(pipe))
 	}
+	return errors.Join(problems...)
+}
+
+// closeWindowsPipe 允许复制、超时和最终收尾关闭同一个自有管道；其他关闭故障仍须传播。
+func closeWindowsPipe(pipe *os.File) error {
+	err := pipe.Close()
+	if errors.Is(err, os.ErrClosed) {
+		return nil
+	}
+	return err
+}
+
+// duplicateWindowsPipeEnd 转交独立句柄后关闭原端；失败时不遗留已复制的句柄。
+func duplicateWindowsPipeEnd(file *os.File) (windows.Handle, error) {
+	handle, err := duplicateWindowsFile(file)
+	err = errors.Join(err, file.Close())
+	if err != nil {
+		if handle != 0 {
+			err = errors.Join(err, windows.CloseHandle(handle))
+		}
+		return 0, err
+	}
+	return handle, nil
 }

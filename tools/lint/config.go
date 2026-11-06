@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -112,7 +113,7 @@ func checkFile(path string, locale bool) error {
 		return fmt.Errorf("%s: 受管配置仅支持 TOML", path)
 	}
 	if !locale {
-		_, err := config.Load(config.Options{
+		_, err := config.Load(context.Background(), config.Options{
 			Path:     path,
 			Explicit: true,
 			LookupEnv: func(string) (string, bool) {

@@ -33,9 +33,10 @@ func TestSessionUsesDefaultEnglishAndExplicitChinese(t *testing.T) {
 	bundle, err := locales.LoadBundle()
 	require.NoError(t, err)
 	cases := []struct {
-		name          string
-		localizer     *messages.Localizer
-		start, finish string
+		name      string
+		localizer *messages.Localizer
+		start     string
+		finish    string
 	}{
 		{"default", nil, "Command started", "Command finished"},
 		{"chinese", bundle.Localizer("zh-CN"), "命令开始", "命令结束"},
@@ -45,9 +46,15 @@ func TestSessionUsesDefaultEnglishAndExplicitChinese(t *testing.T) {
 			cfg := defaultConfig()
 			cfg.Logging.Output = "stderr"
 			var sink bytes.Buffer
-			ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: &sink, Localizer: tc.localizer}, func(err error) {
-				t.Error(err)
-			})
+			ctx, s := Begin(
+				t.Context(),
+				cfg,
+				logging.RunInfo{},
+				Options{Stderr: &sink, Localizer: tc.localizer},
+				func(err error) {
+					t.Error(err)
+				},
+			)
 			s.Finish(ctx, logging.CommandResult{})
 			lines := bytes.Split(bytes.TrimSpace(sink.Bytes()), []byte("\n"))
 			require.Len(t, lines, 2)
@@ -62,14 +69,22 @@ func TestSessionUsesDefaultEnglishAndExplicitChinese(t *testing.T) {
 }
 
 func TestSessionBrokenDiagnosticsPreserveBusinessFailure(t *testing.T) {
-	bundle, err := messages.NewBundle(fstest.MapFS{"active.en.toml": {Data: []byte("[\"session.started\"]\nother = \"partial {{.Missing}}\"\n")}})
+	bundle, err := messages.NewBundle(
+		fstest.MapFS{"active.en.toml": {Data: []byte("[\"session.started\"]\nother = \"partial {{.Missing}}\"\n")}},
+	)
 	require.NoError(t, err)
 	cfg := defaultConfig()
 	cfg.Logging.Output = "stderr"
 	var sink bytes.Buffer
-	ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: &sink, Localizer: bundle.Localizer("en")}, func(err error) {
-		t.Error(err)
-	})
+	ctx, s := Begin(
+		t.Context(),
+		cfg,
+		logging.RunInfo{},
+		Options{Stderr: &sink, Localizer: bundle.Localizer("en")},
+		func(err error) {
+			t.Error(err)
+		},
+	)
 	businessErr := (fault.Definition{Code: "example.business", Kind: fault.Runtime}).New()
 	s.Finish(ctx, logging.CommandResult{ExitCode: 1, Err: businessErr})
 	lines := bytes.Split(bytes.TrimSpace(sink.Bytes()), []byte("\n"))
@@ -89,14 +104,23 @@ func TestSessionConcurrentLocalizersRemainIsolated(t *testing.T) {
 	require.NoError(t, err)
 	var wg sync.WaitGroup
 	for range 20 {
-		for _, tc := range []struct{ lang, want string }{{"en", "Command finished"}, {"zh-CN", "命令结束"}} {
+		for _, tc := range []struct {
+			lang string
+			want string
+		}{{"en", "Command finished"}, {"zh-CN", "命令结束"}} {
 			wg.Go(func() {
 				cfg := defaultConfig()
 				cfg.Logging.Output = "stderr"
 				var sink bytes.Buffer
-				ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: &sink, Localizer: bundle.Localizer(tc.lang)}, func(err error) {
-					t.Error(err)
-				})
+				ctx, s := Begin(
+					t.Context(),
+					cfg,
+					logging.RunInfo{},
+					Options{Stderr: &sink, Localizer: bundle.Localizer(tc.lang)},
+					func(err error) {
+						t.Error(err)
+					},
+				)
 				s.Finish(ctx, logging.CommandResult{})
 				if !bytes.Contains(sink.Bytes(), []byte(tc.want)) {
 					t.Errorf("%s: %s", tc.lang, sink.Bytes())
@@ -111,16 +135,18 @@ func TestSessionUninitializedLocalizerUsesEnglishFallback(t *testing.T) {
 	cfg := defaultConfig()
 	cfg.Logging.Output = "stderr"
 	var sink bytes.Buffer
-	ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: &sink, Localizer: &messages.Localizer{}}, func(err error) {
-		t.Error(err)
-	})
+	ctx, s := Begin(
+		t.Context(),
+		cfg,
+		logging.RunInfo{},
+		Options{Stderr: &sink, Localizer: &messages.Localizer{}},
+		func(err error) {
+			t.Error(err)
+		},
+	)
 	s.Finish(ctx, logging.CommandResult{})
 	require.Contains(t, sink.String(), "Operation failed [session.started]")
 	require.Contains(t, sink.String(), "Operation failed [session.finished]")
-}
-
-func defaultConfig() appconfig.Config {
-	return appconfig.Config{Logging: logging.Defaults(), Diagnostics: diagnostics.Defaults(), Telemetry: telemetry.Defaults()}
 }
 
 type countingSink struct {
@@ -137,10 +163,20 @@ func TestBorrowedLoggerRemainsUsableWithoutSyncOrDirectories(t *testing.T) {
 	home := filepath.Join(t.TempDir(), "unused")
 	t.Setenv("GO_CLI_STARTER_HOME", home)
 	sink := &countingSink{}
-	external := logging.New(logging.RunInfo{}, logging.Options{Config: logging.Defaults(), Writer: sink, RunID: "external"}, nil)
-	ctx, s := Begin(t.Context(), defaultConfig(), logging.RunInfo{Component: "go-cli-starter", Command: "doctor"}, Options{ExternalLogger: external}, func(err error) {
-		t.Error(err)
-	})
+	external := logging.New(
+		logging.RunInfo{},
+		logging.Options{Config: logging.Defaults(), Writer: sink, RunID: "external"},
+		nil,
+	)
+	ctx, s := Begin(
+		t.Context(),
+		defaultConfig(),
+		logging.RunInfo{Component: "go-cli-starter", Command: "doctor"},
+		Options{ExternalLogger: external},
+		func(err error) {
+			t.Error(err)
+		},
+	)
 	s.Finish(ctx, logging.CommandResult{})
 	s.Finish(ctx, logging.CommandResult{})
 	require.Zero(t, sink.syncs)
@@ -158,9 +194,15 @@ func TestConcurrentSessionsOwnPrivateFilesAndFinishOnce(t *testing.T) {
 	var group sync.WaitGroup
 	for range 4 {
 		group.Go(func() {
-			ctx, s := Begin(t.Context(), defaultConfig(), logging.RunInfo{Component: "go-cli-starter", Command: "doctor"}, Options{Paths: paths.Options{AppName: "go-cli-starter"}}, func(err error) {
-				t.Error(err)
-			})
+			ctx, s := Begin(
+				t.Context(),
+				defaultConfig(),
+				logging.RunInfo{Component: "go-cli-starter", Command: "doctor"},
+				Options{Paths: paths.Options{AppName: "go-cli-starter"}},
+				func(err error) {
+					t.Error(err)
+				},
+			)
 			path := s.files.Path
 			if _, duplicate := runPaths.LoadOrStore(path, true); duplicate {
 				t.Error("运行目录重复")
@@ -171,7 +213,8 @@ func TestConcurrentSessionsOwnPrivateFilesAndFinishOnce(t *testing.T) {
 	}
 	group.Wait()
 	runPaths.Range(func(key, _ any) bool {
-		path := key.(string)
+		path, ok := key.(string)
+		require.True(t, ok)
 		info, err := os.Stat(path)
 		require.NoError(t, err)
 		if runtime.GOOS != "windows" {
@@ -206,9 +249,15 @@ func TestConcurrentSessionsOwnPrivateFilesAndFinishOnce(t *testing.T) {
 func TestWriteAndFinishFailuresWarnOnce(t *testing.T) {
 	t.Setenv("GO_CLI_STARTER_HOME", t.TempDir())
 	var warnings atomic.Int32
-	ctx, s := Begin(t.Context(), defaultConfig(), logging.RunInfo{}, Options{Paths: paths.Options{AppName: "go-cli-starter"}}, func(error) {
-		warnings.Add(1)
-	})
+	ctx, s := Begin(
+		t.Context(),
+		defaultConfig(),
+		logging.RunInfo{},
+		Options{Paths: paths.Options{AppName: "go-cli-starter"}},
+		func(error) {
+			warnings.Add(1)
+		},
+	)
 	writer, err := s.files.Writer(diagnostics.EventsFile)
 	require.NoError(t, err)
 	require.NoError(t, writer.Close())
@@ -229,7 +278,11 @@ func TestUnavailableWriterDegradesWithoutTypedNil(t *testing.T) {
 	})
 	writer := s.writer(diagnostics.EventsFile, warn)
 	require.Nil(t, writer)
-	logger := logging.New(logging.RunInfo{}, logging.Options{Config: logging.Defaults(), Writer: writer, RunID: files.ID}, warn)
+	logger := logging.New(
+		logging.RunInfo{},
+		logging.Options{Config: logging.Defaults(), Writer: writer, RunID: files.ID},
+		warn,
+	)
 	logger.Started()
 	logger.Record(logging.CommandResult{ExitCode: 0})
 	require.NoError(t, logger.Sync())
@@ -239,9 +292,15 @@ func TestUnavailableWriterDegradesWithoutTypedNil(t *testing.T) {
 func TestFinishWaitsForRegisteredWorkBeforeEndingSpanAndClosingFiles(t *testing.T) {
 	cfg := defaultConfig()
 	cfg.Telemetry.Exporter = telemetry.File
-	ctx, s := Begin(t.Context(), cfg, logging.RunInfo{Component: "test", Command: "work"}, Options{Directories: &paths.Directories{State: t.TempDir()}}, func(err error) {
-		t.Error(err)
-	})
+	ctx, s := Begin(
+		t.Context(),
+		cfg,
+		logging.RunInfo{Component: "test", Command: "work"},
+		Options{Directories: &paths.Directories{State: t.TempDir()}},
+		func(err error) {
+			t.Error(err)
+		},
+	)
 	started, release, finished := make(chan struct{}), make(chan struct{}), make(chan struct{})
 	workerDone := make(chan struct{})
 	registered := false
@@ -275,7 +334,7 @@ func TestFinishWaitsForRegisteredWorkBeforeEndingSpanAndClosingFiles(t *testing.
 			t.Error("已登记工作或 Session 未完成收尾")
 		}
 	})
-	registered = s.Go(func(ctx context.Context) {
+	registered = s.Go(ctx, func(ctx context.Context) {
 		defer close(workerDone)
 		_, span := s.Tracer.Start(ctx, "worker")
 		defer span.End()
@@ -295,7 +354,7 @@ func TestFinishWaitsForRegisteredWorkBeforeEndingSpanAndClosingFiles(t *testing.
 		defer s.mu.Unlock()
 		return s.finishing
 	}, time.Second, time.Millisecond)
-	require.False(t, s.Go(func(context.Context) {
+	require.False(t, s.Go(ctx, func(context.Context) {
 		t.Error("关闭后不应接受新工作")
 	}))
 	select {
@@ -377,13 +436,27 @@ func TestCorruptCatalogProcess(t *testing.T) {
 	require.Len(t, warnings, 2, "目录加载失败不得吞掉后续日志写入故障")
 	require.Contains(t, warnings[1].Error(), errTestWrite.Error())
 
-	bundle, err := messages.NewBundle(fstest.MapFS{"active.en.toml": {Data: []byte("[\"session.started\"]\nother = \"Injected start\"\n[\"session.finished\"]\nother = \"Injected finish\"\n")}})
+	bundle, err := messages.NewBundle(
+		fstest.MapFS{
+			"active.en.toml": {
+				Data: []byte(
+					"[\"session.started\"]\nother = \"Injected start\"\n[\"session.finished\"]\nother = \"Injected finish\"\n",
+				),
+			},
+		},
+	)
 	require.NoError(t, err)
 	sink.Reset()
 	warnings = nil
-	ctx, s = Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: &sink, Localizer: bundle.Localizer("en")}, func(err error) {
-		warnings = append(warnings, err)
-	})
+	ctx, s = Begin(
+		t.Context(),
+		cfg,
+		logging.RunInfo{},
+		Options{Stderr: &sink, Localizer: bundle.Localizer("en")},
+		func(err error) {
+			warnings = append(warnings, err)
+		},
+	)
 	s.Finish(ctx, logging.CommandResult{})
 	require.Empty(t, warnings)
 	require.Contains(t, sink.String(), "Injected start")
@@ -397,10 +470,16 @@ func TestTraceWarningAndStderrLogsShareSerialization(t *testing.T) {
 	cfg.Telemetry.BatchSize = 1
 	var sink bytes.Buffer
 	var warnings atomic.Int32
-	ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Directories: &paths.Directories{State: t.TempDir()}, Stderr: &sink}, func(err error) {
-		_, _ = fmt.Fprintln(&sink, "测试警告", err)
-		warnings.Add(1)
-	})
+	ctx, s := Begin(
+		t.Context(),
+		cfg,
+		logging.RunInfo{},
+		Options{Directories: &paths.Directories{State: t.TempDir()}, Stderr: &sink},
+		func(err error) {
+			_, _ = fmt.Fprintln(&sink, "测试警告", err)
+			warnings.Add(1)
+		},
+	)
 	w, err := s.files.Writer(diagnostics.TraceFile)
 	require.NoError(t, err)
 	require.NoError(t, w.Close())
@@ -419,5 +498,46 @@ func TestTraceWarningAndStderrLogsShareSerialization(t *testing.T) {
 		if !strings.HasPrefix(line, "测试警告 ") {
 			require.True(t, json.Valid([]byte(line)), "stderr 日志被并发写入破坏：%q", line)
 		}
+	}
+}
+
+func TestRegisteredWorkReceivesExplicitContextAndCancellation(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.Logging.Output = "none"
+	finishCtx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{}, func(err error) {
+		t.Error(err)
+	})
+	defer s.Finish(finishCtx, logging.CommandResult{})
+	ctx, cancel := context.WithCancelCause(t.Context())
+	defer cancel(nil)
+	received := make(chan context.Context, 1)
+	stopped := make(chan error, 1)
+	require.False(t, s.Go(ctx, nil))
+	require.True(t, s.Go(ctx, func(workerCtx context.Context) {
+		received <- workerCtx
+		<-workerCtx.Done()
+		stopped <- context.Cause(workerCtx)
+	}))
+	select {
+	case workerCtx := <-received:
+		require.Same(t, ctx, workerCtx)
+	case <-time.After(time.Second):
+		t.Fatal("工作未收到显式 Context")
+	}
+	cause := errors.New("工作已取消")
+	cancel(cause)
+	select {
+	case err := <-stopped:
+		require.ErrorIs(t, err, cause)
+	case <-time.After(time.Second):
+		t.Fatal("工作未收到取消原因")
+	}
+}
+
+func defaultConfig() appconfig.Config {
+	return appconfig.Config{
+		Logging:     logging.Defaults(),
+		Diagnostics: diagnostics.Defaults(),
+		Telemetry:   telemetry.Defaults(),
 	}
 }

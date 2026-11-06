@@ -54,7 +54,11 @@ func TestGoplsVersionMismatchSuggestsSetup(t *testing.T) {
 }
 
 func TestTextToolVersions(t *testing.T) {
-	cases := []struct{ key, output, version string }{
+	cases := []struct {
+		key     string
+		output  string
+		version string
+	}{
 		{"node", "v26.13.0", "26.13.0"},
 		{"python", "Python 3.15.2", "3.15.2"},
 		{"uv", "uv 0.13.7", "0.13.7"},

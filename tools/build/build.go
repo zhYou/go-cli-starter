@@ -33,6 +33,22 @@ func build() error {
 	if data, err := exec.Command(gitProgram, gitRevParse, "--short", "HEAD").Output(); err == nil {
 		commit = strings.TrimSpace(string(data))
 	}
-	flags := fmt.Sprintf("-s -w -X main.version=%s -X main.commit=%s -X main.date=%s", version, commit, time.Now().UTC().Format(time.RFC3339))
-	return toolrun.Run("", nil, "go", buildCommand, "-trimpath", "-ldflags", flags, "-o", filepath.Join("bin", name), "./"+project.CommandPath)
+	flags := fmt.Sprintf(
+		"-s -w -X main.version=%s -X main.commit=%s -X main.date=%s",
+		version,
+		commit,
+		time.Now().UTC().Format(time.RFC3339),
+	)
+	return toolrun.Run(
+		"",
+		nil,
+		"go",
+		buildCommand,
+		"-trimpath",
+		"-ldflags",
+		flags,
+		"-o",
+		filepath.Join("bin", name),
+		"./"+project.CommandPath,
+	)
 }

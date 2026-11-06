@@ -55,7 +55,7 @@ func TestSchemaReflectsRegisteredCommands(t *testing.T) {
 func TestSchemaGenerationDoesNotExecuteCommands(t *testing.T) {
 	count := 0
 	deps := Dependencies{
-		LoadConfig: func(config.Options) (config.Config, error) {
+		LoadConfig: func(context.Context, config.Options) (config.Config, error) {
 			count++
 			return config.Config{}, nil
 		},

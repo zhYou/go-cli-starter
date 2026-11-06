@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"strings"
 	texttemplate "text/template"
 
@@ -124,9 +125,7 @@ func (l *Localizer) Format(id string, opts FormatOptions) (string, error) {
 	params := opts.Params
 	if opts.PluralCount != nil {
 		params = make(map[string]any, len(opts.Params)+1)
-		for key, value := range opts.Params {
-			params[key] = value
-		}
+		maps.Copy(params, opts.Params)
 		params["PluralCount"] = opts.PluralCount
 	}
 
@@ -178,8 +177,7 @@ func (l *Localizer) Render(err error) string {
 		if detail.Cause != nil && !strings.HasPrefix(string(detail.Code), "validation.") {
 			cause := ""
 			// 未分类叶子错误保留系统或第三方诊断。
-			var typed *fault.Error
-			if errors.As(detail.Cause, &typed) {
+			if _, ok := errors.AsType[*fault.Error](detail.Cause); ok {
 				cause = l.Render(detail.Cause)
 			} else {
 				cause = fmt.Sprint(detail.Cause)

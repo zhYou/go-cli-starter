@@ -14,7 +14,8 @@ import (
 
 func TestChildLoggersKeepParentAndSiblingFieldsIndependent(t *testing.T) {
 	var output bytes.Buffer
-	backend := zap.New(zapcore.NewCore(zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()), zapcore.Lock(zapcore.AddSync(&output)), zap.InfoLevel)).Sugar()
+	backend := zap.New(zapcore.NewCore(zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()), zapcore.Lock(zapcore.AddSync(&output)), zap.InfoLevel)).
+		Sugar()
 	parent := &Logger{sugar: backend}
 	var workers sync.WaitGroup
 	for _, name := range []string{"go", "git"} {
@@ -27,7 +28,7 @@ func TestChildLoggersKeepParentAndSiblingFieldsIndependent(t *testing.T) {
 	workers.Wait()
 	parent.Infow("parent")
 	counts := map[string]int{}
-	for _, line := range bytes.Split(bytes.TrimSpace(output.Bytes()), []byte("\n")) {
+	for line := range bytes.SplitSeq(bytes.TrimSpace(output.Bytes()), []byte("\n")) {
 		var row map[string]any
 		require.NoError(t, json.Unmarshal(line, &row))
 		if row["msg"] == "parent" {
@@ -44,15 +45,25 @@ func TestChildLoggersKeepParentAndSiblingFieldsIndependent(t *testing.T) {
 
 func TestDerivedTraceContextReplacesIdentifiersWithoutDuplicateJSONKeys(t *testing.T) {
 	var output bytes.Buffer
-	logger := New(RunInfo{Component: "go-cli-starter", Command: "greet"}, Options{Config: Defaults(), Writer: &output, RunID: "fixture"}, nil)
+	logger := New(
+		RunInfo{Component: "go-cli-starter", Command: "greet"},
+		Options{Config: Defaults(), Writer: &output, RunID: "fixture"},
+		nil,
+	)
 	traceID, err := trace.TraceIDFromHex("11111111111111111111111111111111")
 	require.NoError(t, err)
 	parentID, err := trace.SpanIDFromHex("1111111111111111")
 	require.NoError(t, err)
 	childID, err := trace.SpanIDFromHex("2222222222222222")
 	require.NoError(t, err)
-	parentCtx := trace.ContextWithSpanContext(t.Context(), trace.NewSpanContext(trace.SpanContextConfig{TraceID: traceID, SpanID: parentID}))
-	childCtx := trace.ContextWithSpanContext(parentCtx, trace.NewSpanContext(trace.SpanContextConfig{TraceID: traceID, SpanID: childID}))
+	parentCtx := trace.ContextWithSpanContext(
+		t.Context(),
+		trace.NewSpanContext(trace.SpanContextConfig{TraceID: traceID, SpanID: parentID}),
+	)
+	childCtx := trace.ContextWithSpanContext(
+		parentCtx,
+		trace.NewSpanContext(trace.SpanContextConfig{TraceID: traceID, SpanID: childID}),
+	)
 	parent := logger.WithContext(parentCtx)
 	parent.With("stage", "child").WithContext(childCtx).Infow("child")
 	parent.Infow("parent")
