@@ -1,39 +1,70 @@
 # 开发说明
 
-先读 [README](../README.md) 准备环境，再按[设计指南](design-guidelines.md)扩展当前模块。
-项目文档、注释与交流使用中文，CLI 默认英文并支持中文，机器标识保持稳定。
+环境版本与首次使用见 [README](../README.md#本地环境)，协作、工作区与交付见 [AGENTS.md](../AGENTS.md)。
+本文件集中开发命令、验证、包文档、测试组织和工具维护；运行时契约见[设计指南](design-guidelines.md)。
 
 ## 协作与环境
 
-修改默认在独立 worktree 中进行，基线、分支命名、已有修改保护、署名和 PR 交付遵循
-[协作约定](../AGENTS.md#隔离开发与交付)。同一 checkout 串行修改。
-正式文档记录当前能力；superpowers 设计和计划保留在本地忽略目录 `docs/superpowers/`，不提交。
-规划或开始前查阅[项目待办](backlog.md)，用于查重和获取上下文。
-该文件只收录维护者在探索项目时明确要求记录的想法；讨论中的建议、发现的问题和当前实施任务均不自动加入。
-记录不代表已决定实施，也不构成实施授权。`BL-xxx` 是唯一待办 ID，当前已授权任务无需补建条目。
-已有条目时在 PR 中引用其 ID，并在开始和交付时同步状态、更新日期与关联 PR。
-已完成条目移除，历史通过 Git 追溯。
+项目命令在仓库根目录执行；优先使用 task，直接调用项目 `[tools]` 纳管工具时用 `mise exec --`，其他命令直接执行。
+首次准备环境、工具版本或 Go 模块变更后显式 setup，再 doctor；声明未变且环境已准备时不重复安装。
+普通任务和 exec 关闭自动安装，`GOTOOLCHAIN=local` 禁止隐式下载工具链。缺工具应报错，不由检查修复。
 
-仓库文本文件统一使用 LF。`.editorconfig` 约束编辑器保存，`.gitattributes` 通过
-`text=auto eol=lf` 约束 Git 提交和检出，包括 Windows；二进制文件由 Git 自动识别。
-调整换行规则时，确认工作区只有本次修改，再执行 `git add --renormalize .`，审查差异后提交。
+六个项目工具由 `mise.toml` 固定，setup 只安装显式清单并下载模块；mise、Git、gh、Codex、RTK 和 superpowers 由用户维护。
+doctor 要求 Git 可用、mise 达到最低版本、六个项目工具版本准确；gh、Codex、RTK 仅报告状态，
+缺失、执行失败、超时或截断不影响结果，不检查认证或固定版本。superpowers 以会话技能列表为准。
+基础检查无需 Codex、RTK 或 superpowers；gopls MCP 的验收独立运行。
 
-命令调用遵循[协作约定](../AGENTS.md#从这里开始)：已有 mise task 的操作优先使用 `mise run <task>`；
-直接调用项目 `mise.toml` 的 `[tools]` 纳管工具时使用 `mise exec -- <命令>`，其他命令直接执行。
-task 内由 mise 提供工具环境，无需额外包装。
+开发 doctor 最多四项并行，每项三秒、每流 2 KiB；govulncheck 核对本地构建来源和版本并执行 `-h`，不访问漏洞库。
+真正联网扫描使用 `mise exec -- govulncheck ./...`，数据库访问失败同样失败。
+项目关闭 mise 锁文件，准确版本取自 TOML，后端解析并校验下载来源，模块由 `go.sum` 校验。
+产品 CLI 的 doctor 是另一项业务扩展入口，见[设计指南](design-guidelines.md#扩展-doctor)。
 
-首次使用及工具版本或 Go 模块变更后显式运行 `mise run setup`，然后运行 `mise run doctor`。
-setup 只按显式清单安装六个项目工具并下载模块。普通任务与 exec 的自动安装均关闭，
-`GOTOOLCHAIN=local` 禁止 Go 隐式下载工具链。缺工具应报错，检查不能兼任安装、升级或修复。
-mise、git、gh、Codex、RTK、superpowers 由用户维护；模型、认证、权限和插件偏好不进入仓库。
-`mise.toml` 统一声明 Go、golangci-lint、GoReleaser、govulncheck、Syft 和 gopls。
-doctor 检查 mise 最低版本、git 和全部项目工具准确版本；gh、Codex、RTK 仅报告状态，
-缺失、执行失败、超时或输出截断均不影响检查结果，不检查认证或固定版本。
-superpowers 以实际会话技能列表为准。基础检查无需这些用户级智能体工具；
-CI 的独立 agent-mcp job 复用统一 setup，再运行 mcp:check。
+仓库文本使用 LF，由 `.editorconfig` 和 `.gitattributes` 约束。调整换行规则时确认只有本次修改，
+再执行 `git add --renormalize .` 并审查差异。个人模型、凭据、权限、插件与 IDE 设置不写入模板。
 
-项目设置 `lockfile = false`，不维护 mise 锁文件。准确版本仍由 TOML 声明，安装时由后端解析下载来源并执行其校验，
-不再预先保存六平台工具下载 URL 和 SHA-256。Go 模块继续使用 go.sum；运行时系统锁与此无关，不可删除。
+## 开发命令
+
+mise 聚合流程，领域 Go 入口只处理各自能力；参数不足、未知或多余时立即失败。
+
+| 命令 | 用途 |
+| --- | --- |
+| `mise run setup` | 安装六个固定版本的项目工具，下载模块 |
+| `mise run doctor` | 检查项目环境，报告用户工具状态 |
+| `mise run lint` | 只读检查格式、双语消息、应用配置、包文档、版本声明和 18 项静态规则 |
+| `mise run lint:i18n` / `lint:config` | 校验双语消息目录 / 受管应用配置；均纳入 lint 和 check |
+| `mise run lint:doc` | 检查正式 Go 包的 doc.go 与包说明位置；纳入 lint 和 check |
+| `mise run lint:test` | 用真实 fixture 测试静态规则自身；仅纳入 check |
+| `mise run build` | 构建到 bin，注入版本信息 |
+| `mise run check` | 完整源码检查，含测试、构建、契约和模板验收 |
+| `mise run template:check` | 在临时副本中验证改名、lint、测试、构建、安装和发布配置 |
+| `mise run template:init --module <模块路径> --name <命令名>` | 初始化模板身份 |
+| `mise run contract:check` / `contract:update` | 检查 / 显式更新机器契约 |
+| `mise run lint:versions` | 检查工具、模块、CI 和文档版本一致性 |
+| `mise run mcp:check` | 验证 gopls MCP 的实际连接和诊断 |
+| `mise run release:verify` | 验证发布归档，并隔离安装宿主程序 |
+直接调用纳管工具无需 shell 激活；以下命令不另设任务别名：
+
+| 命令 | 用途 |
+| --- | --- |
+| `mise exec -- golangci-lint fmt --color=never` | 使用 gofmt 和 goimports 格式化 |
+| `mise exec -- golangci-lint fmt --diff --color=never` | 只读检查格式；有差异时失败 |
+| `mise exec -- go test ./...` | 单元与命令测试 |
+| `mise exec -- go test -race ./...` | 竞态检测，需要 C 编译器 |
+| `mise exec -- go vet ./...` | Go vet 检查 |
+| `mise exec -- go mod tidy -diff` | 只读检查模块元数据 |
+| `mise exec -- govulncheck ./...` | 联网扫描 Go 漏洞 |
+| `mise exec -- goreleaser check` | 验证发布配置，需要 Git remote |
+| `mise exec -- goreleaser release --snapshot --clean --parallelism 2` | 本地构建全部发布压缩包，不发布 |
+
+Linux CI 另执行五秒 argv fuzz 和没有性能门槛的 benchmark：
+
+```sh
+mise exec -- go test ./internal/app/cli -run=^$ -fuzz=FuzzArgv -fuzztime=5s
+mise exec -- go test ./internal/app/cli -run=^$ -bench=. -benchmem
+```
+
+`lint` 聚合消息、配置、包文档、版本、格式及静态规则；`lint:test` 验证规则自身，仅纳入 check。
+`check` 进一步完成测试、vet、模块元数据、构建、机器契约和模板副本验收；它不改源码，但会写缓存、临时文件和 bin。
 
 ## 目录和依赖
 
@@ -97,19 +128,35 @@ bin/dist、生成代码和外部 `*_test` 包不受约束；普通 `*_test.go` �
 
 ## 实现与检查
 
-1. 查阅设计指南对应场景，用 gopls 查询 Go 符号、引用和诊断，确认工作区是实际 checkout。
-   先通过 `mise exec -- gopls mcp -instructions` 阅读说明。普通操作按需使用等价 CLI，不机械调用工具填清单。
-2. 参照 greet 分离有类型业务选项、结果及 Validate。CLI 的 Args、必填及组合校验在读取配置和创建资源前完成，
-   业务入口也调用同一校验。新命令补双语帮助、示例和结果注册，不新增交互输入。
-3. 新配置同步模块 Config、defaults、环境映射、TOML、校验和测试，并使用统一加载入口。
-   双语消息在同次修改中维护，分别运行 `mise run lint:config` 和 `mise run lint:i18n`。
-   仅 Changed 的 flag 覆盖，禁止逐键 koanf getter；缺译、系统原因和结构化 fault 的规则见指南。
-4. 为行为变化运行针对性测试，观察真实结果，修改后检查 gopls 诊断。保留用户已有修改，格式化限于授权范围。
-5. 交付前运行 `mise exec -- golangci-lint fmt --color=never`、`mise run check`，支持的宿主运行 `mise exec -- go test -race ./...`。
-   模板/身份变更增加 `template:check`，工具集成增加 `mcp:check`；受信任会话确认 `codex mcp list` 有 gopls。
-   发布变更增加 snapshot 与 verify；无法执行的检查写明原因。
+先阅读[设计指南](design-guidelines.md)对应场景，编辑期间运行针对性检查；交付前按下表选择最终验证。
+分类按实际影响判断：纯文字是说明和规则表述，不包括工具配置、版本表、模板身份或可执行示例。
+多类改动取并集；完整 check 已覆盖的任务无需再单独执行。此表只调整本地要求，CI 和发布门禁保持完整。
 
-所有测试及文档示例验证都隔离父进程和 helper 子进程的应用配置、状态和缓存：
+| 改动 | 必需验证 |
+| --- | --- |
+| 纯文字、协作规则 | `git diff --check`，核对本地链接、标题锚点及内容与实现一致性；无需 Go 格式化、全量 check 或 race |
+| 受检版本表、工具声明格式 | `mise run lint:versions`；工具或模块实质变更还须运行完整 check，并按 Go/依赖、MCP、打包与发布的影响补充对应验证 |
+| 文档中的模板身份或可执行示例 | 身份和受管文件变更运行 `mise run template:check`；修改示例时验证对应入口、参数或 API，执行时隔离应用 HOME |
+| Go 代码、测试、依赖、应用配置 | 格式化受影响的 Go 文件，运行针对性测试、`mise run check`；支持的宿主运行 `mise exec -- go test -race ./...` |
+| MCP 配置、验收工具或影响 MCP 的 Go/gopls 升级 | 增加 `mise run mcp:check`；Codex 客户端配置变更在受信任会话核对 `codex mcp list` 包含 gopls |
+| 打包与发布流程 | 按[发布验收](maintenance.md#升级和发布)完成 snapshot、release:verify 及发布前检查 |
+
+消息和配置编辑期间分别可用 `lint:i18n`、`lint:config` 快速反馈；它们及 `lint:doc`、`lint:versions`、
+`lint:test`、`template:check`、`contract:check` 已由完整 check 覆盖。MCP、漏洞扫描、发布验收及其他 OS 原生运行独立执行。
+只格式化授权的 Go 文件或目录，例如 `mise exec -- golangci-lint fmt --color=never internal/app/cli/greet.go`。
+无法执行的检查说明原因，不把配置存在、启动成功或 mock 当作真实验收。
+
+### Go 查询与 MCP 回退
+
+修改 Go 语义时，优先通过绑定实际 checkout 的 gopls MCP 查符号、引用和诊断；
+首次使用先读 `mise exec -- gopls mcp -instructions`，修改后检查受影响文件诊断。
+MCP 不可用或绑定错误 checkout 时，改用当前 checkout 的 gopls CLI、Go 工具及源码检查，并报告限制；
+不得用其他 checkout 的诊断证明当前改动正确。普通非 Go 操作无需调用 gopls，同一 checkout 串行修改。
+MCP 集成本身的变更仍须通过真实 `mcp:check`，CLI 回退不能替代该验收。
+
+### 测试与示例隔离
+
+所有测试及示例验证隔离父进程和 helper 子进程的应用 HOME、配置、状态及缓存：
 
 ```sh
 example_home=$(mktemp -d)
@@ -118,14 +165,11 @@ GO_CLI_STARTER_HOME="$example_home" mise exec -- go test -race ./...
 ```
 
 改名为 mycli 后使用 `MYCLI_HOME`，由 `paths.EnvPrefix(name)+"_HOME"` 派生。
-嵌入调用也可注入 Options.Directories、LookupEnv 与 IO；只设置 ConfigDir 不会隔离日志状态。
-`iostreams.IOStreams.WithDefaults` 返回副本，缺省输入 EOF、输出 io.Discard，不访问或关闭进程标准流。
-真实退出码用构建后的程序验证，go run 会包装非零退出。输出测试检查单 JSON 与独立 stderr，
-坏配置下发现命令不读配置、不落盘。进程测试见 `test/integration`，信号测试见 `cmd/<name>`。
-
-Session 关闭顺序、借用资源和永久阻塞 IO 的边界见设计指南。工具进程的 Unix 组与 Windows Job
-需要对应 OS 原生 helper；交叉编译不证明运行、取消或句柄回收成功。CI 配置了三 OS 原生测试，
-报告交付结果时以实际 job 结果为准，不把配置存在写成验收完成。
+嵌入调用可注入 Directories、LookupEnv 与 IO；只设置 ConfigDir 不会隔离日志状态。
+`IOStreams.WithDefaults` 返回副本，缺省输入 EOF、输出 io.Discard，不访问或关闭进程标准流。
+真实退出码用构建后的程序验证，`go run` 会包装非零退出。输出测试检查单 JSON 与独立 stderr；
+坏配置下帮助、version、completion、schema 不读配置、不落盘。
+平台进程树、取消和句柄回收需对应 OS 原生 helper；交叉编译不证明运行行为，报告以实际结果为准。
 
 ## 测试组织与可靠性
 
@@ -174,29 +218,12 @@ GO_CLI_STARTER_HOME="$test_home" mise exec -- go test ./test/integration -run '^
 ```text
 cli/
   doc.go
-    benchmark_test.go
-    fuzz_test.go
     helpers_test.go
+    fuzz_test.go
+    benchmark_test.go
   cli.go
     cli_test.go
-  completion_protocol.go
-    completion_protocol_test.go
-  discovery.go
-    discovery_test.go
-logging/
-  logger.go
-    logger_test.go
-    logger_external_test.go
-command/
-  doc.go
-    helpers_test.go
-    helpers_windows_test.go
-  process.go
-    process_test.go
-integration/
-  doc.go
-    helpers_test.go
-    integration_test.go
+    cli_external_test.go
 ```
 
 ### VS Code
@@ -243,8 +270,8 @@ GoLand 使用分号分隔子后缀，完整文件名也可以作为后缀匹配�
 新增测试先按实际归属选择同名、外部包、集成、平台或共享辅助文件名，优先复用上述通用规则。
 必须独立命名的行为测试才向两款 IDE 的清单追加文件名，避免同一测试同时挂在实现文件和 `doc.go` 下。
 不为折叠统一添加 `zzz` 前缀、创建占位实现或额外生产文件，也不合并不同测试包。
-平台构建约束不同的文件先核对有效覆盖，再决定是否合并。文件调整时同步检查文档、两款 IDE 清单和
-模板受管文件清单。验证时确认测试归属正确，展开后文件仍可打开；本机实际显示需维护者手动验收。
+平台构建约束不同的文件先核对有效覆盖，再决定是否合并。文件调整时核对本文两款 IDE 示例中的例外清单及模板受管文件清单。
+这些是供维护者选择的个人设置示例，智能体不读写用户 IDE 配置；本机显示由维护者验收。
 
 ## 静态规则与开发探测
 
@@ -285,26 +312,13 @@ Get、Raw、All 等绕过结构体的入口。zap 只在 base/logging，OTel SDK
 `mise exec -- golangci-lint fmt --color=never` 使用 gofmt 和 goimports；
 加上 `--diff` 只展示差异并失败，不改源码。
 check 不改写源码，但会使用 Go 缓存、临时文件和 bin 产物。
-Linux CI 直接执行五秒 argv 模糊测试，覆盖空值、空格、Unicode、`--` 和取消；
-另执行树构造和 greet 调用的 benchmark，没有性能门槛。具体命令见 README 的开发命令。
-
-CI 在目标为 main 的 PR 和 main 更新时运行；开发分支之间的 PR 与普通 push 不触发。
-源码检查、race、fuzz/benchmark、snapshot 与安装验收分组并行，独立运行 MCP 和 macOS/Windows 原生验收，
-最后由 `check` 汇总结果。任何依赖失败、取消或跳过都会使汇总失败，已有 main 必需检查名称保持不变。
-Go 模块和编译路径从各 runner 的 `go env` 获取，编译缓存键包含 go.mod、go.sum 和 mise.toml 的摘要；
-项目工具复用统一 mise 缓存，lint 单独缓存。恢复缓存不会跳过验证命令。
-Windows 仅缓存模块，避免实测跨运行编译缓存恢复后的耗时增加，编译结果只在当前 runner 内复用。
-同一 PR 的新运行取消旧运行；非 PR 运行按各自运行 ID 隔离。每日 Security 保留，
-推送 `v*` 标签时 Release 复用同一提交的 CI 与 Security，全部通过后发布。
-
-`doctor` 使用共享执行器，最多四项并行，每项三秒，每流 2 KiB，按固定顺序报告精确版本及
-超时、取消、截断。govulncheck 读取本地 Go 构建信息验证命令、模块来源及版本，再执行 `-h`，
-不访问漏洞库。真正联网扫描由 `mise exec -- govulncheck ./...` 独立执行，不可用或数据库失败同样失败。
+CI、缓存及平台验收见[维护清单](maintenance.md#ci-与验收证据)。
 
 ## 修改模板与升级工具
 
 初始化只重写 `tools/internal/scaffold/scaffold.go` 的 managedFiles 白名单。
 新增身份文件须明确登记；保留初始化实现的原模板身份和 fixture，禁止全仓替换。
+初始化不修改 remote、不创建提交或发布，也不复制本地密钥、诊断数据和用户级配置。
 移动或新增文件先暂存，再运行使用 Git 索引清单复制项目的 `template:check`。
 它验证改名、幂等、测试、真实构建与 go install 后的绝对路径二进制、version/help/schema/TOML。
 旧项目迁移与事务恢复见[模板升级](template-upgrades.md)，初始化不承担升级。
@@ -318,8 +332,8 @@ mise run doctor
 mise run lint:versions
 ```
 
-随后按受影响范围运行 check、race、mcp:check 与 snapshot/verify。提交统一的准确版本声明，
-通过原生 CI 和六目标发布构建验证平台支持；gopls 等 Go 后端从固定模块版本在宿主平台编译。
+随后按[验证矩阵](#实现与检查)补充对应检查，提交统一准确版本声明；平台支持以原生 CI 和六目标发布构建为证。
+gopls 等 Go 后端从固定模块版本在宿主平台编译；非升级任务继续使用已锁定版本。
 README 的 tool-versions 标记与工具显示标签由 lint:versions 解析，修改表格时保留它们。
 Renovate 由管理员启用，覆盖 mise.toml；权限不足时人工更新版本声明并完成检查，不放宽检查。
 用户工具通过各自渠道维护，项目 setup 不安装或更新它们。
@@ -354,17 +368,11 @@ MYCLI_HOME="$(mktemp -d)" mise exec -- mycli version --json
 安装 URL 的 version 只是选择标签，不能替代实际二进制 version/commit 验证。
 `release:verify` 先核对六归档和 SPDX 最终清单，再在两个独立 mise data/cache 中验证错 SHA 明确失败与
 正确 SHA 安装成功，解析绝对安装路径并运行 version/commit/help/schema/TOML。归档必须属于最终清单、
-版本一致且 metadata.commit 等于当前 HEAD；任何提交后都须重新 snapshot，旧产物会被拒绝。
+版本一致且 metadata.commit 等于当前 HEAD；发布验收在最终提交后生成 snapshot，后续提交须重建，旧产物会被拒绝。
 以上占位安装示例是人工部署流程；自动验收使用实际 URL 和摘要，不会修改全局 mise 配置。
 
 ## 发布与交付
 
-发布前运行 `mise run check`、`mise exec -- go test -race ./...` 和 `mise exec -- govulncheck ./...`；
-再运行 `mise exec -- goreleaser release --snapshot --clean --parallelism 2` 与 `mise run release:verify`，
-核对六目标归档、配置示例、SPDX 和最终摘要。
-Syft 固定版本且关闭 enrichment、远程许可证查询及更新检查，SBOM 完成后才生成最终 checksums。
-本地不上传证明；受信任 release workflow 对最终资产生成来源证明。证明失败的重试必须使用同一批
-已发布原始字节，不能重构建或覆盖 Release。安全与托管权限见[维护清单](maintenance.md)。
-
-PR 按仓库模板说明实际行为、兼容记录和测试证据；提交加 Agent: Codex 尾注，保留审查 worktree。
-合并和发布由维护者决定。机器接口变化先读[兼容性规则](compatibility.md)，不要仅刷新快照。
+交付、署名、PR 和工作区保留遵循[协作约定](../AGENTS.md#隔离开发与交付)，用户明确指定的交付方式优先。
+机器接口变更按[兼容性规则](compatibility.md)维护快照和记录，不仅刷新基线。
+发布验收、托管权限和证明重试统一见[维护清单](maintenance.md#升级和发布)；合并和发布由维护者决定。

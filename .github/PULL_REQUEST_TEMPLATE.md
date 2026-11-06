@@ -8,4 +8,4 @@
 
 ## 验证
 
-记录实际执行的检查和结果；未执行或失败的检查须说明原因。验证要求见[开发说明](../docs/development.md)，发布变更补充 snapshot 和 release:verify 结果。
+记录实际执行的检查和结果；未执行或失败的检查须说明原因。验证要求见[验证矩阵](../docs/development.md#实现与检查)，发布变更补充 snapshot 和 release:verify 结果。

@@ -1,7 +1,7 @@
 # CLI 设计指南
 
 本指南供新增命令、模块和维护工具时使用。先找到使用场景，再沿当前实现扩展。
-标为“项目选择”的内容是本仓库契约；链接的库文档说明库本身的能力，两者不能互相替代。
+以下约束描述当前实现；新增功能沿这些边界扩展。库行为以 `go.mod` 锁定版本源码和官方文档为准。
 
 ## 先确定边界，再增加目录
 
@@ -15,12 +15,9 @@
 例如问候逻辑位于 `internal/app/greeting`，结果 schema 的生成机制位于 `internal/base/schema`，
 开发期快照比较位于 `tools/internal/contract`。不要把新业务错误码加入 base 的全局目录，
 也不要为符合目录图而创建空包。构造函数应完成默认值、校验、依赖组合或资源建立；
-简单选项值可以直接使用字面量。嵌套组合较复杂时逐字段分行，便于审查所有权。
+简单选项值可以直接使用字面量。嵌套组合较复杂时逐字段分行，便于审查所有权。稳定协议、状态和错误码使用语义常量，同值不同义不强行合并。
 
-[Go 官方布局指南](https://go.dev/doc/modules/layout)说明 internal 等布局方法；
-[project-layout](https://github.com/golang-standards/project-layout)是社区模式集合，不是 Go 官方标准。
-[Effective Go](https://go.dev/doc/effective_go)用于命名、格式等惯用法，页面说明它始于 2009 年且未持续更新，
-不覆盖模块、泛型等现代特性；这些内容以当前 Go 文档和所锁定 Go 源码为准。
+[Go 官方布局指南](https://go.dev/doc/modules/layout)说明 internal 等布局方法；项目分层和所有权要求由本指南定义。
 
 ## 新命令先校验，再产生副作用
 
@@ -28,7 +25,7 @@
 不添加进度动画或默认 TUI。这是对 [CLI Guidelines](https://clig.dev/) 的输出、错误、参数和信号建议
 结合智能体场景所作的取舍；该指南包含交互建议，并不要求所有 CLI 都使用本项目策略。
 
-新增命令参照 `internal/app/cli/greet.go`：每次构造独立命令和局部 flag，Args 校验位置参数及
+新增命令参照 `internal/app/cli/greet.go`：每次调用构造独立命令树，显式注入依赖，使用局部 flag；Args 校验位置参数及
 有类型业务选项，必填 flag 同时 `MarkFlagRequired`，RunE 调用业务并在成功后写结果。
 根命令额外在配置入口前检查必填和组合 flag。Cobra 自带检查执行顺序不等于这里的副作用约束，
 不能仅依赖它在 PreRun 之后的检查。
@@ -59,7 +56,8 @@ if err := registerResult[greeting.Result](&call.results, greet, nil); err != nil
 }
 ```
 
-业务入口仍调用相同 Validate，避免直接调用绕过 CLI。新命令需补双语帮助、示例、参数错误测试、
+业务入口仍调用相同 Validate，避免直接调用绕过 CLI。greet 和 `internal/app/greeting` 可移除，替换时同步注册与测试。
+新命令需补双语帮助、示例、参数错误测试、
 成功结果和真实退出码测试，并用 `schema <command>` 核对必填标记。结果经 `registerResult[T]`
 登记到本次树，由 jsonschema-go 生成 Draft 2020-12；特殊 JSON 编码需显式类型覆盖并验证真实 JSON。
 format 不能替代业务语义校验。不要把输出写到一半后再执行可能失败的业务。
@@ -161,7 +159,8 @@ zh-CN 是中文、zh 是别名，不从 OS 区域推断。稳定命令、选项�
 
 退出码为成功 0、运行/配置 1、调用无效 2、调用者取消 130。stdout 只提交成功结果；doctor 的已完成失败报告例外，见“扩展 doctor”。
 `--json` 为一个文档，序列化失败保持空输出，底层写失败可能留下部分字节。消费方先检查退出码。
-错误和告警写 stderr；日志按独立出口写入。库依据：
+默认文本；帮助为文本、补全为原生脚本、schema 始终为 JSON。错误和告警写 stderr，日志使用独立出口。
+只有 `cmd/<name>` 处理进程退出，业务和日志返回错误。库依据：
 [Go errors](https://pkg.go.dev/errors@go1.27.3)、
 [go-i18n v2.7.0](https://pkg.go.dev/github.com/nicksnyder/go-i18n/v2@v2.7.0/i18n)。
 错误分类、目录组织和语言优先级是项目契约；go-i18n 的 Bundle 在 Localizer 读取时不能继续修改。
@@ -171,7 +170,7 @@ zh-CN 是中文、zh 是别名，不从 OS 区域推断。稳定命令、选项�
 一次命令可能有业务 span、工具 span 和诊断文件。项目只在参数、配置校验后创建 Session，
 以 run_id 串联命令生命周期。日志默认 info/file，写 `<state>/logs/<run_id>/events.jsonl`，
 也可选 stderr/none；Trace 默认 none，file 独立写 `trace.jsonl`。file 是本地诊断 JSON 流，
-不承诺 OTLP、采集服务接入或重放；无需修改全局 provider，也不会通过环境隐式启用 exporter。
+不承诺 OTLP、采集服务接入或重放；使用私有 provider，不替换全局 provider，也不通过环境隐式启用 exporter。
 SDK 环境仍有版本相关行为，不能将此概括为“忽略所有 OTEL_*”。
 
 在已创建的调用中增加业务 span，参照 greet：
@@ -215,6 +214,8 @@ CLI 自有 stderr 路径串行化错误、日志和告警，但不能替嵌入�
 ## 调外部工具时保留 argv、错误和取消原因
 
 需要 Git 等外部程序时，使用 command.Spec 构建独立 argv，禁止拼 shell 字符串。
+通过 Execution 显式传递 Dir、Env、IO 和调用级 Localizer、Logger、Tracer。
+工具层返回错误，不直接打印；入口统一本地化错误，并在成功时提交结果。
 空参数、空格和 Unicode 必须保留。以下是可放入仓库内部包的实际 API 示例，省略 import：
 
 ```go
@@ -264,16 +265,10 @@ CommandContext 默认取消单个进程，并不承诺清理整棵树；errgroup
 
 ## 让证据匹配交付声明
 
-修改 Go 语义先用绑定实际 checkout 的 gopls 查符号、引用和诊断；等价普通操作按需用 CLI。
-同 checkout 串行修改，禁止只调用工具填清单。测试应观察真实结果：临时 Git 仓库、真实子进程、
-文件锁竞争、可控故障和取消。配置存在、进程启动、mock 返回成功都不足以证明安装或清理成功。
-
-每个示例与测试同时隔离父、子进程的应用 HOME/配置/状态；本模板用 GO_CLI_STARTER_HOME，
-改名后按 paths.EnvPrefix 派生，例如 mycli 使用 MYCLI_HOME。不要写真实用户日志。
-检查只检查，六个项目工具由统一 setup 显式准备，doctor 核验固定版本。
-gh、Codex、RTK 仅报告状态，缺失或探测失败不影响开发 doctor 的结果；superpowers 由实际会话确认。
-统一工具声明、固定工具表、18 lint、2 formatter 与规则 fixture 的运行入口见
-[开发说明](development.md)；平台运行证据、发布摘要与托管设置见[维护清单](maintenance.md)。
+测试观察真实结果：临时 Git 仓库、真实子进程、文件锁竞争、可控故障和取消。
+配置存在、进程启动或 mock 成功不足以证明安装、清理或资源回收成功。
+gopls 与 MCP 回退、应用 HOME 隔离和验证选择统一见[开发说明](development.md#实现与检查)；
+平台、发布及托管证据见[维护清单](maintenance.md#ci-与验收证据)。
 
 ## 扩展 doctor
 
