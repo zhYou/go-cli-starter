@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strings"
 
 	"github.com/pelletier/go-toml/v2"
 	"golang.org/x/mod/semver"
@@ -93,6 +94,34 @@ func Spec(key string) (ToolSpec, error) {
 			`(?m)^Scanner:\s+govulncheck@v([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`,
 			[]string{"-h"},
 		}, nil
+	case "node":
+		return ToolSpec{"node", "Node.js", `(?m)^v([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`, []string{versionFlag}}, nil
+	case "python":
+		return ToolSpec{
+			"python",
+			"Python",
+			`(?m)^Python ([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`,
+			[]string{versionFlag},
+		}, nil
+	case "uv":
+		return ToolSpec{"uv", "uv", `(?m)^uv ([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`, []string{versionFlag}}, nil
+	case "npm:prettier":
+		return ToolSpec{
+			"prettier",
+			"Prettier",
+			`(?m)^([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`,
+			[]string{versionFlag},
+		}, nil
+	case "pypi:yamllint":
+		return ToolSpec{
+			"yamllint",
+			"yamllint",
+			`(?m)^yamllint ([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`,
+			[]string{versionFlag},
+		}, nil
+	case "npm:@prettier/plugin-xml", "npm:prettier-plugin-toml", "npm:markdownlint-cli2", "pypi:pre-commit-hooks":
+		_, display, _ := strings.Cut(key, ":")
+		return ToolSpec{miseProgram, display, "", []string{"where", key}}, nil
 	case "syft":
 		return ToolSpec{
 			"syft",
@@ -110,6 +139,10 @@ func Match(key, output, want string) error {
 	spec, err := Spec(key)
 	if err != nil {
 		return err
+	}
+	if spec.Name == miseProgram && key != miseProgram {
+		prefix, _, _ := strings.Cut(strings.TrimSpace(output), "\n")
+		return matchInstalledPackage(key, strings.TrimSpace(prefix), want)
 	}
 	match := regexp.MustCompile(spec.Pattern).FindStringSubmatch(output)
 	if key == miseProgram {

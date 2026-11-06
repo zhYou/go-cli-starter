@@ -20,12 +20,12 @@
 
 历史版本曾移动入口、配置、测试及开发包。合并到当前模板时以这些最终位置为准：
 
-| 职责 | 当前位置 |
-| --- | --- |
-| 程序入口、源码运行与安装 | `cmd/<name>/` |
-| 应用业务与公共机制 | `internal/app/`、`internal/base/` |
-| 运行时外部进程 | `internal/command/` |
-| 开发工具与私有共享包 | `tools/<领域>/`、`tools/internal/` |
+| 职责                     | 当前位置                                                    |
+| ------------------------ | ----------------------------------------------------------- |
+| 程序入口、源码运行与安装 | `cmd/<name>/`                                               |
+| 应用业务与公共机制       | `internal/app/`、`internal/base/`                           |
+| 运行时外部进程           | `internal/command/`                                         |
+| 开发工具与私有共享包     | `tools/<领域>/`、`tools/internal/`                          |
 | 配置、集成测试与机器契约 | `configs/`、`test/integration/`、`test/testdata/contracts/` |
 
 同步导入、静态入口识别、受管文件清单、GoReleaser main 和测试，不为迁移重建已移除的中间目录。
@@ -56,6 +56,7 @@
    ```
 
    none 关闭日志，Trace 默认 none、file 仅本地诊断 JSON。合并 Session 的登记、等待和收尾顺序，借用 logger/IO 不 Sync/Close。
+
 4. 核对 XDG、Application Support/Caches、APPDATA/LOCALAPPDATA 等私有路径。`GO_CLI_STARTER_HOME` 必须为绝对根，改名 mycli 后使用 `MYCLI_HOME`；配置在根下，data/state/cache 分开。测试和示例同时隔离父子进程的此变量。
 5. 早期 0.3.0 的默认 zh-CN 和模块 JSON 消息继续按上一节迁到当前实现。[CLI 基础记录](compatibility/changes/2026-10-30-cli-foundations.json)中的应用 v0.1.0→v0.2.0 是兼容决策，不代表已发布；模板来源和事务格式不因布局调整升级。
 
@@ -79,14 +80,14 @@
 
 旧任务不保留别名，调用脚本改用当前名称：
 
-| 原任务 | 当前任务 |
-| --- | --- |
-| `i18n:check` | `lint:i18n` |
-| `config:check` | `lint:config` |
-| `doc:check` | `lint:doc` |
+| 原任务           | 当前任务        |
+| ---------------- | --------------- |
+| `i18n:check`     | `lint:i18n`     |
+| `config:check`   | `lint:config`   |
+| `doc:check`      | `lint:doc`      |
 | `versions:check` | `lint:versions` |
-| `rules:check` | `lint:test` |
-| `init` | `template:init` |
+| `rules:check`    | `lint:test`     |
+| `init`           | `template:init` |
 
 移除 `tools/dev` 总入口和 `tools/init`，检查归入 `tools/lint`，初始化与副本验收归入 `tools/template`。
 同步自定义 CI 的工具测试路径、受管清单和包文档；共享能力只放在 `tools/internal`。

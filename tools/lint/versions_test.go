@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -29,6 +30,15 @@ func TestVersionsLoadUnifiedTools(t *testing.T) {
 		"goreleaser":                           "2.19.0",
 		"go:golang.org/x/vuln/cmd/govulncheck": "1.9.0",
 		"syft":                                 "1.55.0",
+		"node":                                 "26.13.0",
+		"python":                               "3.15.2",
+		"uv":                                   "0.13.7",
+		"npm:prettier":                         "3.9.10",
+		"npm:@prettier/plugin-xml":             "3.4.2",
+		"npm:prettier-plugin-toml":             "4.1.0",
+		"npm:markdownlint-cli2":                "0.24.0",
+		"pypi:yamllint":                        "1.38.0",
+		"pypi:pre-commit-hooks":                "6.0.0",
 		"go:golang.org/x/tools/gopls":          "0.24.0",
 	}, versions.Tools)
 	require.NoError(t, checkVersions(root))
@@ -62,7 +72,14 @@ func TestVersionsRejectGoplsDocumentationMismatch(t *testing.T) {
 	//nolint:gosec // G703：只修改当前测试临时目录内的文档 fixture。
 	require.NoError(
 		t,
-		os.WriteFile(path, []byte(strings.Replace(string(data), "| gopls | 0.24.0 |", "| gopls | 0.24.1 |", 1)), 0o600),
+		os.WriteFile(
+			path,
+			[]byte(
+				regexp.MustCompile(`(?m)(\|\s*gopls\s*\|\s*)0\.24\.0(\s*\|)`).
+					ReplaceAllString(string(data), "${1}0.24.1${2}"),
+			),
+			0o600,
+		),
 	)
 	require.ErrorContains(t, checkVersions(root), "README 工具 gopls")
 }
@@ -99,7 +116,14 @@ func TestHistoricalVersionTextIsNotCurrentDeclaration(t *testing.T) {
 	//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
 	require.NoError(
 		t,
-		os.WriteFile(file, []byte(strings.Replace(string(data), "| Go | 1.27.3 |", "| Go | 1.27.30 |", 1)), 0o600),
+		os.WriteFile(
+			file,
+			[]byte(
+				regexp.MustCompile(`(?m)(\|\s*Go\s*\|\s*)1\.27\.3(\s*\|)`).
+					ReplaceAllString(string(data), "${1}1.27.30${2}"),
+			),
+			0o600,
+		),
 	)
 	require.Error(t, checkVersions(root))
 }

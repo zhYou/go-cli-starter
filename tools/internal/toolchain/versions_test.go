@@ -3,6 +3,7 @@ package toolchain
 import (
 	"debug/buildinfo"
 	"runtime/debug"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -50,4 +51,25 @@ func TestGoplsVersionMismatchSuggestsSetup(t *testing.T) {
 	err := Match("go:golang.org/x/tools/gopls", "golang.org/x/tools/gopls v0.24.1", "0.24.0")
 	require.ErrorContains(t, err, "mise run setup")
 	require.NotContains(t, err.Error(), ":agent")
+}
+
+func TestTextToolVersions(t *testing.T) {
+	cases := []struct {
+		key     string
+		output  string
+		version string
+	}{
+		{"node", "v26.13.0", "26.13.0"},
+		{"python", "Python 3.15.2", "3.15.2"},
+		{"uv", "uv 0.13.7", "0.13.7"},
+		{"npm:prettier", "3.9.10", "3.9.10"},
+		{"pypi:yamllint", "yamllint 1.38.0", "1.38.0"},
+	}
+	for _, tt := range cases {
+		t.Run(tt.key, func(t *testing.T) {
+			require.NoError(t, Match(tt.key, tt.output, tt.version))
+			require.Error(t, Match(tt.key, tt.output, "99.99.99"))
+			require.Error(t, Match(tt.key, strings.Replace(tt.output, tt.version, tt.version+"-rc.1", 1), tt.version))
+		})
+	}
 }

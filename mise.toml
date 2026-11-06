@@ -16,11 +16,23 @@ go = "1.27.3"
 golangci-lint = "2.15.0"
 goreleaser = "2.19.0"
 syft = "1.55.0"
+node = "26.13.0"
+python = "3.15.2"
+uv = "0.13.7"
+"npm:prettier" = "3.9.10"
+"npm:@prettier/plugin-xml" = "3.4.2"
+"npm:prettier-plugin-toml" = "4.1.0"
+"npm:markdownlint-cli2" = "0.24.0"
+"pypi:yamllint" = "1.38.0"
+"pypi:pre-commit-hooks" = "6.0.0"
 
 # 环境安装只由 setup 显式执行；其他任务只检查、构建或验收。
 [tasks.setup]
 description = "安装固定版本的开发工具并下载 Go 依赖"
-run = ["mise install go golangci-lint goreleaser go:golang.org/x/vuln/cmd/govulncheck syft go:golang.org/x/tools/gopls", "go mod download"]
+run = [
+  "mise install go golangci-lint goreleaser go:golang.org/x/vuln/cmd/govulncheck syft go:golang.org/x/tools/gopls node python uv npm:prettier npm:@prettier/plugin-xml npm:prettier-plugin-toml npm:markdownlint-cli2 pypi:yamllint pypi:pre-commit-hooks",
+  "go mod download"
+]
 
 [tasks.doctor]
 description = "检查已安装工具的固定版本，报告用户工具状态"
@@ -33,7 +45,7 @@ run = "go run ./tools/build"
 # lint 检查当前源码、资源和声明；lint:test 验证规则自身，只纳入 check。
 [tasks.lint]
 description = "只读检查格式、源码、双语资源、配置、包文档和版本声明"
-depends = ["lint:i18n", "lint:config", "lint:doc", "lint:style", "lint:versions"]
+depends = ["lint:i18n", "lint:config", "lint:doc", "lint:style", "lint:versions", "lint:text"]
 run = ["golangci-lint fmt --diff --color=never", "golangci-lint run --allow-serial-runners"]
 
 [tasks."lint:i18n"]
@@ -89,3 +101,54 @@ run = "go run ./tools/mcp"
 [tasks."release:verify"]
 description = "验证六目标归档、SPDX、SHA-256，并隔离安装宿主归档"
 run = "go run ./tools/release"
+
+# 格式化显式改写；普通 lint 和 check 不调用这些任务。
+[tasks.fmt]
+description = "格式化 Go 与受检文本文件"
+run = [{ task = "fmt:go" }, { task = "fmt:text" }]
+
+[tasks."fmt:go"]
+description = "格式化 Go，可追加指定文件或目录"
+run = "golangci-lint fmt --color=never"
+
+[tasks."fmt:text"]
+description = "格式化文本，可指定文件或目录；默认覆盖全部受检文本"
+usage = 'arg "[paths]" var=#true'
+shell = "{{ os(windows='powershell -NoProfile -Command', linux='sh -eu -c', macos='sh -eu -c') }}"
+run = """
+prettier --write {% if usage.paths | length > 0 %}{% for path in usage.paths %}{% if os() == 'windows' %}'{{ path | replace(from="'", to="''") }}'{% else %}{{ path | quote }}{% endif %} {% endfor %}{% else %}"**/*.{json,xml,toml,md,yaml,yml}" .prettierrc.cjs{% endif %}
+"""
+
+[tasks."lint:text"]
+description = "只读检查五类文本的格式、语法及 Markdown/YAML 规则"
+run = [
+  'prettier --check "**/*.{json,xml,toml,md,yaml,yml}" .prettierrc.cjs',
+  "markdownlint-cli2 --config .markdownlint-cli2.yaml",
+  "yamllint -c .yamllint.yaml .",
+  { task = "lint:syntax" },
+]
+
+[tasks."lint:syntax"]
+description = "用现成 CLI 检查 JSON、XML、TOML 语法"
+shell = "{{ os(windows='powershell -NoProfile -Command', linux='sh -eu -c', macos='sh -eu -c') }}"
+run = '''
+files=$(mktemp)
+trap 'rm -f "$files"' EXIT HUP INT TERM
+for kind in json xml toml; do
+  git ls-files --cached --others --exclude-standard --deduplicate -z -- "*.$kind" ':(exclude)tools/lint/testdata/**' ':(exclude)vendor/**' > "$files"
+  xargs -0 "check-$kind" -- < "$files"
+done
+'''
+run_windows = '''
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+foreach ($kind in @('json', 'xml', 'toml')) {
+  $listed = git ls-files --cached --others --exclude-standard --deduplicate -z -- "*.$kind" ':(exclude)tools/lint/testdata/**' ':(exclude)vendor/**'
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  $files = @(($listed -join "`n") -split [char]0 | Where-Object { $_ })
+  if ($files.Count -gt 0) {
+    & "check-$kind" -- @files
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  }
+}
+'''

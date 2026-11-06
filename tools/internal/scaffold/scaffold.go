@@ -125,6 +125,7 @@ var managedFiles = []string{
 	"tools/lint/main.go",
 	"tools/lint/versions.go",
 	"tools/lint/versions_test.go",
+	"tools/lint/text_test.go",
 	"tools/release/release_install_test.go",
 }
 

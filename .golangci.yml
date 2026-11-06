@@ -71,11 +71,11 @@ linters:
     loggercheck:
       require-string-key: true
       rules:
-        - '(*github.com/zhYou/go-cli-starter/internal/base/logging.Logger).Infow'
-        - '(*github.com/zhYou/go-cli-starter/internal/base/logging.Logger).Errorw'
-        - '(*github.com/zhYou/go-cli-starter/internal/base/logging.Logger).Debugw'
-        - '(*github.com/zhYou/go-cli-starter/internal/base/logging.Logger).Warnw'
-        - '(*github.com/zhYou/go-cli-starter/internal/base/logging.Logger).With'
+        - "(*github.com/zhYou/go-cli-starter/internal/base/logging.Logger).Infow"
+        - "(*github.com/zhYou/go-cli-starter/internal/base/logging.Logger).Errorw"
+        - "(*github.com/zhYou/go-cli-starter/internal/base/logging.Logger).Debugw"
+        - "(*github.com/zhYou/go-cli-starter/internal/base/logging.Logger).Warnw"
+        - "(*github.com/zhYou/go-cli-starter/internal/base/logging.Logger).With"
     revive:
       enable-default-rules: false
       rules:
@@ -107,7 +107,7 @@ linters:
       rules:
         base-boundary:
           files:
-            - '${base-path}/internal/base/**/*.go'
+            - "${base-path}/internal/base/**/*.go"
           deny:
             - pkg: github.com/zhYou/go-cli-starter/internal/app
               desc: base 不得反向依赖 app
@@ -119,30 +119,30 @@ linters:
               desc: base 不得依赖 CLI 框架
         runtime-tools-boundary:
           files:
-            - '$all'
-            - '!${base-path}/tools/**/*.go'
+            - "$all"
+            - "!${base-path}/tools/**/*.go"
           deny:
             - pkg: github.com/zhYou/go-cli-starter/tools
               desc: 运行时代码及测试不得依赖开发工具包
         koanf-boundary:
           # 仅豁免精确配置加载文件，同名文件与测试不能绕过边界。
           files:
-            - '$all'
-            - '!${base-path}/internal/app/config/load.go'
+            - "$all"
+            - "!${base-path}/internal/app/config/load.go"
           deny:
             - pkg: github.com/knadh/koanf/v2$
               desc: 仅允许登记的配置加载文件引入 koanf
         zap-boundary:
           files:
-            - '$all'
-            - '!${base-path}/internal/base/logging/*.go'
+            - "$all"
+            - "!${base-path}/internal/base/logging/*.go"
           deny:
             - pkg: go.uber.org/zap
               desc: zap 后端与编码仅允许在 logging 包内使用
         telemetry-boundary:
           files:
-            - '$all'
-            - '!${base-path}/internal/base/telemetry/*.go'
+            - "$all"
+            - "!${base-path}/internal/base/telemetry/*.go"
           deny:
             - pkg: go.opentelemetry.io/otel/sdk
               desc: OTel SDK 生命周期仅允许在 telemetry 包内管理

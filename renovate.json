@@ -6,7 +6,7 @@
   "ignoreUnstable": true,
   "automerge": false,
   "packageRules": [
-    {"matchManagers": ["mise"], "groupName": "开发工具链"},
-    {"matchManagers": ["gomod"], "matchDepNames": ["go", "toolchain"], "groupName": "Go 工具链"}
+    { "matchManagers": ["mise"], "groupName": "开发工具链" },
+    { "matchManagers": ["gomod"], "matchDepNames": ["go", "toolchain"], "groupName": "Go 工具链" }
   ]
 }

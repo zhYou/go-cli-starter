@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -26,6 +26,7 @@ const (
 type doctorProbe struct {
 	key         string
 	want        string
+	program     string
 	spec        toolchain.ToolSpec
 	preparation error
 	optional    bool
@@ -88,11 +89,15 @@ func reportDoctorProbes(out io.Writer, probes []doctorProbe, results []cmdexec.R
 				continue
 			}
 		}
+		name := probe.spec.Name
+		if name == miseProgram && probe.key != miseProgram {
+			name = probe.spec.Display
+		}
 		version := probe.want
 		if probe.key == miseProgram {
 			version = ">= " + version
 		}
-		if _, err := fmt.Fprintf(out, "通过：%s\n", strings.TrimSpace(probe.spec.Name+" "+version)); err != nil {
+		if _, err := fmt.Fprintf(out, "通过：%s\n", strings.TrimSpace(name+" "+version)); err != nil {
 			problems = append(problems, err)
 		}
 	}
@@ -118,21 +123,7 @@ func doctor() error {
 			return err
 		}
 		probe := doctorProbe{key: key, want: versions.Tools[key], spec: spec}
-		if key == govulncheckTool {
-			path, err := exec.LookPath(spec.Name)
-			if err == nil {
-				var info *buildinfo.BuildInfo
-				info, err = buildinfo.ReadFile(path)
-				if err == nil {
-					err = toolchain.MatchGovulncheckBuildInfo(info, probe.want)
-				}
-			}
-			if err != nil {
-				probe.preparation = fmt.Errorf("govulncheck 本地构建信息无效：%w", err)
-			} else {
-				probe.spec.Name = path
-			}
-		}
+
 		probes = append(probes, probe)
 	}
 	for _, name := range []string{"gh", "codex", "rtk"} {
@@ -144,19 +135,102 @@ func doctor() error {
 			optional: true,
 		})
 	}
+	prepareDoctorProbes(probes)
 	calls := make([]cmdexec.Invocation, len(probes))
 	for i, probe := range probes {
-		calls[i] = cmdexec.Invocation{Program: probe.spec.Name, Args: probe.spec.Args}
+		if probe.preparation != nil {
+			continue
+		}
+		program := probe.program
+		if program == "" {
+			program = probe.spec.Name
+		}
+		calls[i] = cmdexec.Invocation{Program: program, Args: probe.spec.Args}
 	}
 	results := runDoctorProbes(context.Background(), calls)
-	// 展示稳定工具名；执行仍使用已核验的绝对路径，避免核验与运行的对象不同。
-	for i := range probes {
-		if probes[i].key == govulncheckTool {
-			probes[i].spec.Name = govulncheckProgram
-		}
-	}
 	err = reportDoctorProbes(os.Stdout, probes, results)
 	fmt.Println("用户工具：superpowers，请确认用户级技能在 Codex 中可用，项目不限定安装路径。")
 	fmt.Println("运行 mise run mcp:check 检查 gopls 的实际连接。")
 	return err
+}
+
+// prepareDoctorProbes 通过 mise 取得纳管工具的绝对路径，避免父进程 PATH 中的旧工具遮蔽固定版本。
+func prepareDoctorProbes(probes []doctorProbe) {
+	var indices []int
+	var calls []cmdexec.Invocation
+	prettierIndex := -1
+	for i, probe := range probes {
+		if probe.key == "" || probe.key == miseProgram || probe.spec.Name == miseProgram {
+			continue
+		}
+		indices = append(indices, i)
+		program := probe.spec.Name
+		if probe.key == "npm:prettier" {
+			program = "node"
+			prettierIndex = i
+		}
+		calls = append(calls, cmdexec.Invocation{Program: miseProgram, Args: []string{"which", program}})
+	}
+	prefixIndex := len(calls)
+	if prettierIndex >= 0 {
+		calls = append(calls, cmdexec.Invocation{Program: miseProgram, Args: []string{"where", "npm:prettier"}})
+	}
+	results := runDoctorProbes(context.Background(), calls)
+	for n, i := range indices {
+		probe := &probes[i]
+		if err := doctorProbeError(probe.spec.Name, results[n]); err != nil {
+			probe.preparation = err
+			continue
+		}
+		path := strings.TrimSpace(string(results[n].Stdout))
+		if !filepath.IsAbs(path) {
+			probe.preparation = fmt.Errorf("%s 的 mise 安装路径无效", probe.spec.Name)
+			continue
+		}
+		probe.program = path
+		if i == prettierIndex {
+			if err := doctorProbeError("Prettier", results[prefixIndex]); err != nil {
+				probe.preparation = err
+				continue
+			}
+			entry, err := prettierEntry(strings.TrimSpace(string(results[prefixIndex].Stdout)))
+			if err != nil {
+				probe.preparation = err
+				continue
+			}
+			probe.spec.Args = append([]string{entry}, probe.spec.Args...)
+		}
+		if probe.key != govulncheckTool {
+			continue
+		}
+		info, err := buildinfo.ReadFile(path)
+		if err == nil {
+			err = toolchain.MatchGovulncheckBuildInfo(info, probe.want)
+		}
+		if err != nil {
+			probe.preparation = fmt.Errorf("govulncheck 本地构建信息无效：%w", err)
+		}
+	}
+}
+
+// prettierEntry 定位已安装的 JS 入口，通过 Node 运行，避免 Windows 的 cmd 包装脚本。
+func prettierEntry(prefix string) (string, error) {
+	if !filepath.IsAbs(prefix) {
+		return "", fmt.Errorf("已安装的 Prettier 路径无效")
+	}
+	for _, base := range []string{prefix, filepath.Join(prefix, "lib")} {
+		path := filepath.Join(base, "node_modules", "prettier", "bin", "prettier.cjs")
+		info, err := os.Stat(path)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return "", err
+		}
+		if !info.Mode().IsRegular() {
+			return "", fmt.Errorf("已安装的 Prettier 入口不是普通文件: %s", path)
+		}
+		return path, nil
+	}
+	return "", fmt.Errorf("未找到 Prettier 的 JS 入口，请运行 mise run setup")
 }

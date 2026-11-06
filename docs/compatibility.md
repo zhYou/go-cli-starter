@@ -16,10 +16,10 @@
 
 ## 记录与迁移
 
-| 记录 | 涉及内容 |
-| --- | --- |
-| [CLI 基础](compatibility/changes/2026-10-30-cli-foundations.json) | lang、info 默认值及应用 v0.1.0→v0.2.0 决策 |
-| [消息与默认语言](compatibility/changes/2026-11-02-i18n-config.json) | 默认语言由 zh-CN 改为 en |
+| 记录                                                                            | 涉及内容                                            |
+| ------------------------------------------------------------------------------- | --------------------------------------------------- |
+| [CLI 基础](compatibility/changes/2026-10-30-cli-foundations.json)               | lang、info 默认值及应用 v0.1.0→v0.2.0 决策          |
+| [消息与默认语言](compatibility/changes/2026-11-02-i18n-config.json)             | 默认语言由 zh-CN 改为 en                            |
 | [发现能力与 doctor](compatibility/changes/2026-11-02-cli-discovery-doctor.json) | doctor 报告、completion shell 子命令、帮助与 schema |
 
 迁移步骤和旧初始化事务恢复见[模板升级](template-upgrades.md)。模板版本独立于应用发布版本，兼容记录不代表已创建标签或发布；
