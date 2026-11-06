@@ -20,22 +20,36 @@ type mcpClient struct {
 	encoder *json.Encoder
 	decoder *json.Decoder
 	id      int
+	cause   func() error
 }
 
-func startMCP(parent context.Context, root, home string) (*mcpClient, func() error) {
+func startMCP(parent context.Context, root, home string) (*mcpClient, func() error, error) {
+	// 使用操作系统管道，执行器直接传递句柄；避免借用 io.Pipe 的复制 goroutine 等待环。
+	requests, input, err := os.Pipe()
+	if err != nil {
+		return nil, nil, err
+	}
+	output, responses, err := os.Pipe()
+	if err != nil {
+		return nil, nil, errors.Join(err, requests.Close(), input.Close())
+	}
 	ctx, cancel := context.WithCancel(parent)
-	requests, input := io.Pipe()
-	output, responses := io.Pipe()
 	done := make(chan error, 1)
 	go func() {
 		err := cmdexec.Run(ctx, cmdexec.Invocation{Program: miseProgram, Args: []string{"run", quietFlag, "mcp:serve"}},
 			cmdexec.Execution{Dir: root, IO: iostreams.IOStreams{In: requests, Out: responses, ErrOut: os.Stderr}}.
 				WithEnv("SERENA_HOME="+home))
-		done <- errors.Join(err, responses.CloseWithError(err))
+		// 不论启动失败、提前退出或取消，都关闭父进程保留的子端，解除协议读写。
+		done <- errors.Join(err, requests.Close(), responses.Close())
 	}()
 	closeClient := func() error {
+		drained := make(chan error, 1)
+		go func() {
+			// 停止请求后排空尾部消息，避免服务处理 EOF 时因输出填满而阻塞。
+			_, err := io.Copy(io.Discard, output)
+			drained <- err
+		}()
 		inputErr := input.Close()
-		// EOF 先允许正常退出；超时才取消，由共享执行器回收整棵自有进程树。
 		timer := time.NewTimer(10 * time.Second)
 		defer timer.Stop()
 		var runErr error
@@ -46,12 +60,22 @@ func startMCP(parent context.Context, root, home string) (*mcpClient, func() err
 			runErr = <-done
 		}
 		cancel()
-		return errors.Join(inputErr, runErr, requests.Close(), output.Close())
+		return errors.Join(inputErr, runErr, <-drained, output.Close())
 	}
-	return &mcpClient{encoder: json.NewEncoder(input), decoder: json.NewDecoder(output)}, closeClient
+	return &mcpClient{
+		encoder: json.NewEncoder(input), decoder: json.NewDecoder(output),
+		cause: func() error {
+			return context.Cause(ctx)
+		},
+	}, closeClient, nil
 }
 
-func (c *mcpClient) request(method string, params any) (json.RawMessage, error) {
+func (c *mcpClient) request(method string, params any) (result json.RawMessage, resultErr error) {
+	defer func() {
+		if resultErr != nil && c.cause != nil {
+			resultErr = errors.Join(resultErr, c.cause())
+		}
+	}()
 	c.id++
 	if err := c.encoder.Encode(
 		map[string]any{"jsonrpc": "2.0", "id": c.id, "method": method, "params": params},

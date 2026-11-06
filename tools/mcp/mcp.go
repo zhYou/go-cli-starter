@@ -43,7 +43,10 @@ func checkMCP() (resultErr error) {
 	defer func() {
 		resultErr = errors.Join(resultErr, os.RemoveAll(temporary))
 	}()
-	client, closeClient := startMCP(ctx, root, filepath.Join(temporary, "serena-home"))
+	client, closeClient, err := startMCP(ctx, root, filepath.Join(temporary, "serena-home"))
+	if err != nil {
+		return err
+	}
 	defer func() {
 		resultErr = errors.Join(resultErr, closeClient())
 	}()
