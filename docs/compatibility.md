@@ -1,37 +1,26 @@
 # 机器接口兼容性
 
-schema_version 保持 1。命令、选项、JSON 字段、枚举和退出码是机器接口；所选语言的帮助和说明可调整；问候正文等用户文案随语言变化，JSON 字段不翻译。
-消费者应忽略新增字段，结果允许额外属性，配置未知键仍失败。删除、改名、改变字段类型、增加必填要求或改变退出码应视为潜在破坏变更。
-命令废弃先保留旧入口并说明迁移和计划移除版本，再在适当版本移除。
+`schema_version` 保持 1。产品 CLI 的命令、选项、JSON 字段、枚举和退出码是机器接口；
+所选语言的帮助与说明可调整，字段不翻译。消费者应忽略新增字段，结果允许额外属性，配置未知键仍失败。
+删除、改名、改变字段类型、增加必填要求或改变退出码视为潜在破坏变更。
+废弃产品 CLI 命令时先保留旧入口，说明迁移和计划移除版本，再在适当版本移除。
 
-修改接口后运行 `mise run contract:update` 审查 test/testdata/contracts/v1.json 差异，并在 docs/compatibility/changes 新建 JSON 记录。
-记录必须包含 id、compatibility、summary、paths、previous_version、target_version、migration。
-compatibility 为 compatible、breaking 或 review-required；复杂 Schema 变化要求人工审查。
-破坏变化不能声明为兼容，0.x 须提升次版本，1.x 以后须提升主版本。
-首次基线的 previous_version 为 null，不推测不存在的发布。
+## 变更流程
 
-`mise run contract:check` 检查当前程序和快照；CI 另用 `--against` 比较 PR base 或 push before，并只接受相对基准新增或修改的记录。
-刷新当前快照不会跳过与 Git 基准的比较。检查只给出结构差异，不能证明任意 JSON Schema 的语义兼容。
-initial.json 来自设计确认的代码 54d9dcd，在临时副本捕获；派生项目的日常检查只依赖已提交文件。
+1. 修改接口后运行 `mise run contract:update`，审查 `test/testdata/contracts/v1.json` 差异。
+2. 在 `docs/compatibility/changes/` 新增 JSON 记录，包含 `id`、`compatibility`、`summary`、`paths`、`previous_version`、`target_version`、`migration`。
+3. `compatibility` 使用 `compatible`、`breaking` 或 `review-required`；复杂 Schema 变化须人工审查，破坏变化不能声明为兼容。0.x 破坏变更提升次版本，1.x 以后提升主版本；首次基线的 previous_version 为 null。
+4. 运行 `mise run contract:check`。CI 另用 `--against` 比较 PR base 或 push before，只接受相对基准新增或修改的记录；刷新快照不会跳过该比较。
 
-## 当前迁移决策
+检查只给出结构差异，不能证明任意 JSON Schema 的语义兼容。默认配置、语言、日志和路径变化即使未进入快照，也须评估使用影响并提供迁移说明。
 
-[2026-10-30-cli-foundations.json](compatibility/changes/2026-10-30-cli-foundations.json) 记录
-应用 v0.1.0→v0.2.0 的破坏变更决策：根及各子命令新增 lang，log-level 默认由 warn 改为 info，
-共 12 项快照路径。schema_version 仍为 1，结果字段和退出码保持；该记录不表示已创建标签或发布。
+## 记录与迁移
 
-[2026-11-02-i18n-config.json](compatibility/changes/2026-11-02-i18n-config.json) 记录后续默认语言
-由 zh-CN 改为 en 的破坏变更，包含 schema 中 `lang.default` 的变化；需要中文的调用应显式选择
-`--lang zh-CN` 或 `<PREFIX>_LANG=zh-CN`。消息目录集中和应用配置规则的迁移步骤见[模板升级](template-upgrades.md#迁移到集中消息目录和英文默认值)。
-该记录不表示已创建应用版本标签或发布；模板版本仍为 0.3.0，需按来源提交识别本次变更。
+| 记录 | 涉及内容 |
+| --- | --- |
+| [CLI 基础](compatibility/changes/2026-10-30-cli-foundations.json) | lang、info 默认值及应用 v0.1.0→v0.2.0 决策 |
+| [消息与默认语言](compatibility/changes/2026-11-02-i18n-config.json) | 默认语言由 zh-CN 改为 en |
+| [发现能力与 doctor](compatibility/changes/2026-11-02-cli-discovery-doctor.json) | doctor 报告、completion shell 子命令、帮助与 schema |
 
-配置从 YAML 迁到唯一严格 TOML、默认日志改为 info/file、私有目录及显式语言选择也影响使用，
-即使没有进入机器快照仍需人工迁移，步骤见[模板升级](template-upgrades.md)。
-旧 LOG_LEVEL 兼容入口保留；Trace 默认 none，file 为本地诊断 JSON，不声明 OTLP 或重放兼容。
-模板版本 0.3.0 独立于上述应用版本，来源记录和初始化事务格式保持。
-升级前所有未终结旧初始化事务（包括 format 2）须用旧工具完成，不通过删除日志或刷新基线跳过。
-
-本次补充 doctor 空报告、四个 completion shell 子命令及其帮助和发现能力，schema_version 仍为 1。
-原有 `completion <shell>` 调用保留；新增路径与结果见
-[兼容记录](compatibility/changes/2026-11-02-cli-discovery-doctor.json)。doctor 的完整负向检查报告可伴随退出码 1，
-该行为只适用于已完成报告；真正执行、渲染失败仍不提交 stdout。
+迁移步骤和旧初始化事务恢复见[模板升级](template-upgrades.md)。模板版本独立于应用发布版本，兼容记录不代表已创建标签或发布；
+派生项目的检查依赖已提交基线与记录，不推测不存在的版本或历史快照。
