@@ -40,6 +40,7 @@ mise run check
 | -------------------- | -------- |
 | Go                   | 1.27.3   |
 | golangci-lint        | 2.15.0   |
+| actionlint           | 1.7.12   |
 | GoReleaser           | 2.19.0   |
 | govulncheck          | 1.9.0    |
 | Syft                 | 1.55.0   |
@@ -174,7 +175,7 @@ task 内由 mise 提供工具环境，无需额外包装。
 | `mise run setup` / `mise run doctor`                         | 显式准备并检查环境                               |
 | `mise run build`                                             | 构建到 bin，注入版本信息                         |
 | `mise run fmt`                                               | 显式格式化 Go 和 JSON、XML、TOML、Markdown、YAML |
-| `mise run lint`                                              | 只读检查 Go、五类文本、资源和声明                |
+| `mise run lint`                                              | 只读检查 Go、五类文本、工作流语义、资源和声明    |
 | `mise run check`                                             | 完整源码、测试、构建、契约与模板验收             |
 | `mise run template:init --module <模块路径> --name <命令名>` | 初始化模板身份                                   |
 

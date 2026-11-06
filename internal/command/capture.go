@@ -23,8 +23,9 @@ const (
 // DefaultCaptureLimit 是每个输出流默认的最大捕获字节数。
 const DefaultCaptureLimit = 1 << 20
 
-// CaptureOptions.Limit 是每路输出的字节上限，0 使用 1 MiB；达到上限后持续排空。
+// CaptureOptions 设置每路输出的捕获边界。
 type CaptureOptions struct {
+	// Limit 是每路输出的字节上限，0 使用 1 MiB；达到上限后持续排空。
 	Limit int
 }
 

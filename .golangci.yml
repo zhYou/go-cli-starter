@@ -86,6 +86,7 @@ linters:
         - name: error-return
         - name: error-strings
         - name: errorf
+        - name: import-shadowing
         - name: increment-decrement
         - name: indent-error-flow
           arguments: [preserve-scope]

@@ -73,3 +73,16 @@ func TestTextToolVersions(t *testing.T) {
 		})
 	}
 }
+
+func TestActionlintVersion(t *testing.T) {
+	spec, err := Spec("actionlint")
+	require.NoError(t, err)
+	require.Equal(t, "actionlint", spec.Name)
+	require.Equal(t, []string{"-version"}, spec.Args)
+	require.NoError(t, Match("actionlint", "1.7.12\ninstalled by downloading from release page\n", "1.7.12"))
+	for _, output := range []string{"1.7.13", "1.7.120", "1.7.12-rc.1", "1.7.12+patched", "invalid"} {
+		t.Run(output, func(t *testing.T) {
+			require.ErrorContains(t, Match("actionlint", output, "1.7.12"), "mise run setup")
+		})
+	}
+}

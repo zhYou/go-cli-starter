@@ -27,6 +27,7 @@ func TestVersionsLoadUnifiedTools(t *testing.T) {
 	require.Equal(t, map[string]string{
 		"go":                                   "1.27.3",
 		"golangci-lint":                        "2.15.0",
+		"actionlint":                           "1.7.12",
 		"goreleaser":                           "2.19.0",
 		"go:golang.org/x/vuln/cmd/govulncheck": "1.9.0",
 		"syft":                                 "1.55.0",

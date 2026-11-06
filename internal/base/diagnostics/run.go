@@ -33,7 +33,7 @@ type metadata struct {
 	Version  int       `json:"version"`
 	ID       string    `json:"run_id"`
 	Started  time.Time `json:"started"`
-	Finished time.Time `json:"finished,omitempty"`
+	Finished time.Time `json:"finished"`
 }
 
 // NewID 为无文件和有文件的会话生成独立关联标识。

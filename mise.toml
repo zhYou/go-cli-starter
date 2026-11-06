@@ -14,6 +14,7 @@ go = "1.27.3"
 "go:golang.org/x/tools/gopls" = "0.24.0"
 "go:golang.org/x/vuln/cmd/govulncheck" = "1.9.0"
 golangci-lint = "2.15.0"
+actionlint = "1.7.12"
 goreleaser = "2.19.0"
 syft = "1.55.0"
 node = "26.13.0"
@@ -30,7 +31,7 @@ uv = "0.13.7"
 [tasks.setup]
 description = "安装固定版本的开发工具并下载 Go 依赖"
 run = [
-  "mise install go golangci-lint goreleaser go:golang.org/x/vuln/cmd/govulncheck syft go:golang.org/x/tools/gopls node python uv npm:prettier npm:@prettier/plugin-xml npm:prettier-plugin-toml npm:markdownlint-cli2 pypi:yamllint pypi:pre-commit-hooks",
+  "mise install go golangci-lint actionlint goreleaser go:golang.org/x/vuln/cmd/govulncheck syft go:golang.org/x/tools/gopls node python uv npm:prettier npm:@prettier/plugin-xml npm:prettier-plugin-toml npm:markdownlint-cli2 pypi:yamllint pypi:pre-commit-hooks",
   "go mod download"
 ]
 
@@ -45,7 +46,7 @@ run = "go run ./tools/build"
 # lint 检查当前源码、资源和声明；lint:test 验证规则自身，只纳入 check。
 [tasks.lint]
 description = "只读检查格式、源码、双语资源、配置、包文档和版本声明"
-depends = ["lint:i18n", "lint:config", "lint:doc", "lint:style", "lint:versions", "lint:text"]
+depends = ["lint:i18n", "lint:config", "lint:doc", "lint:style", "lint:versions", "lint:text", "lint:workflow"]
 run = ["golangci-lint fmt --diff --color=never", "golangci-lint run --allow-serial-runners"]
 
 [tasks."lint:i18n"]
@@ -127,6 +128,10 @@ run = [
   "yamllint -c .yamllint.yaml .",
   { task = "lint:syntax" },
 ]
+
+[tasks."lint:workflow"]
+description = "检查 GitHub Actions 工作流语义，不调用可选脚本检查器"
+run = "actionlint -shellcheck= -pyflakes="
 
 [tasks."lint:syntax"]
 description = "用现成 CLI 检查 JSON、XML、TOML 语法"

@@ -82,7 +82,7 @@ func checkRuleFixture(ctx context.Context, kind string) (resultErr error) {
 		Program: lintProgram,
 		Args: []string{
 			runCommand,
-			"--enable-only=depguard,forbidigo,loggercheck,errcheck",
+			"--enable-only=depguard,forbidigo,loggercheck,errcheck,revive",
 			"--allow-serial-runners",
 			"--issues-exit-code=0",
 			"--show-stats=false",
