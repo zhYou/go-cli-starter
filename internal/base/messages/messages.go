@@ -15,21 +15,30 @@ import (
 )
 
 // Bundle 构造后不再暴露修改接口，可并发创建 Localizer。
-type Bundle struct{ bundle *i18n.Bundle }
+type Bundle struct {
+	bundle *i18n.Bundle
+}
 
 // 固定函数集不会随调用变化，可以安全复用已解析的模板。
-type strictTextParser struct{ template.TextParser }
-
-func (strictTextParser) Cacheable() bool { return true }
+type strictTextParser struct {
+	template.TextParser
+}
 
 var strictParser = strictTextParser{template.TextParser{
-	Option: "missingkey=error", Funcs: texttemplate.FuncMap{"index": strictIndex},
+	Option: "missingkey=error",
+	Funcs:  texttemplate.FuncMap{"index": strictIndex},
 }}
 
 // Localizer 提供本次调用的只读语言视图。
 type Localizer struct {
 	language  string
 	localizer *i18n.Localizer
+}
+
+// FormatOptions 指定模板参数和用于选择复数形式的计数。
+type FormatOptions struct {
+	Params      map[string]any
+	PluralCount any
 }
 
 // NewBundle 加载并冻结消息目录；零参数保留为旧调用的诊断兜底。
@@ -57,9 +66,14 @@ func NewBundle(catalogs ...fs.FS) (*Bundle, error) {
 			}
 			for id, fields := range entries {
 				file.Messages = append(file.Messages, &i18n.Message{
-					ID: id, Description: fields["description"],
-					Zero: fields["zero"], One: fields["one"], Two: fields["two"],
-					Few: fields["few"], Many: fields["many"], Other: fields["other"],
+					ID:          id,
+					Description: fields["description"],
+					Zero:        fields["zero"],
+					One:         fields["one"],
+					Two:         fields["two"],
+					Few:         fields["few"],
+					Many:        fields["many"],
+					Other:       fields["other"],
 				})
 			}
 
@@ -85,25 +99,6 @@ func NewBundle(catalogs ...fs.FS) (*Bundle, error) {
 	return &Bundle{bundle: b}, nil
 }
 
-// 缺省复数形式使用必需的 other，避免上游返回可用文本时仍附带错误。
-func fillPluralForms(message *i18n.Message) {
-	if message.Zero == "" {
-		message.Zero = message.Other
-	}
-	if message.One == "" {
-		message.One = message.Other
-	}
-	if message.Two == "" {
-		message.Two = message.Other
-	}
-	if message.Few == "" {
-		message.Few = message.Other
-	}
-	if message.Many == "" {
-		message.Many = message.Other
-	}
-}
-
 // Localizer 创建指定语言的独立只读视图。
 func (b *Bundle) Localizer(lang string) *Localizer {
 	switch lang {
@@ -116,12 +111,8 @@ func (b *Bundle) Localizer(lang string) *Localizer {
 }
 
 // Language 返回当前语言标识。
-func (l *Localizer) Language() string { return l.language }
-
-// FormatOptions 指定模板参数和用于选择复数形式的计数。
-type FormatOptions struct {
-	Params      map[string]any
-	PluralCount any
+func (l *Localizer) Language() string {
+	return l.language
 }
 
 // Format 只返回完整渲染的消息；查找、复数选择或模板执行失败时返回错误。
@@ -129,6 +120,7 @@ func (l *Localizer) Format(id string, opts FormatOptions) (string, error) {
 	if l == nil || l.localizer == nil {
 		return "", fmt.Errorf("无法渲染消息 %q：Localizer 未初始化", id)
 	}
+
 	params := opts.Params
 	if opts.PluralCount != nil {
 		params = make(map[string]any, len(opts.Params)+1)
@@ -137,13 +129,17 @@ func (l *Localizer) Format(id string, opts FormatOptions) (string, error) {
 		}
 		params["PluralCount"] = opts.PluralCount
 	}
+
 	text, matched, err := l.localizer.LocalizeWithTag(&i18n.LocalizeConfig{
-		MessageID: id, TemplateData: params, PluralCount: opts.PluralCount,
+		MessageID:      id,
+		TemplateData:   params,
+		PluralCount:    opts.PluralCount,
 		TemplateParser: &strictParser,
 	})
 	if err != nil {
 		return "", fmt.Errorf("渲染消息 %q：%w", id, err)
 	}
+
 	requested, err := language.Parse(l.language)
 	if err != nil {
 		return "", fmt.Errorf("无效的语言 %q：%w", l.language, err)
@@ -196,4 +192,27 @@ func (l *Localizer) Render(err error) string {
 		lines = append(lines, text)
 	}
 	return strings.Join(lines, "; ")
+}
+
+func (strictTextParser) Cacheable() bool {
+	return true
+}
+
+// 缺省复数形式使用必需的 other，避免上游返回可用文本时仍附带错误。
+func fillPluralForms(message *i18n.Message) {
+	if message.Zero == "" {
+		message.Zero = message.Other
+	}
+	if message.One == "" {
+		message.One = message.Other
+	}
+	if message.Two == "" {
+		message.Two = message.Other
+	}
+	if message.Few == "" {
+		message.Few = message.Other
+	}
+	if message.Many == "" {
+		message.Many = message.Other
+	}
 }

@@ -86,14 +86,21 @@ func TestWindowsDrainDeadlineClosesOnlyOwnedPipes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = borrowed.Close() }()
-	defer func() { _ = writer.Close() }()
+	defer func() {
+		_ = borrowed.Close()
+	}()
+	defer func() {
+		_ = writer.Close()
+	}()
 	call, options := helper(t, "exit")
 	// 包装为 Reader，真实文件读取在 goroutine 中进行，驱动 WaitDelay 分支。
 	options.IO.In = struct{ io.Reader }{borrowed}
 	options.WaitDelay = 10 * time.Millisecond
 	released := make(chan struct{})
-	timer := time.AfterFunc(500*time.Millisecond, func() { _ = writer.Close(); close(released) })
+	timer := time.AfterFunc(500*time.Millisecond, func() {
+		_ = writer.Close()
+		close(released)
+	})
 	defer timer.Stop()
 	r := Capture(t.Context(), call, options, CaptureOptions{})
 	<-released
@@ -163,21 +170,29 @@ func TestWindowsTerminationFailureClosesJobBeforeWaiting(t *testing.T) {
 				_ = child.wait(ctx, DefaultWaitDelay)
 				t.Fatal(err)
 			}
-			defer func() { _ = windows.CloseHandle(rescue) }()
+			defer func() {
+				_ = windows.CloseHandle(rescue)
+			}()
 			_ = windows.CloseHandle(child.job)
 			child.job = restricted
 			ctx, cancel := context.WithCancel(t.Context())
 			cancel()
 			var finish func() error
 			if phase == "cancel_suspended" {
-				finish = func() error { return child.wait(ctx, DefaultWaitDelay) }
+				finish = func() error {
+					return child.wait(ctx, DefaultWaitDelay)
+				}
 			} else {
 				// 模拟尚未获得独立 os.Process 等待句柄的创建中止；执行正式 abort 收尾函数。
 				_ = child.process.Release()
-				finish = func() error { return abortWindowsProcess(child.info, child.job) }
+				finish = func() error {
+					return abortWindowsProcess(child.info, child.job)
+				}
 			}
 			done := make(chan error, 1)
-			go func() { done <- finish() }()
+			go func() {
+				done <- finish()
+			}()
 			select {
 			case err = <-done:
 			case <-time.After(3 * time.Second):

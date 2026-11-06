@@ -40,7 +40,8 @@ func resolveCommand(root *cobra.Command, args []string) (*cobra.Command, error) 
 func newHelpCommand(root *cobra.Command) *cobra.Command {
 	var target *cobra.Command
 	return &cobra.Command{
-		Use: "help [命令路径...]", Short: "显示命令帮助",
+		Use:               "help [命令路径...]",
+		Short:             "显示命令帮助",
 		ValidArgsFunction: completeHelp(root),
 		Annotations:       map[string]string{annotationSkipConfig: annotationEnabled},
 		Args: func(_ *cobra.Command, args []string) error {
@@ -48,14 +49,17 @@ func newHelpCommand(root *cobra.Command) *cobra.Command {
 			target, err = resolveCommand(root, args)
 			return err
 		},
-		RunE: func(_ *cobra.Command, _ []string) error { return target.Help() },
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return target.Help()
+		},
 	}
 }
 
 func newCompletionCommand(root *cobra.Command, call *invocation, name string) *cobra.Command {
 	shells := []string{shellBash, shellZsh, shellFish, shellPowerShell}
 	completion := &cobra.Command{
-		Use: "completion", Short: "生成 Shell 补全脚本",
+		Use:         "completion",
+		Short:       "生成 Shell 补全脚本",
 		Annotations: map[string]string{annotationSkipConfig: annotationEnabled},
 		Args: func(_ *cobra.Command, args []string) error {
 			if len(args) > 1 {
@@ -71,7 +75,9 @@ func newCompletionCommand(root *cobra.Command, call *invocation, name string) *c
 				return cmd.Help()
 			}
 			// 保留 completion -- <shell> 这一历史位置参数调用。
-			return writeText(cmd.OutOrStdout(), func(w io.Writer) error { return generateCompletion(root, args[0], w) })
+			return writeText(cmd.OutOrStdout(), func(w io.Writer) error {
+				return generateCompletion(root, args[0], w)
+			})
 		},
 	}
 	for _, shell := range shells {
@@ -97,7 +103,10 @@ func newCompletionCommand(root *cobra.Command, call *invocation, name string) *c
 			file = name + ".ps1"
 		}
 		params := map[string]any{paramName: name, "Shell": shell, "File": file}
-		call.bindCommand(child, commandTexts{short: textMessage{id: "cli.completion_shell", params: params}, example: textMessage{id: "cli.completion_shell_example", params: params}})
+		call.bindCommand(child, commandTexts{
+			short:   textMessage{id: "cli.completion_shell", params: params},
+			example: textMessage{id: "cli.completion_shell_example", params: params},
+		})
 		completion.AddCommand(child)
 	}
 	return completion

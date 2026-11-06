@@ -14,13 +14,21 @@ import (
 
 type failingWriter struct{}
 
-func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("output unavailable") }
+func (failingWriter) Write([]byte) (int, error) {
+	return 0, errors.New("output unavailable")
+}
 
 func TestOutputFailureIsRuntimeError(t *testing.T) {
 	var errOut bytes.Buffer
 	code := Run(context.Background(), []string{"greet", "--name", "x"}, Options{
-		Name: "testcli", Out: failingWriter{}, ErrOut: &errOut, ConfigDir: t.TempDir(), Directories: &paths.Directories{State: t.TempDir()},
-		LookupEnv: func(string) (string, bool) { return "", false },
+		Name:        "testcli",
+		Out:         failingWriter{},
+		ErrOut:      &errOut,
+		ConfigDir:   t.TempDir(),
+		Directories: &paths.Directories{State: t.TempDir()},
+		LookupEnv: func(string) (string, bool) {
+			return "", false
+		},
 	})
 	if code != 1 || !strings.Contains(errOut.String(), "output unavailable") {
 		t.Fatalf("code=%d stderr=%q", code, errOut.String())
@@ -35,13 +43,18 @@ func TestJSONMarshalFailureLeavesOutputEmpty(t *testing.T) {
 
 func TestTextRenderFailureLeavesOutputEmpty(t *testing.T) {
 	var out bytes.Buffer
-	require.Error(t, writeText(&out, func(w io.Writer) error { _, _ = io.WriteString(w, "局部结果"); return errors.New("渲染失败") }))
+	require.Error(t, writeText(&out, func(w io.Writer) error {
+		_, _ = io.WriteString(w, "局部结果")
+		return errors.New("渲染失败")
+	}))
 	require.Zero(t, out.Len())
 }
 
 type shortWriter struct{}
 
-func (shortWriter) Write(p []byte) (int, error) { return len(p) / 2, nil }
+func (shortWriter) Write(p []byte) (int, error) {
+	return len(p) / 2, nil
+}
 
 func TestShortWriteIsFailure(t *testing.T) {
 	require.ErrorIs(t, writeJSON(shortWriter{}, true), io.ErrShortWrite)
@@ -50,7 +63,9 @@ func TestShortWriteIsFailure(t *testing.T) {
 
 type failedWriter struct{}
 
-func (failedWriter) Write([]byte) (int, error) { return 0, errors.New("写入失败") }
+func (failedWriter) Write([]byte) (int, error) {
+	return 0, errors.New("写入失败")
+}
 
 func TestHelpWriteFailureIsRuntimeError(t *testing.T) {
 	for _, args := range [][]string{{"--help"}, {"help", "greet"}, {"version"}, {"schema"}, {"completion", "bash"}} {

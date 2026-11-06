@@ -14,7 +14,9 @@ func TestEmbeddedCatalogAndSharedBundle(t *testing.T) {
 	errors := make([]error, callers)
 	var wg sync.WaitGroup
 	for i := range bundles {
-		wg.Go(func() { bundles[i], errors[i] = LoadBundle() })
+		wg.Go(func() {
+			bundles[i], errors[i] = LoadBundle()
+		})
 	}
 	wg.Wait()
 	for i := range bundles {
@@ -48,10 +50,16 @@ func TestEmbeddedCatalogAndSharedBundle(t *testing.T) {
 	greeting, err = zh.Format("greeting.message", messages.FormatOptions{Params: map[string]any{"Name": "Ada"}})
 	require.NoError(t, err)
 	require.Equal(t, "你好，Ada！", greeting)
-	one, err := en.Format("cli.shell_count", messages.FormatOptions{Params: map[string]any{"Count": 1}, PluralCount: 1})
+	one, err := en.Format("cli.shell_count", messages.FormatOptions{
+		Params:      map[string]any{"Count": 1},
+		PluralCount: 1,
+	})
 	require.NoError(t, err)
 	require.Equal(t, "Expected at most one shell name, received 1 argument", one)
-	many, err := en.Format("cli.shell_count", messages.FormatOptions{Params: map[string]any{"Count": 2}, PluralCount: 2})
+	many, err := en.Format("cli.shell_count", messages.FormatOptions{
+		Params:      map[string]any{"Count": 2},
+		PluralCount: 2,
+	})
 	require.NoError(t, err)
 	require.Equal(t, "Expected at most one shell name, received 2 arguments", many)
 }

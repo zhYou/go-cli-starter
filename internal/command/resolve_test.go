@@ -17,7 +17,7 @@ func TestPathUsesInvocationEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	//nolint:gosec // G306：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
-	if err = os.WriteFile(filepath.Join(options.Dir, name), data, 0700); err != nil {
+	if err = os.WriteFile(filepath.Join(options.Dir, name), data, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	call.Program = name
@@ -51,7 +51,7 @@ func TestErrDot(t *testing.T) {
 func TestWindowsExtensionsUseOnlyInvocationEnvironment(t *testing.T) {
 	root := t.TempDir()
 	base := filepath.Join(root, "helper")
-	if err := os.WriteFile(base+".tool", []byte("fixture"), 0600); err != nil {
+	if err := os.WriteFile(base+".tool", []byte("fixture"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	got, err := resolveWindowsExecutable(base, []string{"PATHEXT=exe;;tool;"})

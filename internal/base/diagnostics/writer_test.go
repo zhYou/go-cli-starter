@@ -13,7 +13,9 @@ import (
 func TestRotationPreservesWholeRecordsAndBoundsBackups(t *testing.T) {
 	root, err := os.OpenRoot(t.TempDir())
 	require.NoError(t, err)
-	defer func() { _ = root.Close() }()
+	defer func() {
+		_ = root.Close()
+	}()
 	w, err := newWriter(root, EventsFile, 12, 2)
 	require.NoError(t, err)
 	for _, s := range []string{"first\n", "second\n", "third\n", "fourth\n"} {
@@ -33,7 +35,7 @@ func TestRotationPreservesWholeRecordsAndBoundsBackups(t *testing.T) {
 		info, err := e.Info()
 		require.NoError(t, err)
 		if runtime.GOOS != "windows" {
-			require.Equal(t, os.FileMode(0600), info.Mode().Perm())
+			require.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 		}
 	}
 	require.Contains(t, all.String(), "second\n")
@@ -47,7 +49,9 @@ func TestRotationPreservesWholeRecordsAndBoundsBackups(t *testing.T) {
 func TestOversizeRecordIsNotSplit(t *testing.T) {
 	root, err := os.OpenRoot(t.TempDir())
 	require.NoError(t, err)
-	defer func() { _ = root.Close() }()
+	defer func() {
+		_ = root.Close()
+	}()
 	w, err := newWriter(root, TraceFile, 4, 0)
 	require.NoError(t, err)
 	_, err = w.Write([]byte("oversized\n"))

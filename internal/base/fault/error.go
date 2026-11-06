@@ -45,7 +45,9 @@ type Option func(*Error)
 // WithParams 快照参数映射；嵌套值应为不可变值，每个错误拥有独立映射。
 func WithParams(params Params) Option {
 	snapshot := maps.Clone(params)
-	return func(e *Error) { e.Params = maps.Clone(snapshot) }
+	return func(e *Error) {
+		e.Params = maps.Clone(snapshot)
+	}
 }
 
 // New 创建领域错误，未指定参数时保持独立状态。
@@ -86,10 +88,14 @@ func (e *Error) Error() string {
 }
 
 // Unwrap 返回原始原因，支持标准错误链检查。
-func (e *Error) Unwrap() error { return e.Cause }
+func (e *Error) Unwrap() error {
+	return e.Cause
+}
 
 // New 和 Wrap 保留无消息码的外部错误适配入口。
-func New(kind Kind, message string) error { return &Error{Kind: kind, Message: message} }
+func New(kind Kind, message string) error {
+	return &Error{Kind: kind, Message: message}
+}
 
 // Wrap 保留原始原因并补充错误分类。
 func Wrap(kind Kind, message string, cause error) error {

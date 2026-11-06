@@ -11,7 +11,9 @@ import (
 )
 
 // Validator 持有构造后冻结的类型校验规则。
-type Validator struct{ engine *validator.Validate }
+type Validator struct {
+	engine *validator.Validate
+}
 
 // New 在并发使用前完成规则注册；可通过 callback 组合条件和业务规则。
 func New(register ...func(*validator.Validate)) *Validator {
@@ -25,7 +27,9 @@ func New(register ...func(*validator.Validate)) *Validator {
 		}
 		return f.Name
 	})
-	if err := engine.RegisterValidation("notblank", func(f validator.FieldLevel) bool { return strings.TrimSpace(f.Field().String()) != "" }); err != nil {
+	if err := engine.RegisterValidation("notblank", func(f validator.FieldLevel) bool {
+		return strings.TrimSpace(f.Field().String()) != ""
+	}); err != nil {
 		panic(err)
 	}
 	for _, configure := range register {

@@ -28,17 +28,26 @@ func TestSignalHelper(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		notify = func() (context.Context, context.CancelFunc) {
 			ctx, cancel := context.WithCancel(context.Background())
-			go func() { _, _ = os.Stdin.Read(make([]byte, 1)); cancel() }()
+			go func() {
+				_, _ = os.Stdin.Read(make([]byte, 1))
+				cancel()
+			}()
 			return ctx, cancel
 		}
 	}
-	deps := cli.Dependencies{LoadConfig: func(config.Options) (config.Config, error) { return config.Defaults(), nil }, Greet: func(ctx context.Context, _ greeting.Options) (greeting.Result, error) {
-		_, _ = io.WriteString(os.Stderr, "就绪\n")
-		<-ctx.Done()
-		return greeting.Result{}, ctx.Err()
-	}}
+	deps := cli.Dependencies{
+		LoadConfig: func(config.Options) (config.Config, error) {
+			return config.Defaults(), nil
+		},
+		Greet: func(ctx context.Context, _ greeting.Options) (greeting.Result, error) {
+			_, _ = io.WriteString(os.Stderr, "就绪\n")
+			<-ctx.Done()
+			return greeting.Result{}, ctx.Err()
+		},
+	}
 	os.Exit(run([]string{"greet", "--name", "test"}, &deps, notify))
 }
+
 func TestMainSignalCancellation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -64,7 +73,12 @@ func TestMainSignalCancellation(t *testing.T) {
 	readDone := make(chan struct{})
 	var waitOnce sync.Once
 	var waitErr error
-	waitChild := func() error { waitOnce.Do(func() { waitErr = cmd.Wait() }); return waitErr }
+	waitChild := func() error {
+		waitOnce.Do(func() {
+			waitErr = cmd.Wait()
+		})
+		return waitErr
+	}
 	t.Cleanup(func() {
 		cancel()
 		_ = stdin.Close()
@@ -78,7 +92,11 @@ func TestMainSignalCancellation(t *testing.T) {
 	})
 	reader := bufio.NewReader(stderr)
 	ready := make(chan string, 1)
-	go func() { defer close(readDone); line, _ := reader.ReadString('\n'); ready <- line }()
+	go func() {
+		defer close(readDone)
+		line, _ := reader.ReadString('\n')
+		ready <- line
+	}()
 	select {
 	case line := <-ready:
 		require.Equal(t, "就绪\n", line)

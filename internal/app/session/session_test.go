@@ -45,7 +45,9 @@ func TestSessionUsesDefaultEnglishAndExplicitChinese(t *testing.T) {
 			cfg := defaultConfig()
 			cfg.Logging.Output = "stderr"
 			var sink bytes.Buffer
-			ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: &sink, Localizer: tc.localizer}, func(err error) { t.Error(err) })
+			ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: &sink, Localizer: tc.localizer}, func(err error) {
+				t.Error(err)
+			})
 			s.Finish(ctx, logging.CommandResult{})
 			lines := bytes.Split(bytes.TrimSpace(sink.Bytes()), []byte("\n"))
 			require.Len(t, lines, 2)
@@ -65,7 +67,9 @@ func TestSessionBrokenDiagnosticsPreserveBusinessFailure(t *testing.T) {
 	cfg := defaultConfig()
 	cfg.Logging.Output = "stderr"
 	var sink bytes.Buffer
-	ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: &sink, Localizer: bundle.Localizer("en")}, func(err error) { t.Error(err) })
+	ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: &sink, Localizer: bundle.Localizer("en")}, func(err error) {
+		t.Error(err)
+	})
 	businessErr := (fault.Definition{Code: "example.business", Kind: fault.Runtime}).New()
 	s.Finish(ctx, logging.CommandResult{ExitCode: 1, Err: businessErr})
 	lines := bytes.Split(bytes.TrimSpace(sink.Bytes()), []byte("\n"))
@@ -90,7 +94,9 @@ func TestSessionConcurrentLocalizersRemainIsolated(t *testing.T) {
 				cfg := defaultConfig()
 				cfg.Logging.Output = "stderr"
 				var sink bytes.Buffer
-				ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: &sink, Localizer: bundle.Localizer(tc.lang)}, func(err error) { t.Error(err) })
+				ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: &sink, Localizer: bundle.Localizer(tc.lang)}, func(err error) {
+					t.Error(err)
+				})
 				s.Finish(ctx, logging.CommandResult{})
 				if !bytes.Contains(sink.Bytes(), []byte(tc.want)) {
 					t.Errorf("%s: %s", tc.lang, sink.Bytes())
@@ -105,7 +111,9 @@ func TestSessionUninitializedLocalizerUsesEnglishFallback(t *testing.T) {
 	cfg := defaultConfig()
 	cfg.Logging.Output = "stderr"
 	var sink bytes.Buffer
-	ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: &sink, Localizer: &messages.Localizer{}}, func(err error) { t.Error(err) })
+	ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: &sink, Localizer: &messages.Localizer{}}, func(err error) {
+		t.Error(err)
+	})
 	s.Finish(ctx, logging.CommandResult{})
 	require.Contains(t, sink.String(), "Operation failed [session.started]")
 	require.Contains(t, sink.String(), "Operation failed [session.finished]")
@@ -120,14 +128,19 @@ type countingSink struct {
 	syncs int
 }
 
-func (s *countingSink) Sync() error { s.syncs++; return nil }
+func (s *countingSink) Sync() error {
+	s.syncs++
+	return nil
+}
 
 func TestBorrowedLoggerRemainsUsableWithoutSyncOrDirectories(t *testing.T) {
 	home := filepath.Join(t.TempDir(), "unused")
 	t.Setenv("GO_CLI_STARTER_HOME", home)
 	sink := &countingSink{}
 	external := logging.New(logging.RunInfo{}, logging.Options{Config: logging.Defaults(), Writer: sink, RunID: "external"}, nil)
-	ctx, s := Begin(t.Context(), defaultConfig(), logging.RunInfo{Component: "go-cli-starter", Command: "doctor"}, Options{ExternalLogger: external}, func(err error) { t.Error(err) })
+	ctx, s := Begin(t.Context(), defaultConfig(), logging.RunInfo{Component: "go-cli-starter", Command: "doctor"}, Options{ExternalLogger: external}, func(err error) {
+		t.Error(err)
+	})
 	s.Finish(ctx, logging.CommandResult{})
 	s.Finish(ctx, logging.CommandResult{})
 	require.Zero(t, sink.syncs)
@@ -145,7 +158,9 @@ func TestConcurrentSessionsOwnPrivateFilesAndFinishOnce(t *testing.T) {
 	var group sync.WaitGroup
 	for range 4 {
 		group.Go(func() {
-			ctx, s := Begin(t.Context(), defaultConfig(), logging.RunInfo{Component: "go-cli-starter", Command: "doctor"}, Options{Paths: paths.Options{AppName: "go-cli-starter"}}, func(err error) { t.Error(err) })
+			ctx, s := Begin(t.Context(), defaultConfig(), logging.RunInfo{Component: "go-cli-starter", Command: "doctor"}, Options{Paths: paths.Options{AppName: "go-cli-starter"}}, func(err error) {
+				t.Error(err)
+			})
 			path := s.files.Path
 			if _, duplicate := runPaths.LoadOrStore(path, true); duplicate {
 				t.Error("运行目录重复")
@@ -160,13 +175,13 @@ func TestConcurrentSessionsOwnPrivateFilesAndFinishOnce(t *testing.T) {
 		info, err := os.Stat(path)
 		require.NoError(t, err)
 		if runtime.GOOS != "windows" {
-			require.Equal(t, os.FileMode(0700), info.Mode().Perm())
+			require.Equal(t, os.FileMode(0o700), info.Mode().Perm())
 		}
 		file := filepath.Join(path, diagnostics.EventsFile)
 		info, err = os.Stat(file)
 		require.NoError(t, err)
 		if runtime.GOOS != "windows" {
-			require.Equal(t, os.FileMode(0600), info.Mode().Perm())
+			require.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 		}
 		// #nosec G304 -- 路径仅来自本测试创建并登记的私有诊断目录。
 		data, err := os.ReadFile(file)
@@ -191,7 +206,9 @@ func TestConcurrentSessionsOwnPrivateFilesAndFinishOnce(t *testing.T) {
 func TestWriteAndFinishFailuresWarnOnce(t *testing.T) {
 	t.Setenv("GO_CLI_STARTER_HOME", t.TempDir())
 	var warnings atomic.Int32
-	ctx, s := Begin(t.Context(), defaultConfig(), logging.RunInfo{}, Options{Paths: paths.Options{AppName: "go-cli-starter"}}, func(error) { warnings.Add(1) })
+	ctx, s := Begin(t.Context(), defaultConfig(), logging.RunInfo{}, Options{Paths: paths.Options{AppName: "go-cli-starter"}}, func(error) {
+		warnings.Add(1)
+	})
 	writer, err := s.files.Writer(diagnostics.EventsFile)
 	require.NoError(t, err)
 	require.NoError(t, writer.Close())
@@ -207,7 +224,9 @@ func TestUnavailableWriterDegradesWithoutTypedNil(t *testing.T) {
 	require.NoError(t, files.Close())
 	s := &Session{files: files}
 	warnings := 0
-	warn := reporter(loggingFailed, func(error) { warnings++ })
+	warn := reporter(loggingFailed, func(error) {
+		warnings++
+	})
 	writer := s.writer(diagnostics.EventsFile, warn)
 	require.Nil(t, writer)
 	logger := logging.New(logging.RunInfo{}, logging.Options{Config: logging.Defaults(), Writer: writer, RunID: files.ID}, warn)
@@ -220,14 +239,25 @@ func TestUnavailableWriterDegradesWithoutTypedNil(t *testing.T) {
 func TestFinishWaitsForRegisteredWorkBeforeEndingSpanAndClosingFiles(t *testing.T) {
 	cfg := defaultConfig()
 	cfg.Telemetry.Exporter = telemetry.File
-	ctx, s := Begin(t.Context(), cfg, logging.RunInfo{Component: "test", Command: "work"}, Options{Directories: &paths.Directories{State: t.TempDir()}}, func(err error) { t.Error(err) })
+	ctx, s := Begin(t.Context(), cfg, logging.RunInfo{Component: "test", Command: "work"}, Options{Directories: &paths.Directories{State: t.TempDir()}}, func(err error) {
+		t.Error(err)
+	})
 	started, release, finished := make(chan struct{}), make(chan struct{}), make(chan struct{})
 	workerDone := make(chan struct{})
 	registered := false
 	var releaseOnce, finishOnce sync.Once
-	releaseWork := func() { releaseOnce.Do(func() { close(release) }) }
+	releaseWork := func() {
+		releaseOnce.Do(func() {
+			close(release)
+		})
+	}
 	finish := func() {
-		finishOnce.Do(func() { go func() { s.Finish(ctx, logging.CommandResult{}); close(finished) }() })
+		finishOnce.Do(func() {
+			go func() {
+				s.Finish(ctx, logging.CommandResult{})
+				close(finished)
+			}()
+		})
 	}
 	t.Cleanup(func() {
 		releaseWork()
@@ -260,8 +290,14 @@ func TestFinishWaitsForRegisteredWorkBeforeEndingSpanAndClosingFiles(t *testing.
 		t.Fatal("登记的工作未启动")
 	}
 	finish()
-	require.Eventually(t, func() bool { s.mu.Lock(); defer s.mu.Unlock(); return s.finishing }, time.Second, time.Millisecond)
-	require.False(t, s.Go(func(context.Context) { t.Error("关闭后不应接受新工作") }))
+	require.Eventually(t, func() bool {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return s.finishing
+	}, time.Second, time.Millisecond)
+	require.False(t, s.Go(func(context.Context) {
+		t.Error("关闭后不应接受新工作")
+	}))
 	select {
 	case <-finished:
 		t.Fatal("业务尚未结束就关闭资源")
@@ -291,7 +327,9 @@ func TestStderrIsBorrowedAndNeverSyncedOrClosed(t *testing.T) {
 	cfg := defaultConfig()
 	cfg.Logging.Output = "stderr"
 	sink := &countingSink{}
-	ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: sink}, func(err error) { t.Error(err) })
+	ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: sink}, func(err error) {
+		t.Error(err)
+	})
 	s.Finish(ctx, logging.CommandResult{})
 	require.Zero(t, sink.syncs)
 	require.Contains(t, sink.String(), "command_finished")
@@ -302,7 +340,9 @@ var errTestWrite = errors.New("diagnostic write failed")
 
 type failedDiagnosticWriter struct{}
 
-func (failedDiagnosticWriter) Write([]byte) (int, error) { return 0, errTestWrite }
+func (failedDiagnosticWriter) Write([]byte) (int, error) {
+	return 0, errTestWrite
+}
 
 func TestCorruptCatalogProcess(t *testing.T) {
 	if os.Getenv("TEST_CORRUPT_I18N_CATALOG") != "1" {
@@ -312,7 +352,9 @@ func TestCorruptCatalogProcess(t *testing.T) {
 	cfg.Logging.Output = "stderr"
 	var sink bytes.Buffer
 	var warnings []error
-	ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: &sink}, func(err error) { warnings = append(warnings, err) })
+	ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: &sink}, func(err error) {
+		warnings = append(warnings, err)
+	})
 	businessErr := (fault.Definition{Code: "example.business", Kind: fault.Runtime}).New()
 	s.Finish(ctx, logging.CommandResult{ExitCode: 1, Err: businessErr})
 	require.Len(t, warnings, 1)
@@ -328,7 +370,9 @@ func TestCorruptCatalogProcess(t *testing.T) {
 	require.Equal(t, "example.business", finish["error_code"])
 
 	warnings = nil
-	ctx, s = Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: failedDiagnosticWriter{}}, func(err error) { warnings = append(warnings, err) })
+	ctx, s = Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: failedDiagnosticWriter{}}, func(err error) {
+		warnings = append(warnings, err)
+	})
 	s.Finish(ctx, logging.CommandResult{})
 	require.Len(t, warnings, 2, "目录加载失败不得吞掉后续日志写入故障")
 	require.Contains(t, warnings[1].Error(), errTestWrite.Error())
@@ -337,7 +381,9 @@ func TestCorruptCatalogProcess(t *testing.T) {
 	require.NoError(t, err)
 	sink.Reset()
 	warnings = nil
-	ctx, s = Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: &sink, Localizer: bundle.Localizer("en")}, func(err error) { warnings = append(warnings, err) })
+	ctx, s = Begin(t.Context(), cfg, logging.RunInfo{}, Options{Stderr: &sink, Localizer: bundle.Localizer("en")}, func(err error) {
+		warnings = append(warnings, err)
+	})
 	s.Finish(ctx, logging.CommandResult{})
 	require.Empty(t, warnings)
 	require.Contains(t, sink.String(), "Injected start")
@@ -351,7 +397,10 @@ func TestTraceWarningAndStderrLogsShareSerialization(t *testing.T) {
 	cfg.Telemetry.BatchSize = 1
 	var sink bytes.Buffer
 	var warnings atomic.Int32
-	ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Directories: &paths.Directories{State: t.TempDir()}, Stderr: &sink}, func(err error) { _, _ = fmt.Fprintln(&sink, "测试警告", err); warnings.Add(1) })
+	ctx, s := Begin(t.Context(), cfg, logging.RunInfo{}, Options{Directories: &paths.Directories{State: t.TempDir()}, Stderr: &sink}, func(err error) {
+		_, _ = fmt.Fprintln(&sink, "测试警告", err)
+		warnings.Add(1)
+	})
 	w, err := s.files.Writer(diagnostics.TraceFile)
 	require.NoError(t, err)
 	require.NoError(t, w.Close())

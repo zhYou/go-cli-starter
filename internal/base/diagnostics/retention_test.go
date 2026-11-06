@@ -29,7 +29,7 @@ func TestRetentionProtectsActiveAndUnknownFiles(t *testing.T) {
 	require.NoError(t, err)
 	_, err = writer.Write([]byte(strings.Repeat("x", 2*1024*1024)))
 	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(filepath.Join(base, "legacy.jsonl"), []byte("legacy"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(base, "legacy.jsonl"), []byte("legacy"), 0o600))
 	require.NoError(t, Cleanup(base, cfg))
 	_, err = os.Stat(run.Path)
 	require.NoError(t, err)
@@ -60,7 +60,7 @@ func TestExpiredRunAndUnknownContent(t *testing.T) {
 	unknown, err := Open(base, Defaults(), nil)
 	require.NoError(t, err)
 	require.NoError(t, unknown.Close())
-	require.NoError(t, os.WriteFile(filepath.Join(unknown.Path, "user.txt"), []byte("keep"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(unknown.Path, "user.txt"), []byte("keep"), 0o600))
 	require.NoError(t, writeMetadataPath(unknown.Path, metadata{Version: 1, ID: unknown.ID, Started: old, Finished: old}))
 	require.NoError(t, Cleanup(base, cfg))
 	_, err = os.Stat(filepath.Join(unknown.Path, "user.txt"))
@@ -77,7 +77,7 @@ func TestRetentionReclaimsPublishedRunWithInterruptedMetadataUpdate(t *testing.T
 	require.NoError(t, run.Close())
 	old := time.Now().Add(-48 * time.Hour)
 	require.NoError(t, writeMetadataPath(run.Path, metadata{Version: 1, ID: run.ID, Started: old, Finished: old}))
-	require.NoError(t, os.WriteFile(filepath.Join(run.Path, metadataTemporaryName), []byte("{"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(run.Path, metadataTemporaryName), []byte("{"), 0o600))
 	cfg.RetentionDays = 1
 	require.NoError(t, Cleanup(base, cfg))
 	_, err = os.Stat(run.Path)
@@ -102,6 +102,7 @@ func TestDiagnosticLeaseHelper(t *testing.T) {
 	_, _ = io.Copy(io.Discard, os.Stdin)
 	require.NoError(t, run.Close())
 }
+
 func TestDiagnosticCleanupHelper(t *testing.T) {
 	base := os.Getenv(helperRootEnv)
 	if base == "" {
@@ -112,6 +113,7 @@ func TestDiagnosticCleanupHelper(t *testing.T) {
 	cfg.MaxTotalSizeMiB = 1
 	require.NoError(t, Cleanup(base, cfg))
 }
+
 func TestProcessesProtectLiveRunAndReclaimKilledWriter(t *testing.T) {
 	base := t.TempDir()
 	exe, err := os.Executable()
@@ -126,7 +128,9 @@ func TestProcessesProtectLiveRunAndReclaimKilledWriter(t *testing.T) {
 	require.NoError(t, err)
 	output, err := child.StdoutPipe()
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = input.Close() })
+	t.Cleanup(func() {
+		_ = input.Close()
+	})
 	waitChild := startDiagnosticProcess(t, child)
 	line, err := bufio.NewReader(output).ReadString('\n')
 	require.NoError(t, err)
@@ -153,6 +157,7 @@ func TestProcessesProtectLiveRunAndReclaimKilledWriter(t *testing.T) {
 	_, err = os.Stat(path)
 	require.ErrorIs(t, err, os.ErrNotExist)
 }
+
 func TestRetentionDoesNotFollowArtifactSymlinks(t *testing.T) {
 	base := t.TempDir()
 	cfg := Defaults()
@@ -162,7 +167,7 @@ func TestRetentionDoesNotFollowArtifactSymlinks(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, run.Close())
 	victim := filepath.Join(t.TempDir(), "keep")
-	require.NoError(t, os.WriteFile(victim, []byte("keep"), 0600))
+	require.NoError(t, os.WriteFile(victim, []byte("keep"), 0o600))
 	if err := os.Symlink(victim, filepath.Join(run.Path, EventsFile)); err != nil {
 		if runtime.GOOS == "windows" {
 			t.Skipf("当前 Windows 主机无法创建符号链接：%v", err)
@@ -211,7 +216,7 @@ func TestInterruptedCleanupDoesNotOrphanData(t *testing.T) {
 		run, err := Open(base, cfg, nil)
 		require.NoError(t, err)
 		for _, name := range []string{EventsFile, "events.000001.jsonl", "trace.000001.jsonl"} {
-			require.NoError(t, os.WriteFile(filepath.Join(run.Path, name), []byte("{}\n"), 0600))
+			require.NoError(t, os.WriteFile(filepath.Join(run.Path, name), []byte("{}\n"), 0o600))
 		}
 		return run
 	}
@@ -220,11 +225,13 @@ func TestInterruptedCleanupDoesNotOrphanData(t *testing.T) {
 	old := time.Now().Add(-48 * time.Hour)
 	require.NoError(t, writeMetadataPath(expired.Path, metadata{Version: metadataVersion, ID: expired.ID, Started: old, Finished: old}))
 	active := create()
-	defer func() { require.NoError(t, active.Close()) }()
+	defer func() {
+		require.NoError(t, active.Close())
+	}()
 	unknown := create()
 	require.NoError(t, unknown.Close())
 	marker := filepath.Join(unknown.Path, "user.txt")
-	require.NoError(t, os.WriteFile(marker, []byte("保留"), 0600))
+	require.NoError(t, os.WriteFile(marker, []byte("保留"), 0o600))
 	require.NoError(t, writeMetadataPath(unknown.Path, metadata{Version: metadataVersion, ID: unknown.ID, Started: old, Finished: old}))
 	// 活动目录也过期，确保保留依赖租约而非时间筛选。
 	require.NoError(t, writeMetadataPath(active.Path, metadata{Version: metadataVersion, ID: active.ID, Started: old, Finished: old}))
@@ -240,7 +247,9 @@ func TestInterruptedCleanupDoesNotOrphanData(t *testing.T) {
 	require.NoError(t, err)
 	output, err := child.StdoutPipe()
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = input.Close() })
+	t.Cleanup(func() {
+		_ = input.Close()
+	})
 	waitChild := startDiagnosticProcess(t, child)
 	ready := make(chan string, 1)
 	readDone := make(chan struct{})

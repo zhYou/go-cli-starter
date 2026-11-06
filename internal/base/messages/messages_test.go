@@ -77,20 +77,35 @@ other = "{{.Name}} 的 {{.Count}} 个文件"
 	bundle, err := NewBundle(catalog)
 	require.NoError(t, err)
 	en, zh := bundle.Localizer("en"), bundle.Localizer("zh")
-	one, err := en.Format("files.count", FormatOptions{Params: map[string]any{"Count": 1, "Name": "Ada"}, PluralCount: 1})
+	one, err := en.Format("files.count", FormatOptions{
+		Params:      map[string]any{"Count": 1, "Name": "Ada"},
+		PluralCount: 1,
+	})
 	require.NoError(t, err)
 	require.Equal(t, "1 file for Ada", one)
-	many, err := en.Format("files.count", FormatOptions{Params: map[string]any{"Count": 2, "Name": "Ada"}, PluralCount: 2})
+	many, err := en.Format("files.count", FormatOptions{
+		Params:      map[string]any{"Count": 2, "Name": "Ada"},
+		PluralCount: 2,
+	})
 	require.NoError(t, err)
 	require.Equal(t, "2 files for Ada", many)
-	count, err := en.Format("files.default_count", FormatOptions{PluralCount: 2, Params: map[string]any{"Unused": "value"}})
+	count, err := en.Format("files.default_count", FormatOptions{
+		PluralCount: 2,
+		Params:      map[string]any{"Unused": "value"},
+	})
 	require.NoError(t, err)
 	require.Equal(t, "2 files", count)
-	translated, err := zh.Format("files.count", FormatOptions{Params: map[string]any{"Count": 2, "Name": "Ada"}, PluralCount: 2})
+	translated, err := zh.Format("files.count", FormatOptions{
+		Params:      map[string]any{"Count": 2, "Name": "Ada"},
+		PluralCount: 2,
+	})
 	require.NoError(t, err)
 	require.Equal(t, "Ada 的 2 个文件", translated)
 
-	partial, err := en.Format("files.count", FormatOptions{Params: map[string]any{"Count": 1}, PluralCount: 1})
+	partial, err := en.Format("files.count", FormatOptions{
+		Params:      map[string]any{"Count": 1},
+		PluralCount: 1,
+	})
 	require.Error(t, err)
 	require.Empty(t, partial)
 	require.Equal(t, "Operation failed [files.count]", en.Text("files.count", map[string]any{"Count": 1}))
@@ -170,7 +185,10 @@ other = "{{.Count}} items"
 	bundle, err := NewBundle(catalog)
 	require.NoError(t, err)
 	localizer := bundle.Localizer("en")
-	text, err := localizer.Format("fallback", FormatOptions{Params: map[string]any{"Count": 1}, PluralCount: 1})
+	text, err := localizer.Format("fallback", FormatOptions{
+		Params:      map[string]any{"Count": 1},
+		PluralCount: 1,
+	})
 	require.NoError(t, err)
 	require.Equal(t, "1 items", text)
 	require.Equal(t, "Operation failed [incomplete]", localizer.Text("incomplete", map[string]any{"Count": 1}))

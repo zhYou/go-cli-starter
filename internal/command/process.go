@@ -43,6 +43,7 @@ func Run(ctx context.Context, call Invocation, options Execution) (result error)
 	if options.WaitDelay == 0 {
 		options.WaitDelay = DefaultWaitDelay
 	}
+
 	env := options.Env
 	if env == nil {
 		env = os.Environ()
@@ -50,8 +51,12 @@ func Run(ctx context.Context, call Invocation, options Execution) (result error)
 	options.Env = append([]string{}, env...)
 	call.Args = append([]string(nil), call.Args...)
 	options.IO = options.IO.WithDefaults()
+
 	ctx, finish := observe(ctx, call, options)
-	defer func() { finish(result) }()
+	defer func() {
+		finish(result)
+	}()
+
 	path, err := resolve(call.Program, options.Dir, options.Env)
 	if err != nil {
 		return err
@@ -62,8 +67,6 @@ func Run(ctx context.Context, call Invocation, options Execution) (result error)
 	}
 	return err
 }
-
-func contextError(ctx context.Context) error { return errors.Join(ctx.Err(), context.Cause(ctx)) }
 
 // WithEnv 独立复制环境，再追加覆盖变量；父配置不变。
 func (options Execution) WithEnv(values ...string) Execution {
@@ -81,4 +84,8 @@ func (options Execution) WithOperation(operation string) Execution {
 		options.Operation = operation
 	}
 	return options
+}
+
+func contextError(ctx context.Context) error {
+	return errors.Join(ctx.Err(), context.Cause(ctx))
 }

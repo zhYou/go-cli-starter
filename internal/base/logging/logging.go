@@ -63,9 +63,13 @@ func New(info RunInfo, options Options, warn func(error)) *Logger {
 }
 
 // Sync 同步日志后端，不关闭输出；仅由拥有该 logger 的应用入口调用。
-func (l *Logger) Sync() error { return l.sugar.Sync() }
+func (l *Logger) Sync() error {
+	return l.sugar.Sync()
+}
 
-type warningWriter struct{ warn func(error) }
+type warningWriter struct {
+	warn func(error)
+}
 
 func (w warningWriter) Write(data []byte) (int, error) {
 	w.warn(errors.New(strings.TrimSpace(string(data))))

@@ -27,12 +27,15 @@ func TestIsolatedEnvironmentHelper(t *testing.T) {
 	cfg := Defaults()
 	cfg.Exporter = File
 	var out bytes.Buffer
-	s := Start(t.Context(), cfg, Info{}, &out, func(error) { fmt.Fprintln(os.Stderr, "sanitized_trace_warning") })
+	s := Start(t.Context(), cfg, Info{}, &out, func(error) {
+		fmt.Fprintln(os.Stderr, "sanitized_trace_warning")
+	})
 	_, span := s.Tracer.Start(t.Context(), "fixture")
 	fmt.Println("recording", span.IsRecording())
 	span.End()
 	_ = s.Close(t.Context())
 }
+
 func childEnvironment(extra ...string) []string {
 	var env []string
 	for _, entry := range os.Environ() {
@@ -42,6 +45,7 @@ func childEnvironment(extra ...string) []string {
 	}
 	return append(env, extra...)
 }
+
 func runEnvironmentHelper(t *testing.T, extra ...string) string {
 	t.Helper()
 	exe, err := os.Executable()
@@ -55,9 +59,10 @@ func runEnvironmentHelper(t *testing.T, extra ...string) string {
 	require.NoError(t, err, string(output))
 	return string(output)
 }
+
 func TestLocalTraceIgnoresRemoteExporterEnvironment(t *testing.T) {
 	fifo := filepath.Join(t.TempDir(), "certificate")
-	require.NoError(t, syscall.Mkfifo(fifo, 0600))
+	require.NoError(t, syscall.Mkfifo(fifo, 0o600))
 	vars := []string{
 		"OTEL_EXPORTER_OTLP_HEADERS=Authorization=private-fixture-header%zz",
 		"OTEL_EXPORTER_OTLP_TRACES_HEADERS=Authorization=private-fixture-trace%zz",
@@ -72,6 +77,7 @@ func TestLocalTraceIgnoresRemoteExporterEnvironment(t *testing.T) {
 	require.NotContains(t, output, "private-fixture")
 	require.NotContains(t, output, "sanitized_trace_warning")
 }
+
 func TestMalformedSDKEnvironmentDegradesWithoutRawOutput(t *testing.T) {
 	for _, env := range []string{"OTEL_RESOURCE_ATTRIBUTES=private-fixture-resource", "OTEL_RESOURCE_ATTRIBUTES=key=private-fixture%zz", "OTEL_TRACES_SAMPLER=private-fixture-sampler", "OTEL_BSP_MAX_QUEUE_SIZE=private-fixture-size"} {
 		t.Run(strings.SplitN(env, "=", 2)[0], func(t *testing.T) {

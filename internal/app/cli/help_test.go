@@ -61,7 +61,9 @@ func TestHelpRenderingFailureIsRuntimeAndLeavesStdoutEmpty(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			bundle := catalogFixture(t, tc.language, "help.usage", tc.replacement)
-			loader := func() (*messages.Bundle, error) { return bundle, nil }
+			loader := func() (*messages.Bundle, error) {
+				return bundle, nil
+			}
 			var out, stderr bytes.Buffer
 			code := run(context.Background(), []string{"--lang", tc.language, "--help"}, Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv}, loader)
 			require.Equal(t, 1, code, stderr.String())
@@ -73,7 +75,9 @@ func TestHelpRenderingFailureIsRuntimeAndLeavesStdoutEmpty(t *testing.T) {
 
 func TestAllHelpCallbacksPropagateRenderingFailure(t *testing.T) {
 	bundle := catalogFixture(t, "en", "help.usage", "other = \"prefix {{.Missing}} suffix\"\n")
-	loader := func() (*messages.Bundle, error) { return bundle, nil }
+	loader := func() (*messages.Bundle, error) {
+		return bundle, nil
+	}
 	for _, args := range [][]string{{}, {"--help"}, {"greet", "--help"}, {"help", "greet"}, {"completion"}} {
 		var out, stderr bytes.Buffer
 		code := run(context.Background(), args, Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv}, loader)
@@ -90,7 +94,12 @@ func TestExistingHelpAndVersionFlagsKeepTheirDescriptions(t *testing.T) {
 				var out bytes.Buffer
 				root, call, err := buildRoot(defaults(Options{Out: &out, LookupEnv: noFixtureEnv}), locales.LoadBundle)
 				require.NoError(t, err)
-				cmd := &cobra.Command{Use: "extra", RunE: func(*cobra.Command, []string) error { return nil }}
+				cmd := &cobra.Command{
+					Use: "extra",
+					RunE: func(*cobra.Command, []string) error {
+						return nil
+					},
+				}
 				if flag == "version" {
 					cmd.Version = "dev"
 					cmd.Flags().Bool("help", false, "custom help description")

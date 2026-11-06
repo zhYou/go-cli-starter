@@ -16,20 +16,24 @@ func TestTwoInvocationsDoNotShareDependencies(t *testing.T) {
 	var outA, outB bytes.Buffer
 	var levels []string
 	makeRoot := func(label string, out *bytes.Buffer) *invocationFixture {
-		deps := Dependencies{LoadConfig: func(o config.Options) (config.Config, error) {
-			level := "warn"
-			if o.LogLevel != nil {
-				level = *o.LogLevel
-			}
-			cfg := config.Defaults()
-			cfg.Logging = logging.Config{Level: level, Output: "stderr"}
-			return cfg, nil
-		}, Greet: func(_ context.Context, o greeting.Options) (greeting.Result, error) {
-			return greeting.Result{Message: label + o.Name}, nil
-		}, NewLogger: func(info logging.RunInfo, o logging.Options, warn func(error)) *logging.Logger {
-			levels = append(levels, o.Config.Level)
-			return logging.New(info, o, warn)
-		}}
+		deps := Dependencies{
+			LoadConfig: func(o config.Options) (config.Config, error) {
+				level := "warn"
+				if o.LogLevel != nil {
+					level = *o.LogLevel
+				}
+				cfg := config.Defaults()
+				cfg.Logging = logging.Config{Level: level, Output: "stderr"}
+				return cfg, nil
+			},
+			Greet: func(_ context.Context, o greeting.Options) (greeting.Result, error) {
+				return greeting.Result{Message: label + o.Name}, nil
+			},
+			NewLogger: func(info logging.RunInfo, o logging.Options, warn func(error)) *logging.Logger {
+				levels = append(levels, o.Config.Level)
+				return logging.New(info, o, warn)
+			},
+		}
 		opts := Options{Out: out, ErrOut: &bytes.Buffer{}, Dependencies: &deps}
 		require.Nil(t, deps.Validator)
 		return &invocationFixture{run: func(args ...string) {
@@ -45,22 +49,34 @@ func TestTwoInvocationsDoNotShareDependencies(t *testing.T) {
 	require.Equal(t, []string{"debug", "warn"}, levels)
 }
 
-type invocationFixture struct{ run func(...string) }
+type invocationFixture struct {
+	run func(...string)
+}
 
 func TestInvalidArgsNeverLoadConfigOrRunBusiness(t *testing.T) {
 	for _, args := range [][]string{{"greet"}, {"greet", "--name", " "}, {"greet", "--name", "x", "extra"}, {"greet", "--unknown"}} {
 		count := 0
-		deps := Dependencies{LoadConfig: func(config.Options) (config.Config, error) { count++; return config.Config{}, nil }, Greet: func(context.Context, greeting.Options) (greeting.Result, error) {
-			count++
-			return greeting.Result{}, nil
-		}}
+		deps := Dependencies{
+			LoadConfig: func(config.Options) (config.Config, error) {
+				count++
+				return config.Config{}, nil
+			},
+			Greet: func(context.Context, greeting.Options) (greeting.Result, error) {
+				count++
+				return greeting.Result{}, nil
+			},
+		}
 		require.Equal(t, 2, Run(context.Background(), args, Options{Dependencies: &deps}))
 		require.Zero(t, count)
 	}
 }
+
 func TestDiscoveryNeverLoadsConfiguration(t *testing.T) {
 	count := 0
-	deps := Dependencies{LoadConfig: func(config.Options) (config.Config, error) { count++; return config.Config{}, nil }}
+	deps := Dependencies{LoadConfig: func(config.Options) (config.Config, error) {
+		count++
+		return config.Config{}, nil
+	}}
 	for _, args := range [][]string{{"help", "greet"}, {"greet", "--help"}, {"version"}, {"--version"}, {"schema"}, {"completion", "bash"}, {"__complete", "greet", ""}} {
 		require.Zero(t, Run(context.Background(), args, Options{Dependencies: &deps}), "%v", args)
 	}

@@ -27,9 +27,17 @@ func invokeContext(t *testing.T, ctx context.Context, args ...string) (int, stri
 	t.Helper()
 	var out, errOut bytes.Buffer
 	code := Run(ctx, args, Options{
-		Name: "testcli", Version: "v1.2.3", Commit: "abc123", Date: "2026-10-28",
-		Out: &out, ErrOut: &errOut, ConfigDir: t.TempDir(), Directories: &paths.Directories{State: t.TempDir()},
-		LookupEnv: func(string) (string, bool) { return "", false },
+		Name:        "testcli",
+		Version:     "v1.2.3",
+		Commit:      "abc123",
+		Date:        "2026-10-28",
+		Out:         &out,
+		ErrOut:      &errOut,
+		ConfigDir:   t.TempDir(),
+		Directories: &paths.Directories{State: t.TempDir()},
+		LookupEnv: func(string) (string, bool) {
+			return "", false
+		},
 	})
 	return code, out.String(), errOut.String()
 }
@@ -46,16 +54,22 @@ func metadataRoot(opts Options) *cobra.Command {
 // isolatedOptions 显式注入配置、目录与环境；任何 argv 都不读取或写入用户状态。
 func isolatedOptions(home string, out, stderr io.Writer) Options {
 	dirs := paths.Directories{Config: home, Data: filepath.Join(home, "data"), State: filepath.Join(home, "state"), Cache: filepath.Join(home, "cache")}
-	return Options{Directories: &dirs, Out: out, ErrOut: stderr, LookupEnv: func(key string) (string, bool) {
-		if key == "GO_CLI_STARTER_HOME" {
-			return home, true
-		}
-		return "", false
-	}, Dependencies: &Dependencies{LoadConfig: func(config.Options) (config.Config, error) {
-		cfg := config.Defaults()
-		cfg.Logging.Output = "none"
-		return cfg, nil
-	}}}
+	return Options{
+		Directories: &dirs,
+		Out:         out,
+		ErrOut:      stderr,
+		LookupEnv: func(key string) (string, bool) {
+			if key == "GO_CLI_STARTER_HOME" {
+				return home, true
+			}
+			return "", false
+		},
+		Dependencies: &Dependencies{LoadConfig: func(config.Options) (config.Config, error) {
+			cfg := config.Defaults()
+			cfg.Logging.Output = "none"
+			return cfg, nil
+		}},
+	}
 }
 
 func catalogFixture(t *testing.T, language, id, replacement string) *messages.Bundle {
@@ -146,4 +160,6 @@ other = "乙名称"
 	return bundle
 }
 
-func noFixtureEnv(string) (string, bool) { return "", false }
+func noFixtureEnv(string) (string, bool) {
+	return "", false
+}

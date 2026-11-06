@@ -43,8 +43,8 @@ func TestInspectRejectsAmbiguousOrInvalidEntry(t *testing.T) {
 				require.NoError(t, os.Remove(file))
 			case "multiple":
 				//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
-				require.NoError(t, os.MkdirAll(filepath.Join(root, "cmd", "other"), 0755))
-				require.NoError(t, os.WriteFile(filepath.Join(root, "cmd", "other", "main.go"), []byte("package main\nconst appName=\"other\"\nfunc main(){}"), 0600))
+				require.NoError(t, os.MkdirAll(filepath.Join(root, "cmd", "other"), 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(root, "cmd", "other", "main.go"), []byte("package main\nconst appName=\"other\"\nfunc main(){}"), 0o600))
 			default:
 				source := map[string]string{
 					"mismatch":     "package main\nconst appName=\"other\"\nfunc main(){}",
@@ -55,7 +55,7 @@ func TestInspectRejectsAmbiguousOrInvalidEntry(t *testing.T) {
 					"main-args":    "package main\nconst appName=\"tool\"\nfunc main(x int){}",
 					"variable":     "package main\nvar appName=\"tool\"\nfunc main(){}",
 				}[mode]
-				require.NoError(t, os.WriteFile(file, []byte(source), 0600))
+				require.NoError(t, os.WriteFile(file, []byte(source), 0o600))
 			}
 			_, err := Inspect(root)
 			require.Error(t, err)
@@ -66,7 +66,7 @@ func TestInspectRejectsAmbiguousOrInvalidEntry(t *testing.T) {
 func TestInspectRejectsSymlink(t *testing.T) {
 	root := projectFixture(t, "example.com/tool", "tool")
 	outside := filepath.Join(t.TempDir(), "outside.go")
-	require.NoError(t, os.WriteFile(outside, []byte("package main\nconst appName=\"tool\"\nfunc main(){}"), 0600))
+	require.NoError(t, os.WriteFile(outside, []byte("package main\nconst appName=\"tool\"\nfunc main(){}"), 0o600))
 	file := filepath.Join(root, "cmd", "tool", "main.go")
 	require.NoError(t, os.Remove(file))
 	if err := os.Symlink(outside, file); err != nil {

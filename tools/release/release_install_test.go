@@ -29,7 +29,7 @@ func installBoundaryObserver(t *testing.T) string {
 	require.NoError(t, os.WriteFile(source, []byte(`package main
 import ("os"; "fmt")
 func main() { _ = os.WriteFile(os.Getenv("INSTALL_BOUNDARY_MARKER"), []byte("called"), 0600); fmt.Fprintln(os.Stderr, "checksum mismatch"); os.Exit(1) }
-`), 0600))
+`), 0o600))
 	binary := filepath.Join(dir, "mise")
 	if runtime.GOOS == windowsPlatform {
 		binary += executableSuffix
@@ -55,7 +55,7 @@ func releaseMetadataFixture(t *testing.T, dir, version string) {
 	require.NoError(t, err)
 	data, err := json.Marshal(map[string]string{"project_name": appName, "version": version, "commit": strings.TrimSpace(string(head))})
 	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "metadata.json"), data, 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "metadata.json"), data, 0o600))
 }
 
 func TestReleaseRejectsUnlistedInstallArchive(t *testing.T) {
@@ -67,7 +67,7 @@ func TestReleaseRejectsUnlistedInstallArchive(t *testing.T) {
 		extension = ".zip"
 	}
 	unlisted := appName + "_9.9.9_" + runtime.GOOS + "_" + runtime.GOARCH + extension
-	require.NoError(t, os.WriteFile(filepath.Join(dir, unlisted), []byte("未列入最终校验清单的宿主归档"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, unlisted), []byte("未列入最终校验清单的宿主归档"), 0o600))
 	require.NoError(t, checkReleaseSnapshot(dir), "原有六目标清单依然有效")
 	err := verifyRelease(dir)
 	require.NoFileExists(t, marker, "未列入清单的归档不得到达任何 mise 安装调用")
@@ -100,13 +100,13 @@ func TestArchiveInstallRejectsChangedValidatedSnapshot(t *testing.T) {
 			case "missing":
 				delete(snapshot.checksums, host)
 			case "changed-bytes":
-				require.NoError(t, os.WriteFile(filepath.Join(dir, host), []byte("结构验证后被替换的归档"), 0600))
+				require.NoError(t, os.WriteFile(filepath.Join(dir, host), []byte("结构验证后被替换的归档"), 0o600))
 			case "changed-digest":
 				snapshot.checksums[host] = strings.Repeat("0", 64)
 			case "stale-head":
 				data, err := json.Marshal(map[string]string{"project_name": appName, "version": "0.1.0", "commit": strings.Repeat("0", 40)})
 				require.NoError(t, err)
-				require.NoError(t, os.WriteFile(filepath.Join(dir, "metadata.json"), data, 0600))
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "metadata.json"), data, 0o600))
 			}
 			err = verifyArchiveInstall(dir, snapshot)
 			require.NoFileExists(t, marker, "版本、成员或摘要拒绝必须先于安装")
@@ -129,7 +129,7 @@ func TestReleaseRejectsMixedManifestVersionsBeforeInstall(t *testing.T) {
 	sbom = []byte(strings.ReplaceAll(string(sbom), host, changed))
 	require.NoError(t, os.Remove(filepath.Join(dir, host+".spdx.json")))
 	//nolint:gosec // G703：changed 仅由固定测试身份与版本组成，目标位于当前临时目录。
-	require.NoError(t, os.WriteFile(filepath.Join(dir, changed+".spdx.json"), sbom, 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, changed+".spdx.json"), sbom, 0o600))
 	//nolint:gosec // G304：只读取当前测试生成的校验清单 fixture。
 	sums, err := os.ReadFile(filepath.Join(dir, "checksums.txt"))
 	require.NoError(t, err)
@@ -145,7 +145,7 @@ func TestReleaseRejectsMixedManifestVersionsBeforeInstall(t *testing.T) {
 		}
 	}
 	//nolint:gosec // G703：仅更新当前临时 fixture 内的固定校验清单。
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "checksums.txt"), []byte(strings.Join(lines, "\n")+"\n"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "checksums.txt"), []byte(strings.Join(lines, "\n")+"\n"), 0o600))
 	err = verifyRelease(dir)
 	require.NoFileExists(t, marker, "混合版本必须先于安装被拒绝")
 	require.ErrorContains(t, err, "发布归档版本不一致")

@@ -56,12 +56,12 @@ func TestWindowsHelper(t *testing.T) {
 		}
 	case "marker-exit":
 		//nolint:gosec // G703：辅助进程只执行自身测试二进制；路径来自当前测试生成的临时目录。
-		if err := os.WriteFile(args[1], []byte("executed"), 0600); err != nil {
+		if err := os.WriteFile(args[1], []byte("executed"), 0o600); err != nil {
 			os.Exit(9)
 		}
 	case "marker":
 		//nolint:gosec // G703：辅助进程只执行自身测试二进制；路径来自当前测试生成的临时目录。
-		_ = os.WriteFile(args[1], []byte("executed"), 0600)
+		_ = os.WriteFile(args[1], []byte("executed"), 0o600)
 		time.Sleep(5 * time.Second)
 	case "handle":
 		raw, _ := strconv.ParseUint(args[1], 10, 64)

@@ -113,8 +113,11 @@ func checkFile(path string, locale bool) error {
 	}
 	if !locale {
 		_, err := config.Load(config.Options{
-			Path: path, Explicit: true,
-			LookupEnv: func(string) (string, bool) { return "", false },
+			Path:     path,
+			Explicit: true,
+			LookupEnv: func(string) (string, bool) {
+				return "", false
+			},
 		})
 		if err != nil {
 			return fmt.Errorf("应用配置 %s 无效: %w", path, err)

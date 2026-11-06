@@ -18,7 +18,7 @@ func versionFixture(t *testing.T) string {
 	for _, name := range []string{"mise.toml", "go.mod", "README.md", "AGENTS.md", ".github/workflows/ci.yml", ".github/workflows/release.yml"} {
 		dest := filepath.Join(root, name)
 		//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
-		require.NoError(t, os.MkdirAll(filepath.Dir(dest), 0755))
+		require.NoError(t, os.MkdirAll(filepath.Dir(dest), 0o755))
 		require.NoError(t, fixture.CopyFile(filepath.Join("../..", name), dest))
 	}
 	return root
@@ -36,9 +36,12 @@ func TestVersionsLoadUnifiedTools(t *testing.T) {
 	versions, err := toolchain.Load(root)
 	require.NoError(t, err)
 	require.Equal(t, map[string]string{
-		"go": "1.27.3", "golangci-lint": "2.15.0", "goreleaser": "2.19.0",
-		"go:golang.org/x/vuln/cmd/govulncheck": "1.9.0", "syft": "1.55.0",
-		"go:golang.org/x/tools/gopls": "0.24.0",
+		"go":                                   "1.27.3",
+		"golangci-lint":                        "2.15.0",
+		"goreleaser":                           "2.19.0",
+		"go:golang.org/x/vuln/cmd/govulncheck": "1.9.0",
+		"syft":                                 "1.55.0",
+		"go:golang.org/x/tools/gopls":          "0.24.0",
 	}, versions.Tools)
 	require.NoError(t, checkVersions(root))
 }
@@ -47,7 +50,7 @@ func TestVersionsRejectNonExactToolVersion(t *testing.T) {
 	for _, version := range []string{"latest", "0.24", "0.24.0-rc.1", "0.24.0+patched"} {
 		t.Run(version, func(t *testing.T) {
 			root := versionFixture(t)
-			require.NoError(t, os.WriteFile(filepath.Join(root, "mise.toml"), []byte("min_version = \"2026.10.21\"\n[tools]\n\"go:golang.org/x/tools/gopls\" = \""+version+"\"\n"), 0600))
+			require.NoError(t, os.WriteFile(filepath.Join(root, "mise.toml"), []byte("min_version = \"2026.10.21\"\n[tools]\n\"go:golang.org/x/tools/gopls\" = \""+version+"\"\n"), 0o600))
 			require.ErrorContains(t, checkVersions(root), "必须固定稳定的精确版本")
 		})
 	}
@@ -60,7 +63,7 @@ func TestVersionsRejectGoplsDocumentationMismatch(t *testing.T) {
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	//nolint:gosec // G703：只修改当前测试临时目录内的文档 fixture。
-	require.NoError(t, os.WriteFile(path, []byte(strings.Replace(string(data), "| gopls | 0.24.0 |", "| gopls | 0.24.1 |", 1)), 0600))
+	require.NoError(t, os.WriteFile(path, []byte(strings.Replace(string(data), "| gopls | 0.24.0 |", "| gopls | 0.24.1 |", 1)), 0o600))
 	require.ErrorContains(t, checkVersions(root), "README 工具 gopls")
 }
 
@@ -71,7 +74,7 @@ func TestVersionsRejectCIMismatch(t *testing.T) {
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	//nolint:gosec // G703：只修改临时 fixture 的固定 CI 配置，用于验证版本不一致。
-	require.NoError(t, os.WriteFile(path, []byte(strings.ReplaceAll(string(data), "version: 2026.10.21", "version: 2026.10.20")), 0600))
+	require.NoError(t, os.WriteFile(path, []byte(strings.ReplaceAll(string(data), "version: 2026.10.21", "version: 2026.10.20")), 0o600))
 	require.ErrorContains(t, checkVersions(root), "CI mise 版本不一致")
 }
 
@@ -79,15 +82,15 @@ func TestHistoricalVersionTextIsNotCurrentDeclaration(t *testing.T) {
 	root := versionFixture(t)
 	path := filepath.Join(root, "docs/superpowers/specs/history.md")
 	//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
-	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0755))
-	require.NoError(t, os.WriteFile(path, []byte("Go 1.20.0 mise 2020.1.1"), 0600))
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	require.NoError(t, os.WriteFile(path, []byte("Go 1.20.0 mise 2020.1.1"), 0o600))
 	require.NoError(t, checkVersions(root))
 	file := filepath.Join(root, "README.md")
 	//nolint:gosec // G304：测试路径和权限只来自当前临时 fixture，不读取用户文件。
 	data, err := os.ReadFile(file)
 	require.NoError(t, err)
 	//nolint:gosec // G703：路径只来自当前测试的临时目录或测试子进程的显式协议参数。
-	require.NoError(t, os.WriteFile(file, []byte(strings.Replace(string(data), "| Go | 1.27.3 |", "| Go | 1.27.30 |", 1)), 0600))
+	require.NoError(t, os.WriteFile(file, []byte(strings.Replace(string(data), "| Go | 1.27.3 |", "| Go | 1.27.30 |", 1)), 0o600))
 	require.Error(t, checkVersions(root))
 }
 
@@ -117,7 +120,7 @@ func TestVersionsGoToolchain(t *testing.T) {
 			if tt.toolchain != "" {
 				module += "\ntoolchain " + tt.toolchain + "\n"
 			}
-			require.NoError(t, os.WriteFile(filepath.Join(root, "go.mod"), []byte(module), 0600))
+			require.NoError(t, os.WriteFile(filepath.Join(root, "go.mod"), []byte(module), 0o600))
 			err := checkVersions(root)
 			if tt.wantError {
 				require.ErrorContains(t, err, "模块最低 Go 版本、工具链与 mise 不一致")

@@ -11,7 +11,9 @@ import (
 )
 
 // Directories 保存应用私有配置、数据、状态与缓存目录。
-type Directories struct{ Config, Data, State, Cache string }
+type Directories struct {
+	Config, Data, State, Cache string
+}
 
 // Options 声明本次调用的显式依赖与覆盖选项。
 type Options struct {
@@ -20,7 +22,9 @@ type Options struct {
 }
 
 // EnvPrefix 从应用名生成稳定的环境变量前缀。
-func EnvPrefix(app string) string { return strings.ToUpper(strings.ReplaceAll(app, "-", "_")) }
+func EnvPrefix(app string) string {
+	return strings.ToUpper(strings.ReplaceAll(app, "-", "_"))
+}
 
 // Resolve 解析应用目录，不创建文件或修改环境。
 func Resolve(opts Options) (Directories, error) {
@@ -39,8 +43,12 @@ func Resolve(opts Options) (Directories, error) {
 		}
 		return v
 	}
-	join := func(parts ...string) string { return path.Join(parts...) }
-	absolute := func(s string) bool { return strings.HasPrefix(s, "/") }
+	join := func(parts ...string) string {
+		return path.Join(parts...)
+	}
+	absolute := func(s string) bool {
+		return strings.HasPrefix(s, "/")
+	}
 	if platform == "windows" {
 		join = func(parts ...string) string {
 			for i := range parts {
@@ -113,4 +121,6 @@ func Resolve(opts Options) (Directories, error) {
 }
 
 // ConfigFile 返回私有配置文件的完整路径。
-func (d Directories) ConfigFile() string { return filepath.Join(d.Config, "config.toml") }
+func (d Directories) ConfigFile() string {
+	return filepath.Join(d.Config, "config.toml")
+}

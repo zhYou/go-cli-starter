@@ -43,7 +43,7 @@ func NewID() string {
 // Open 创建独立运行目录，先取得存活锁，再发布可清理的元数据。
 func Open(base string, config Config, warn func(error)) (*Run, error) {
 	// #nosec G703 -- base 来自已校验的用户状态路径或测试临时目录，允许创建该配置位置。
-	if err := os.MkdirAll(base, 0700); err != nil {
+	if err := os.MkdirAll(base, 0o700); err != nil {
 		return nil, err
 	}
 	if err := Cleanup(base, config); err != nil && warn != nil {
@@ -53,17 +53,19 @@ func Open(base string, config Config, warn func(error)) (*Run, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = parent.Close() }()
+	defer func() {
+		_ = parent.Close()
+	}()
 	id := NewID()
 	path := filepath.Join(base, id)
-	if err := parent.Mkdir(id, 0700); err != nil {
+	if err := parent.Mkdir(id, 0o700); err != nil {
 		return nil, err
 	}
 	root, err := parent.OpenRoot(id)
 	if err != nil {
 		return nil, err
 	}
-	file, err := root.OpenFile(leaseName, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0600)
+	file, err := root.OpenFile(leaseName, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o600)
 	if err != nil {
 		_ = root.Close()
 		return nil, err
@@ -72,7 +74,7 @@ func Open(base string, config Config, warn func(error)) (*Run, error) {
 		_ = root.Close()
 		return nil, err
 	}
-	lease := flock.New(filepath.Join(path, leaseName), flock.SetPermissions(0600), flock.SetFlag(os.O_RDWR))
+	lease := flock.New(filepath.Join(path, leaseName), flock.SetPermissions(0o600), flock.SetFlag(os.O_RDWR))
 	locked, err := lease.TryLock()
 	if err != nil || !locked {
 		_ = lease.Close()
@@ -84,7 +86,16 @@ func Open(base string, config Config, warn func(error)) (*Run, error) {
 		_ = root.Close()
 		return nil, err
 	}
-	return &Run{ID: id, Path: path, root: root, lease: lease, config: config, base: base, writers: map[string]*Writer{}, warn: warn}, nil
+	return &Run{
+		ID:      id,
+		Path:    path,
+		root:    root,
+		lease:   lease,
+		config:  config,
+		base:    base,
+		writers: map[string]*Writer{},
+		warn:    warn,
+	}, nil
 }
 
 // Writer 返回本会话拥有的文件 writer，只接受登记的诊断文件名。
@@ -135,12 +146,13 @@ func (r *Run) Close() error {
 	})
 	return r.closeErr
 }
+
 func writeMetadata(root *os.Root, value metadata) error {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return err
 	}
-	f, err := root.OpenFile(metadataTemporaryName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	f, err := root.OpenFile(metadataTemporaryName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
 	}
@@ -152,4 +164,7 @@ func writeMetadata(root *os.Root, value metadata) error {
 	}
 	return root.Rename(metadataTemporaryName, metadataName)
 }
-func readEntries(root *os.Root) ([]fs.DirEntry, error) { return fs.ReadDir(root.FS(), ".") }
+
+func readEntries(root *os.Root) ([]fs.DirEntry, error) {
+	return fs.ReadDir(root.FS(), ".")
+}

@@ -30,7 +30,8 @@ type flagSchema struct {
 func newSchemaCommand(root *cobra.Command, registry *resultRegistry) *cobra.Command {
 	var target *cobra.Command
 	return &cobra.Command{
-		Use: "schema [命令路径...]", Short: "以 JSON 格式描述命令和选项",
+		Use:         "schema [命令路径...]",
+		Short:       "以 JSON 格式描述命令和选项",
 		Annotations: map[string]string{annotationSkipConfig: annotationEnabled},
 		Args: func(_ *cobra.Command, args []string) error {
 			var err error
@@ -49,7 +50,15 @@ func newSchemaCommand(root *cobra.Command, registry *resultRegistry) *cobra.Comm
 }
 
 func describeCommand(cmd *cobra.Command, registry *resultRegistry) commandSchema {
-	result := commandSchema{ResultSchema: (*registry)[cmd], Path: cmd.CommandPath(), Use: cmd.Use, Description: cmd.Short, Examples: cmd.Example, Flags: []flagSchema{}, Commands: []commandSchema{}}
+	result := commandSchema{
+		ResultSchema: (*registry)[cmd],
+		Path:         cmd.CommandPath(),
+		Use:          cmd.Use,
+		Description:  cmd.Short,
+		Examples:     cmd.Example,
+		Flags:        []flagSchema{},
+		Commands:     []commandSchema{},
+	}
 	add := func(inherited bool) func(*pflag.Flag) {
 		return func(flag *pflag.Flag) {
 			if flag.Hidden {
@@ -61,7 +70,9 @@ func describeCommand(cmd *cobra.Command, registry *resultRegistry) commandSchema
 	}
 	cmd.LocalFlags().VisitAll(add(false))
 	cmd.InheritedFlags().VisitAll(add(true))
-	sort.Slice(result.Flags, func(i, j int) bool { return result.Flags[i].Name < result.Flags[j].Name })
+	sort.Slice(result.Flags, func(i, j int) bool {
+		return result.Flags[i].Name < result.Flags[j].Name
+	})
 	for _, child := range cmd.Commands() {
 		if !child.Hidden {
 			result.Commands = append(result.Commands, describeCommand(child, registry))

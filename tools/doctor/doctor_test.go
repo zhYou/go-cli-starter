@@ -34,11 +34,14 @@ func TestDoctorHelper(t *testing.T) {
 		start := time.Now().UnixNano()
 		ready, gate := os.Args[len(os.Args)-3], os.Args[len(os.Args)-2]
 		//nolint:gosec // G703：同步路径只由当前测试的临时目录生成。
-		if err := os.WriteFile(ready, []byte("ready"), 0600); err != nil {
+		if err := os.WriteFile(ready, []byte("ready"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 		//nolint:gosec // G703：释放路径只由父测试的临时 fixture 传入。
-		require.Eventually(t, func() bool { _, err := os.Stat(gate); return err == nil }, 2*time.Second, time.Millisecond, "未收到探测释放信号")
+		require.Eventually(t, func() bool {
+			_, err := os.Stat(gate)
+			return err == nil
+		}, 2*time.Second, time.Millisecond, "未收到探测释放信号")
 		data, _ := json.Marshal([2]int64{start, time.Now().UnixNano()})
 		_, _ = os.Stdout.Write(data)
 	case "sleep":
@@ -55,7 +58,10 @@ func TestDoctorProbesBoundedAndOrdered(t *testing.T) {
 	require.NoError(t, err)
 	calls := []cmdexec.Invocation{}
 	for _, mode := range []string{"sleep", "large", "version"} {
-		calls = append(calls, cmdexec.Invocation{Program: exe, Args: []string{"-test.run=^TestDoctorHelper$", "--", mode}})
+		calls = append(calls, cmdexec.Invocation{
+			Program: exe,
+			Args:    []string{"-test.run=^TestDoctorHelper$", "--", mode},
+		})
 	}
 	started := time.Now()
 	results := runDoctorProbes(t.Context(), calls)
@@ -81,7 +87,15 @@ func TestDoctorProbesBoundedAndOrdered(t *testing.T) {
 
 func TestDoctorSummaryStableAndExplicit(t *testing.T) {
 	var out bytes.Buffer
-	calls := []doctorProbe{{key: "go", want: "1.27.3", spec: toolchain.ToolSpec{Name: "go"}}, {key: "syft", want: "1.55.0", spec: toolchain.ToolSpec{Name: "syft"}}}
+	calls := []doctorProbe{{
+		key:  "go",
+		want: "1.27.3",
+		spec: toolchain.ToolSpec{Name: "go"},
+	}, {
+		key:  "syft",
+		want: "1.55.0",
+		spec: toolchain.ToolSpec{Name: "syft"},
+	}}
 	results := []cmdexec.Result{{Status: cmdexec.Succeeded, Stdout: []byte("go version go1.27.3 linux/amd64\n")}, {Status: cmdexec.Succeeded, StdoutTruncated: true}}
 	require.Error(t, reportDoctorProbes(&out, calls, results))
 	require.Equal(t, "通过：go 1.27.3\n", out.String())
@@ -102,12 +116,18 @@ func TestDoctorConcurrencyLimit(t *testing.T) {
 	require.NoError(t, err)
 	calls := make([]cmdexec.Invocation, 8)
 	for i := range calls {
-		calls[i] = cmdexec.Invocation{Program: exe, Args: []string{"-test.run=^TestDoctorHelper$", "--", filepath.Join(root, fmt.Sprintf("ready-%d", i)), filepath.Join(root, fmt.Sprintf("gate-%d", i/4)), "interval"}}
+		calls[i] = cmdexec.Invocation{
+			Program: exe,
+			Args:    []string{"-test.run=^TestDoctorHelper$", "--", filepath.Join(root, fmt.Sprintf("ready-%d", i)), filepath.Join(root, fmt.Sprintf("gate-%d", i/4)), "interval"},
+		}
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	done := make(chan []cmdexec.Result, 1)
 	finished := make(chan struct{})
-	go func() { defer close(finished); done <- runDoctorProbes(ctx, calls) }()
+	go func() {
+		defer close(finished)
+		done <- runDoctorProbes(ctx, calls)
+	}()
 	t.Cleanup(func() {
 		cancel()
 		select {
@@ -119,9 +139,12 @@ func TestDoctorConcurrencyLimit(t *testing.T) {
 	for wave := 0; wave < 2; wave++ {
 		for slot := 0; slot < 4; slot++ {
 			ready := filepath.Join(root, fmt.Sprintf("ready-%d", wave*4+slot))
-			require.Eventually(t, func() bool { _, err := os.Stat(ready); return err == nil }, 2*time.Second, time.Millisecond, "未出现探测就绪标记 %s", ready)
+			require.Eventually(t, func() bool {
+				_, err := os.Stat(ready)
+				return err == nil
+			}, 2*time.Second, time.Millisecond, "未出现探测就绪标记 %s", ready)
 		}
-		require.NoError(t, os.WriteFile(filepath.Join(root, fmt.Sprintf("gate-%d", wave)), nil, 0600))
+		require.NoError(t, os.WriteFile(filepath.Join(root, fmt.Sprintf("gate-%d", wave)), nil, 0o600))
 	}
 	var results []cmdexec.Result
 	select {
@@ -174,7 +197,7 @@ func main() {
     default: fmt.Println(name + " fixture")
     }
 }
-`), 0600))
+`), 0o600))
 	binary := filepath.Join(dir, "probe")
 	if runtime.GOOS == windowsPlatform {
 		binary += executableSuffix
@@ -188,7 +211,7 @@ func main() {
 func doctorEnvironmentFixture(t *testing.T, binary, missing string) *os.File {
 	t.Helper()
 	root := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(root, "mise.toml"), []byte("min_version = \"2026.10.21\"\n[tools]\n\"go:golang.org/x/tools/gopls\" = \"0.24.0\"\n"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "mise.toml"), []byte("min_version = \"2026.10.21\"\n[tools]\n\"go:golang.org/x/tools/gopls\" = \"0.24.0\"\n"), 0o600))
 	bin := t.TempDir()
 	for _, name := range []string{"mise", "git", "gh", "codex", "rtk", "gopls"} {
 		if name == missing {
@@ -204,11 +227,33 @@ func doctorEnvironmentFixture(t *testing.T, binary, missing string) *os.File {
 	t.Setenv("DOCTOR_GOPLS_VERSION", "0.24.0")
 	t.Setenv("GO_CLI_STARTER_HOME", t.TempDir())
 	t.Chdir(root)
+
+	// 先完成 fixture 的首次启动，避免宿主启动开销占用被测探测的三秒预算。
+	for _, name := range []string{"mise", "git", "gh", "codex", "rtk", "gopls"} {
+		if name == missing {
+			continue
+		}
+		arg := "--version"
+		if name == "gopls" {
+			arg = "version"
+		}
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+		//nolint:gosec // G204：只启动 PATH 指向的本次测试 fixture；故障模式在就绪后单独设置。
+		cmd := exec.CommandContext(ctx, name, arg)
+		cmd.Env = append(os.Environ(), "DOCTOR_FAULT_TOOL=", "DOCTOR_FAULT=")
+		output, err := cmd.CombinedOutput()
+		cancel()
+		require.NoError(t, err, "fixture %s 未就绪：%s", name, output)
+	}
+
 	out, err := os.CreateTemp(t.TempDir(), "doctor-output")
 	require.NoError(t, err)
 	original := os.Stdout
 	os.Stdout = out
-	t.Cleanup(func() { os.Stdout = original; _ = out.Close() })
+	t.Cleanup(func() {
+		os.Stdout = original
+		_ = out.Close()
+	})
 	return out
 }
 
@@ -244,25 +289,39 @@ func TestDoctorRequiredTools(t *testing.T) {
 
 func TestDoctorUserToolsOnlyReport(t *testing.T) {
 	binary := doctorToolFixture(t)
+	out := doctorEnvironmentFixture(t, binary, "")
 	for _, name := range []string{"gh", "codex", "rtk"} {
 		for _, fault := range []struct{ mode, detail string }{
 			{"available", "fixture"}, {"missing", "不可用"}, {"failure", "不可用"}, {"timeout", "超时"}, {"truncated", "截断"},
 		} {
 			t.Run(name+"/"+fault.mode, func(t *testing.T) {
-				missing := ""
 				if fault.mode == "missing" {
-					missing = name
+					path, err := exec.LookPath(name)
+					require.NoError(t, err)
+					require.NoError(t, os.Rename(path, path+".hidden"))
+					t.Cleanup(func() {
+						require.NoError(t, os.Rename(path+".hidden", path))
+					})
 				}
-				out := doctorEnvironmentFixture(t, binary, missing)
+				require.NoError(t, out.Truncate(0))
+				_, err := out.Seek(0, 0)
+				require.NoError(t, err)
 				t.Setenv("DOCTOR_FAULT_TOOL", name)
 				t.Setenv("DOCTOR_FAULT", fault.mode)
 				require.NoError(t, doctor())
-				_, err := out.Seek(0, 0)
+				_, err = out.Seek(0, 0)
 				require.NoError(t, err)
 				data, err := io.ReadAll(out)
 				require.NoError(t, err)
-				require.Contains(t, string(data), name)
-				require.Contains(t, string(data), fault.detail)
+				var detail string
+				for _, line := range strings.Split(string(data), "\n") {
+					if strings.HasPrefix(line, "用户工具："+name+"：") {
+						detail = line
+						break
+					}
+				}
+				require.NotEmpty(t, detail)
+				require.Contains(t, detail, fault.detail)
 			})
 		}
 	}

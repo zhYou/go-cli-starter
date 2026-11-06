@@ -42,6 +42,7 @@ func FromType(t reflect.Type, override json.RawMessage) (json.RawMessage, error)
 	}
 	return json.Marshal(schema)
 }
+
 func checkEncoding(t reflect.Type, seen map[reflect.Type]bool) error {
 	if seen[t] {
 		return nil
@@ -72,6 +73,7 @@ func checkEncoding(t reflect.Type, seen map[reflect.Type]bool) error {
 	}
 	return nil
 }
+
 func openStructs(s *jsonschema.Schema) {
 	if s == nil {
 		return

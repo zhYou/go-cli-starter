@@ -14,7 +14,9 @@ import (
 )
 
 // Info 提供本次命令的资源关联信息，不收集环境或参数。
-type Info struct{ Service, Version, RunID string }
+type Info struct {
+	Service, Version, RunID string
+}
 
 // Session 持有私有 provider；writer 由 diagnostics 会话持有。
 type Session struct {
@@ -40,14 +42,20 @@ func Start(ctx context.Context, config Config, info Info, writer io.Writer, warn
 		gate.Lock()
 		defer gate.Unlock()
 		if active && warn != nil {
-			warning.Do(func() { warn(err) })
+			warning.Do(func() {
+				warn(err)
+			})
 		}
 	}
 	s := &Session{
-		Tracer:       noop.NewTracerProvider().Tracer(info.Service),
-		config:       config,
-		warn:         report,
-		stopWarnings: func() { gate.Lock(); active = false; gate.Unlock() },
+		Tracer: noop.NewTracerProvider().Tracer(info.Service),
+		config: config,
+		warn:   report,
+		stopWarnings: func() {
+			gate.Lock()
+			active = false
+			gate.Unlock()
+		},
 	}
 	if config.Exporter == None {
 		return s
@@ -144,6 +152,7 @@ func (e guardedExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadO
 	e.warn(e.SpanExporter.ExportSpans(ctx, filtered))
 	return nil
 }
+
 func (e guardedExporter) Shutdown(ctx context.Context) error {
 	e.warn(e.SpanExporter.Shutdown(ctx))
 	return nil
@@ -154,4 +163,6 @@ type configuredSpan struct {
 	resource *resource.Resource
 }
 
-func (s configuredSpan) Resource() *resource.Resource { return s.resource }
+func (s configuredSpan) Resource() *resource.Resource {
+	return s.resource
+}

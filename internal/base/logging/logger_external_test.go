@@ -9,7 +9,9 @@ import (
 	"github.com/zhYou/go-cli-starter/internal/base/logging"
 )
 
-type featureEvent struct{ count int }
+type featureEvent struct {
+	count int
+}
 
 func (e featureEvent) Emit(log *logging.Logger) {
 	log.Infow("示例业务事件", "event", "feature_finished", "count", e.count)

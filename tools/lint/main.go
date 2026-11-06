@@ -14,6 +14,7 @@ func main() {
 		os.Exit(1)
 	}
 }
+
 func run(args []string) error {
 	if len(args) != 1 {
 		return fmt.Errorf("用法：lint <i18n|config|doc|versions|test>")

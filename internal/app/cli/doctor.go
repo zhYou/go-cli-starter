@@ -12,7 +12,8 @@ import (
 func newDoctorCommand(call *invocation) *cobra.Command {
 	options := doctor.Options{}
 	cmd := &cobra.Command{
-		Use: "doctor", Short: "报告应用检查结果",
+		Use:         "doctor",
+		Short:       "报告应用检查结果",
 		Annotations: map[string]string{annotationSkipConfig: annotationEnabled},
 		Args: func(cmd *cobra.Command, args []string) error {
 			if err := noArgs(cmd, args); err != nil {

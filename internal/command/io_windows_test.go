@@ -25,7 +25,9 @@ func TestWindowsNativeIOAndBorrowedFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = file.Close() }()
+	defer func() {
+		_ = file.Close()
+	}()
 	options.IO.Out = file
 	options.IO.ErrOut = file
 	if err = Run(t.Context(), call, options); err != nil {
@@ -46,9 +48,13 @@ func TestWindowsNativeIOAndBorrowedFiles(t *testing.T) {
 	}
 }
 
-type windowsFailWriter struct{ err error }
+type windowsFailWriter struct {
+	err error
+}
 
-func (writer windowsFailWriter) Write([]byte) (int, error) { return 0, writer.err }
+func (writer windowsFailWriter) Write([]byte) (int, error) {
+	return 0, writer.err
+}
 
 func TestWindowsCopyFailureIsReturned(t *testing.T) {
 	call, options := windowsHelper(t, "stdio")
@@ -64,7 +70,9 @@ func TestWindowsBorrowedInputFileRemainsOpen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = input.Close() }()
+	defer func() {
+		_ = input.Close()
+	}()
 	if _, err = input.WriteString("borrowed input"); err != nil {
 		t.Fatal(err)
 	}

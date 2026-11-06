@@ -25,7 +25,11 @@ func (w *recordingWriter) Write(p []byte) (int, error) {
 	}
 	return n, err
 }
-func (w *recordingWriter) Err() error { return w.err }
+
+func (w *recordingWriter) Err() error {
+	return w.err
+}
+
 func writeJSON(out io.Writer, value any) error {
 	data, err := json.Marshal(value)
 	if err != nil {
@@ -33,6 +37,7 @@ func writeJSON(out io.Writer, value any) error {
 	}
 	return writeBytes(out, append(data, '\n'))
 }
+
 func writeText(out io.Writer, render func(io.Writer) error) error {
 	var buffer bytes.Buffer
 	if err := render(&buffer); err != nil {
@@ -40,6 +45,7 @@ func writeText(out io.Writer, render func(io.Writer) error) error {
 	}
 	return writeBytes(out, buffer.Bytes())
 }
+
 func writeBytes(out io.Writer, data []byte) error {
 	n, err := out.Write(data)
 	if err == nil && n != len(data) {

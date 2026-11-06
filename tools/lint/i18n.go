@@ -12,6 +12,22 @@ import (
 	"github.com/zhYou/go-cli-starter/internal/base/messages/catalog"
 )
 
+// templateValue 跟踪根对象与可证明的字符串字面量；未知值不能用于判断根参数。
+type templateValue struct {
+	known, root bool
+	literal     string
+	isLiteral   bool
+}
+
+type templateAnalyzer struct {
+	template  *template.Template
+	params    map[string]bool
+	active    map[string]bool
+	depth     int
+	pipeDepth int
+	err       error
+}
+
 // checkI18n 校验集中目录的语法、双语 ID 和各复数形式参数并集。
 func checkI18n(source fs.FS) error {
 	names, err := catalog.Files(source)
@@ -108,22 +124,6 @@ func parameters(entry map[string]string) ([]string, error) {
 	}
 	slices.Sort(result)
 	return result, nil
-}
-
-// templateValue 跟踪根对象与可证明的字符串字面量；未知值不能用于判断根参数。
-type templateValue struct {
-	known, root bool
-	literal     string
-	isLiteral   bool
-}
-
-type templateAnalyzer struct {
-	template  *template.Template
-	params    map[string]bool
-	active    map[string]bool
-	depth     int
-	pipeDepth int
-	err       error
 }
 
 func (a *templateAnalyzer) collect(node parse.Node, rootDot bool, aliases map[string]templateValue) {
@@ -275,6 +275,22 @@ func (a *templateAnalyzer) collectCommand(command *parse.CommandNode, rootDot bo
 	a.params[key.literal] = true
 }
 
+// bindAliases 跟踪根别名和字面量；禁止跨分支修改外层变量。
+func (a *templateAnalyzer) bindAliases(pipe *parse.PipeNode, rootDot bool, aliases map[string]templateValue, control bool) {
+	if pipe == nil || len(pipe.Decl) == 0 {
+		return
+	}
+	if pipe.IsAssign && (control || a.depth > 0) {
+		a.err = fmt.Errorf("不支持控制结构中的模板变量赋值")
+		return
+	}
+	if len(pipe.Decl) != 1 {
+		a.err = fmt.Errorf("不支持多个模板变量声明")
+		return
+	}
+	aliases[pipe.Decl[0].Ident[0]] = pipeValue(pipe, rootDot, aliases)
+}
+
 // nodeValue 只对可证明的根引用及字符串值作肯定判断。
 func nodeValue(node parse.Node, rootDot bool, aliases map[string]templateValue) templateValue {
 	switch n := node.(type) {
@@ -354,20 +370,4 @@ func templateContext(pipe *parse.PipeNode, rootDot bool, aliases map[string]temp
 		return false, fmt.Errorf("无法静态确定模板上下文")
 	}
 	return value.root, nil
-}
-
-// bindAliases 跟踪根别名和字面量；禁止跨分支修改外层变量。
-func (a *templateAnalyzer) bindAliases(pipe *parse.PipeNode, rootDot bool, aliases map[string]templateValue, control bool) {
-	if pipe == nil || len(pipe.Decl) == 0 {
-		return
-	}
-	if pipe.IsAssign && (control || a.depth > 0) {
-		a.err = fmt.Errorf("不支持控制结构中的模板变量赋值")
-		return
-	}
-	if len(pipe.Decl) != 1 {
-		a.err = fmt.Errorf("不支持多个模板变量声明")
-		return
-	}
-	aliases[pipe.Decl[0].Ident[0]] = pipeValue(pipe, rootDot, aliases)
 }

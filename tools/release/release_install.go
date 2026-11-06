@@ -97,7 +97,9 @@ func verifyArchiveInstall(dist string, snapshot *releaseSnapshot) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = os.RemoveAll(root) }()
+	defer func() {
+		_ = os.RemoveAll(root)
+	}()
 	archiveURL := (&url.URL{Scheme: "file", Path: filepath.ToSlash(archive)}).String()
 	// 错误摘要必须先在全新 data/cache 中失败；正确安装使用另一套目录，避免缓存掩盖校验。
 	for _, valid := range []bool{false, true} {
@@ -106,11 +108,11 @@ func verifyArchiveInstall(dist string, snapshot *releaseSnapshot) error {
 			phase, expected = "verified", checksum
 		}
 		dir := filepath.Join(root, phase)
-		if err := os.MkdirAll(dir, 0700); err != nil {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return err
 		}
 		config := fmt.Sprintf("[settings]\nauto_install = false\nexec_auto_install = false\n[tools.\"http:%s\"]\nversion = %q\nurl = %q\nchecksum = %q\n", appName, metadata.Version, archiveURL, "sha256:"+expected)
-		if err := os.WriteFile(filepath.Join(dir, "mise.toml"), []byte(config), 0600); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, "mise.toml"), []byte(config), 0o600); err != nil {
 			return err
 		}
 		env := isolatedMiseEnv(dir)
@@ -162,8 +164,15 @@ func isolatedMiseEnv(dir string) []string {
 		env = append(env, value)
 	}
 	for key, suffix := range map[string]string{
-		"MISE_CONFIG_DIR": "config", "MISE_DATA_DIR": "data", "MISE_CACHE_DIR": "cache", "MISE_STATE_DIR": "state", "MISE_TMP_DIR": "tmp",
-		"MISE_SYSTEM_CONFIG_DIR": "system-config", "MISE_SYSTEM_DATA_DIR": "system-data", "MISE_GLOBAL_CONFIG_FILE": "empty-global.toml", "MISE_SYSTEM_CONFIG_FILE": "empty-system.toml",
+		"MISE_CONFIG_DIR":         "config",
+		"MISE_DATA_DIR":           "data",
+		"MISE_CACHE_DIR":          "cache",
+		"MISE_STATE_DIR":          "state",
+		"MISE_TMP_DIR":            "tmp",
+		"MISE_SYSTEM_CONFIG_DIR":  "system-config",
+		"MISE_SYSTEM_DATA_DIR":    "system-data",
+		"MISE_GLOBAL_CONFIG_FILE": "empty-global.toml",
+		"MISE_SYSTEM_CONFIG_FILE": "empty-system.toml",
 	} {
 		env = append(env, key+"="+filepath.Join(dir, suffix))
 	}

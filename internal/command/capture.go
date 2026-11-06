@@ -24,7 +24,9 @@ const (
 const DefaultCaptureLimit = 1 << 20
 
 // CaptureOptions.Limit 是每路输出的字节上限，0 使用 1 MiB；达到上限后持续排空。
-type CaptureOptions struct{ Limit int }
+type CaptureOptions struct {
+	Limit int
+}
 
 // Result 保留原始输出及错误，供调用方先判断结果，再向 CLI stdout 提交。
 type Result struct {

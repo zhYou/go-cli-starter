@@ -22,7 +22,7 @@ func TestTemplateLintUsesCopiedTaskAndPropagatesFailure(t *testing.T) {
 		suffix = executableSuffix
 	}
 	globalConfig := filepath.Join(t.TempDir(), "config.toml")
-	require.NoError(t, os.WriteFile(globalConfig, nil, 0600))
+	require.NoError(t, os.WriteFile(globalConfig, nil, 0o600))
 	t.Setenv("MISE_GLOBAL_CONFIG_FILE", globalConfig)
 	projectRoot, err := filepath.Abs(filepath.Join("..", ".."))
 	require.NoError(t, err)
@@ -42,7 +42,7 @@ func TestTemplateLintUsesCopiedTaskAndPropagatesFailure(t *testing.T) {
 			report := filepath.Join(dir, "lint-report")
 			t.Setenv("LINT_FIXTURE_REPORT", report)
 			config := fmt.Sprintf("[settings]\nauto_install = false\nexec_auto_install = false\ntask.run_auto_install = false\n[tasks.lint]\nrun = %q\n", filepath.FromSlash("./"+probeName))
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "mise.toml"), []byte(config), 0600))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "mise.toml"), []byte(config), 0o600))
 			source := fmt.Sprintf(`package main
 import "os"
 func main() {
@@ -51,7 +51,7 @@ func main() {
 }
 `, code)
 			probeSource := filepath.Join(dir, "probe.go")
-			require.NoError(t, os.WriteFile(probeSource, []byte(source), 0600))
+			require.NoError(t, os.WriteFile(probeSource, []byte(source), 0o600))
 			// 先用项目 mise 解析的 Go 预编译，避免临时任务混用宿主 Go 与继承的 GOROOT。
 			//nolint:gosec // G204：Go 路径由项目 mise 解析，源码和产物均位于测试临时目录。
 			cmd := exec.Command(goExecutable, "build", "-o", filepath.Join(dir, probeName), probeSource)
@@ -79,7 +79,7 @@ func TestCopiedRepositorySupportsGoVCSStamping(t *testing.T) {
 		"cmd/fixture/main.go": "package main\nconst appName=\"fixture\"\nfunc main(){}\n",
 	} {
 		//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
-		if err := os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0o755); err != nil {
 			t.Fatal(err)
 		}
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
@@ -106,16 +106,16 @@ func TestTemplateMetadataAndGuidesSurviveRename(t *testing.T) {
 	dir := t.TempDir()
 	for name, data := range map[string]string{"go.mod": "module " + scaffold.TemplateModule + "\n\ngo 1.27.0\n", "cmd/" + scaffold.TemplateName + "/main.go": "package main\nconst appName = \"" + scaffold.TemplateName + "\"\nfunc main(){}\n", ".template-version": "0.1.0\n"} {
 		//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
-		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0755))
-		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(data), 0600))
+		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(data), 0o600))
 	}
 	for _, name := range []string{"SECURITY.md", ".github/PULL_REQUEST_TEMPLATE.md", ".github/CODEOWNERS.example", "docs/backlog.md", "docs/maintenance.md"} {
 		//nolint:gosec // G301：测试路径和权限只来自当前临时 fixture，不读取用户文件。
-		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0755))
+		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0o755))
 		require.NoError(t, fixture.CopyFile(filepath.Join("../..", name), filepath.Join(dir, name)))
 	}
 	//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, "docs"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "docs"), 0o755))
 	require.NoError(t, fixture.CopyFile("../../docs/template-upgrades.md", filepath.Join(dir, "docs/template-upgrades.md")))
 	_, err := scaffold.Initialize(dir, "example.com/copied/tool", "copied")
 	require.NoError(t, err)
@@ -136,11 +136,11 @@ func TestInstallVersionLikeCommandNames(t *testing.T) {
 	for _, name := range []string{"v0", "v1", "v02"} {
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
-			require.NoError(t, os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/installfixture\n\ngo 1.27.0\n"), 0600))
+			require.NoError(t, os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/installfixture\n\ngo 1.27.0\n"), 0o600))
 			dir := filepath.Join(root, "cmd", name)
 			//nolint:gosec // G301：临时测试目录或可执行 fixture 明确模拟项目文件权限，不保存用户数据。
-			require.NoError(t, os.MkdirAll(dir, 0755))
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\nconst appName=\""+name+"\"\nfunc main(){}\n"), 0600))
+			require.NoError(t, os.MkdirAll(dir, 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\nconst appName=\""+name+"\"\nfunc main(){}\n"), 0o600))
 			require.NoError(t, fixture.PrepareGit(root))
 			project, err := scaffold.Inspect(root)
 			require.NoError(t, err)

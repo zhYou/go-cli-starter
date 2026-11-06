@@ -46,7 +46,7 @@ mise 聚合流程，领域 Go 入口只处理各自能力；参数不足、未�
 
 | 命令 | 用途 |
 | --- | --- |
-| `mise exec -- golangci-lint fmt --color=never` | 使用 gofmt 和 goimports 格式化 |
+| `mise exec -- golangci-lint fmt --color=never` | 使用 gofumpt 和 goimports 格式化 |
 | `mise exec -- golangci-lint fmt --diff --color=never` | 只读检查格式；有差异时失败 |
 | `mise exec -- go test ./...` | 单元与命令测试 |
 | `mise exec -- go test -race ./...` | 竞态检测，需要 C 编译器 |
@@ -101,6 +101,48 @@ toolrun 和 fixture 分别共享进程调用与临时文件/Git fixture 操作�
 `template:check` 在临时副本内调用同一 `mise run lint`，不维护第二份静态检查清单，也不递归调用 check。
 本次子进程通过 `MISE_TRUSTED_CONFIG_PATHS` 只信任副本目录，并使用生成应用前缀隔离 HOME；
 不写入用户的持久信任配置。源项目和生成项目分别接受检查，验证对象不同。
+
+## 代码风格
+
+以 [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments) 的惯用写法为基础，
+采用 [Google Go Style Guide](https://google.github.io/styleguide/go/guide) 的清晰、简单原则，
+参考 [Uber Go Style Guide](https://github.com/uber-go/guide/blob/master/style.md) 的函数组织建议。
+项目的具体取舍以本节为准；外部规范不整体引入，也不因上游调整自动重写代码。
+
+### 排版与展开
+
+`golangci-lint fmt` 统一运行 gofumpt 和 goimports，使用默认规则，不启用额外格式选项。
+gofumpt 的输出兼容 gofmt；工具版本随项目固定的 golangci-lint 提供，不另行安装。
+保存后或提交前格式化本次修改范围，`mise run lint` 和 `check` 只读检查格式。
+
+- 所有非空函数、方法和匿名函数体都展开，单句返回和转发方法也一样；空函数体可保留 `{}`。
+- 普通语句各占一行，不用分号压缩多条语句；`if` 初始化和 `for` 子句保留语言要求的分号。
+- 非空具名 struct 和 interface 的成员分行声明；空类型保留 `struct{}` 等紧凑形式。
+- 简单字面量和匿名表格类型交给格式工具处理；复杂嵌套字面量逐字段展开，便于核对依赖和资源所有权。
+- 空行分隔输入校验、依赖准备、主要操作和结果处理等不同阶段；紧密相关的赋值、错误检查和使用放在一起。
+- 不设置固定行长、函数长度或空行数量。长表达式先考虑命名中间值或按职责拆分，避免为凑行数增加抽象。
+
+函数展开、逻辑分段和组织规则由代码审查确认，格式工具不会全部代劳。例如：
+
+```go
+return writeText(cmd.OutOrStdout(), func(w io.Writer) error {
+    _, err := fmt.Fprintln(w, result.Message)
+    return err
+})
+```
+
+### 命名、组织与注释
+
+变量名结合使用范围表达含义：短作用域可用 `ctx`、`err`、`i` 等惯用名称，跨较长流程的变量使用明确名称。
+避免重复包名或上下文已经表达的概念，同一类型的方法保持接收者名称一致；需要区分原实例与工作副本时按角色命名。
+
+相关类型、构造函数和方法集中组织，同一接收者的方法成组；同一职责内公开入口优先，私有辅助函数随后按大致调用顺序排列。
+以职责和阅读顺序组织文件，不为满足排列规则拆包、创建接口或增加文件。移动声明时保留初始化、注册顺序和编译指令。
+错误及特殊情况优先处理并返回，减少主流程嵌套；资源取得后及时登记收尾，不为调整排版移动执行时机。
+
+注释用中文说明职责、原因、限制和所有权，避免复述显然的语句。导出 API 和包说明继续遵守下节的 GoDoc 要求。
+生产代码、开发工具和测试使用同一阅读风格；测试名称、断言和已有辅助代码归属保持各自职责。
+测试数据、内嵌源码和协议快照按其测试意图保留，不参与批量风格改写。
 
 ## 包文档
 
@@ -309,7 +351,7 @@ Get、Raw、All 等绕过结构体的入口。zap 只在 base/logging，OTel SDK
 业务 JSON、测试数据和协议/契约数据不纳入扫描。两项检查由 lint 调用并纳入 check；它们不会自动安装
 工具或修复文件。
 
-`mise exec -- golangci-lint fmt --color=never` 使用 gofmt 和 goimports；
+`mise exec -- golangci-lint fmt --color=never` 使用 gofumpt 和 goimports；
 加上 `--diff` 只展示差异并失败，不改源码。
 check 不改写源码，但会使用 Go 缓存、临时文件和 bin 产物。
 CI、缓存及平台验收见[维护清单](maintenance.md#ci-与验收证据)。

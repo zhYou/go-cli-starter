@@ -12,7 +12,9 @@ import (
 
 type textEncoded int
 
-func (textEncoded) MarshalText() ([]byte, error) { return []byte("编码文本"), nil }
+func (textEncoded) MarshalText() ([]byte, error) {
+	return []byte("编码文本"), nil
+}
 
 func TestSpecialJSONEncodingRequiresOverride(t *testing.T) {
 	for _, value := range []any{struct {
@@ -48,7 +50,9 @@ func TestSpecialJSONEncodingRequiresOverride(t *testing.T) {
 
 type encoded string
 
-func (encoded) MarshalJSON() ([]byte, error) { return []byte("42"), nil }
+func (encoded) MarshalJSON() ([]byte, error) {
+	return []byte("42"), nil
+}
 
 func TestResultSchemaMatchesEncoding(t *testing.T) {
 	type result struct {
@@ -64,7 +68,11 @@ func TestResultSchemaMatchesEncoding(t *testing.T) {
 	require.NoError(t, json.Unmarshal(data, &schema))
 	resolved, err := schema.Resolve(nil)
 	require.NoError(t, err)
-	for _, value := range []result{{Message: "你好"}, {Message: "你好", Items: []string{}, Map: map[string]int{"x": 1}}} {
+	for _, value := range []result{{Message: "你好"}, {
+		Message: "你好",
+		Items:   []string{},
+		Map:     map[string]int{"x": 1},
+	}} {
 		raw, err := json.Marshal(value)
 		require.NoError(t, err)
 		var v any
@@ -83,7 +91,9 @@ func TestResultSchemaMatchesEncoding(t *testing.T) {
 	override, err := FromType(reflect.TypeFor[encoded](), json.RawMessage(`{"type":"integer"}`))
 	require.NoError(t, err)
 	require.Contains(t, string(override), `"integer"`)
-	type recursive struct{ Next *recursive }
+	type recursive struct {
+		Next *recursive
+	}
 	_, err = FromType(reflect.TypeFor[recursive](), nil)
 	require.Error(t, err)
 	_, err = FromType(reflect.TypeFor[string](), json.RawMessage(`{"$ref":"https://example.invalid/schema"}`))

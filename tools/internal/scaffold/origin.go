@@ -43,10 +43,12 @@ func ReadOrigin(fs afero.Fs, root string) (Origin, error) {
 	}
 	return origin, nil
 }
+
 func makeOrigin(root, module, name string) (Origin, error) {
 	i := (&Initializer{}).defaults()
 	return i.origin(context.Background(), root, module, name)
 }
+
 func (i *Initializer) origin(ctx context.Context, root, module, name string) (Origin, error) {
 	path, err := i.safePath(root, ".template-version")
 	if err != nil {
@@ -84,6 +86,7 @@ func (i *Initializer) origin(ctx context.Context, root, module, name string) (Or
 	}
 	return origin, nil
 }
+
 func (i *Initializer) originChange(ctx context.Context, root, module, name string) (*change, error) {
 	if _, err := i.FS.Stat(filepath.Join(root, ".template-version")); os.IsNotExist(err) {
 		return nil, nil
@@ -105,5 +108,5 @@ func (i *Initializer) originChange(ctx context.Context, root, module, name strin
 	if err != nil {
 		return nil, err
 	}
-	return &change{path, append(data, '\n'), 0644}, nil
+	return &change{path, append(data, '\n'), 0o644}, nil
 }

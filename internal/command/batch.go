@@ -103,6 +103,7 @@ func batchFailure(index int, err error) error {
 	}
 	return batchItemFailed.Wrap(cause, fault.WithParams(fault.Params{"Index": index + 1}))
 }
+
 func withoutCancellation(err error) error {
 	//nolint:errorlint // 这里只移除取消叶子；包装节点必须继续递归以保留真实原因。
 	if err == nil || err == context.Canceled || err == context.DeadlineExceeded {
@@ -124,5 +125,10 @@ func withoutCancellation(err error) error {
 // 保留标准 deadline 错误链，同时识别本项自行到期；不引入可变全局状态。
 type itemDeadlineCause struct{}
 
-func (itemDeadlineCause) Error() string { return context.DeadlineExceeded.Error() }
-func (itemDeadlineCause) Unwrap() error { return context.DeadlineExceeded }
+func (itemDeadlineCause) Error() string {
+	return context.DeadlineExceeded.Error()
+}
+
+func (itemDeadlineCause) Unwrap() error {
+	return context.DeadlineExceeded
+}

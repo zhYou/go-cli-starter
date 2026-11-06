@@ -90,15 +90,23 @@ func Load(opts Options) (Config, error) {
 		file = filepath.Join(opts.UserConfigDir, opts.AppName, "config.toml")
 	}
 	defaults := map[string]any{
-		loggingLevelKey: cfg.Logging.Level, "logging.output": cfg.Logging.Output,
-		"diagnostics.max_size_mib": cfg.Diagnostics.MaxSizeMiB, "diagnostics.max_backups": cfg.Diagnostics.MaxBackups,
-		"diagnostics.retention_days": cfg.Diagnostics.RetentionDays, "diagnostics.max_total_size_mib": cfg.Diagnostics.MaxTotalSizeMiB,
-		"telemetry.exporter": cfg.Telemetry.Exporter, "telemetry.export_timeout": cfg.Telemetry.ExportTimeout,
-		"telemetry.shutdown_timeout": cfg.Telemetry.ShutdownTimeout, "telemetry.queue_size": cfg.Telemetry.QueueSize,
-		"telemetry.batch_size": cfg.Telemetry.BatchSize, "telemetry.batch_interval": cfg.Telemetry.BatchInterval,
+		loggingLevelKey:                  cfg.Logging.Level,
+		"logging.output":                 cfg.Logging.Output,
+		"diagnostics.max_size_mib":       cfg.Diagnostics.MaxSizeMiB,
+		"diagnostics.max_backups":        cfg.Diagnostics.MaxBackups,
+		"diagnostics.retention_days":     cfg.Diagnostics.RetentionDays,
+		"diagnostics.max_total_size_mib": cfg.Diagnostics.MaxTotalSizeMiB,
+		"telemetry.exporter":             cfg.Telemetry.Exporter,
+		"telemetry.export_timeout":       cfg.Telemetry.ExportTimeout,
+		"telemetry.shutdown_timeout":     cfg.Telemetry.ShutdownTimeout,
+		"telemetry.queue_size":           cfg.Telemetry.QueueSize,
+		"telemetry.batch_size":           cfg.Telemetry.BatchSize,
+		"telemetry.batch_interval":       cfg.Telemetry.BatchInterval,
 	}
 	k := koanf.New(".")
-	layer := func(values map[string]any) error { return k.Load(confmap.Provider(values, "."), nil) }
+	layer := func(values map[string]any) error {
+		return k.Load(confmap.Provider(values, "."), nil)
+	}
 	if err := layer(defaults); err != nil {
 		return cfg, problem(decodeProblem, err, nil)
 	}
@@ -170,14 +178,22 @@ func Load(opts Options) (Config, error) {
 	}
 	return cfg, ctx.Err()
 }
+
 func decode(k *koanf.Koanf, cfg *Config) error {
 	return k.UnmarshalWithConf("", cfg, koanf.UnmarshalConf{Tag: "mapstructure", DecoderConfig: strictDecoderConfig()})
 }
+
 func strictDecoderConfig() *mapstructure.DecoderConfig {
 	return &mapstructure.DecoderConfig{
-		WeaklyTypedInput: false, ErrorUnused: true, DecodeHook: strictHook, MatchName: func(a, b string) bool { return a == b },
+		WeaklyTypedInput: false,
+		ErrorUnused:      true,
+		DecodeHook:       strictHook,
+		MatchName: func(a, b string) bool {
+			return a == b
+		},
 	}
 }
+
 func strictHook(from, to reflect.Type, value any) (any, error) {
 	if to == reflect.TypeFor[time.Duration]() {
 		switch v := value.(type) {

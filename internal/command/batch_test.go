@@ -57,7 +57,7 @@ func TestBatchFirstCauseSurvivesCleanup(t *testing.T) {
 			waitMarker(t, ready)
 			waitMarker(t, failReady)
 			if failureFirst {
-				if err := os.WriteFile(gate, nil, 0600); err != nil {
+				if err := os.WriteFile(gate, nil, 0o600); err != nil {
 					t.Fatal(err)
 				}
 			} else {
@@ -67,7 +67,7 @@ func TestBatchFirstCauseSurvivesCleanup(t *testing.T) {
 			if failureFirst {
 				cancel(parentCause)
 			} else {
-				if err := os.WriteFile(gate, nil, 0600); err != nil {
+				if err := os.WriteFile(gate, nil, 0o600); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -153,11 +153,11 @@ func TestBatchOrderCollectAll(t *testing.T) {
 	// 顺序与 collect-all 由文件门闩控制，不对成功进程施加短期限。
 	done := startBatch(t, t.Context(), items, options, BatchOptions{Concurrency: 1})
 	waitMarker(t, firstReady)
-	if err := os.WriteFile(firstGate, nil, 0600); err != nil {
+	if err := os.WriteFile(firstGate, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	waitMarker(t, secondReady)
-	if err := os.WriteFile(secondGate, nil, 0600); err != nil {
+	if err := os.WriteFile(secondGate, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	outcome := awaitBatch(t, done)
@@ -216,7 +216,7 @@ func TestBatchConcurrencyBound(t *testing.T) {
 		for slot := 0; slot < 2; slot++ {
 			waitMarker(t, filepath.Join(options.Dir, fmt.Sprintf("ready-%d", wave*2+slot)))
 		}
-		if err := os.WriteFile(filepath.Join(options.Dir, fmt.Sprintf("gate-%d", wave)), nil, 0600); err != nil {
+		if err := os.WriteFile(filepath.Join(options.Dir, fmt.Sprintf("gate-%d", wave)), nil, 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -258,7 +258,7 @@ func TestConcurrentFailFastKeepsItemCauseOnly(t *testing.T) {
 	done := startBatch(t, t.Context(), []Invocation{sleeping, failure, sleeping}, options, BatchOptions{Concurrency: 2, FailFast: true})
 	waitMarker(t, ready)
 	waitMarker(t, failureReady)
-	if err := os.WriteFile(gate, nil, 0600); err != nil {
+	if err := os.WriteFile(gate, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	result := awaitBatch(t, done)

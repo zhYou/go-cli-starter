@@ -14,7 +14,9 @@ func writeMetadataPath(path string, value metadata) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = root.Close() }()
+	defer func() {
+		_ = root.Close()
+	}()
 	return writeMetadata(root, value)
 }
 
@@ -24,7 +26,15 @@ func startDiagnosticProcess(t *testing.T, child *exec.Cmd) func() error {
 	require.NoError(t, child.Start())
 	var once sync.Once
 	var waitErr error
-	wait := func() error { once.Do(func() { waitErr = child.Wait() }); return waitErr }
-	t.Cleanup(func() { _ = child.Process.Kill(); _ = wait() })
+	wait := func() error {
+		once.Do(func() {
+			waitErr = child.Wait()
+		})
+		return waitErr
+	}
+	t.Cleanup(func() {
+		_ = child.Process.Kill()
+		_ = wait()
+	})
 	return wait
 }

@@ -54,10 +54,16 @@ func TestSchemaReflectsRegisteredCommands(t *testing.T) {
 
 func TestSchemaGenerationDoesNotExecuteCommands(t *testing.T) {
 	count := 0
-	deps := Dependencies{LoadConfig: func(config.Options) (config.Config, error) { count++; return config.Config{}, nil }, Greet: func(context.Context, greeting.Options) (greeting.Result, error) {
-		count++
-		return greeting.Result{}, nil
-	}}
+	deps := Dependencies{
+		LoadConfig: func(config.Options) (config.Config, error) {
+			count++
+			return config.Config{}, nil
+		},
+		Greet: func(context.Context, greeting.Options) (greeting.Result, error) {
+			count++
+			return greeting.Result{}, nil
+		},
+	}
 	var out bytes.Buffer
 	require.Zero(t, Run(context.Background(), []string{"schema", "greet"}, Options{Out: &out, Dependencies: &deps}))
 	var doc struct {

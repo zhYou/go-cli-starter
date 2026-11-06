@@ -14,6 +14,7 @@ func main() {
 	}
 	os.Exit(run(os.Args[1:], root, os.Stdout, os.Stderr))
 }
+
 func run(args []string, root string, out, errOut io.Writer) int {
 	if len(args) != 0 {
 		switch args[0] {

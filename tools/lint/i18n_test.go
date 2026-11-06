@@ -170,7 +170,9 @@ func TestCheckFindsParametersInAliasesAndPipelines(t *testing.T) {
 	}
 	for name, en := range cases {
 		t.Run(name, func(t *testing.T) {
-			content := func(text string) string { return "[\"sample\"]\nother = " + strconv.Quote(text) + "\n" }
+			content := func(text string) string {
+				return "[\"sample\"]\nother = " + strconv.Quote(text) + "\n"
+			}
 			// 正例用独立写法表达同一组参数，防止双边同时漏检而假通过。
 			reference := `{{.Name}}`
 			if name == "direct reassignment" {

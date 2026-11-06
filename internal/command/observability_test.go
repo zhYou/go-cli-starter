@@ -19,7 +19,12 @@ func TestCommandLogsUseExplicitLanguageAndStableFields(t *testing.T) {
 	for _, language := range []string{"zh-CN", "en", "default"} {
 		t.Run(language, func(t *testing.T) {
 			var sink bytes.Buffer
-			logger := logging.New(logging.RunInfo{}, logging.Options{Config: logging.Config{Level: "debug", Output: "stderr"}, Writer: &sink}, func(err error) { t.Error(err) })
+			logger := logging.New(logging.RunInfo{}, logging.Options{
+				Config: logging.Config{Level: "debug", Output: "stderr"},
+				Writer: &sink,
+			}, func(err error) {
+				t.Error(err)
+			})
 			call, options := helper(t, "bytes")
 			options.Logger = logger
 			if language != "default" {
@@ -58,10 +63,19 @@ func TestOnlyStartedItemsEmitSpansAndNoRawData(t *testing.T) {
 	var traceOutput bytes.Buffer
 	cfg := telemetry.Defaults()
 	cfg.Exporter = telemetry.File
-	provider := telemetry.Start(t.Context(), cfg, telemetry.Info{Service: "command-test"}, &traceOutput, func(err error) { t.Error(err) })
-	t.Cleanup(func() { _ = provider.Close(t.Context()) })
+	provider := telemetry.Start(t.Context(), cfg, telemetry.Info{Service: "command-test"}, &traceOutput, func(err error) {
+		t.Error(err)
+	})
+	t.Cleanup(func() {
+		_ = provider.Close(t.Context())
+	})
 	var logs bytes.Buffer
-	logger := logging.New(logging.RunInfo{}, logging.Options{Config: logging.Config{Level: "info", Output: "stderr"}, Writer: &logs}, func(err error) { t.Error(err) })
+	logger := logging.New(logging.RunInfo{}, logging.Options{
+		Config: logging.Config{Level: "info", Output: "stderr"},
+		Writer: &logs,
+	}, func(err error) {
+		t.Error(err)
+	})
 	call, options := helper(t, "exit")
 	call.Args = append(call.Args, "private-argv")
 	options.Env = append(options.Env, "VALUE=private-env")

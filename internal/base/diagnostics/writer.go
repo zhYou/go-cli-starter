@@ -21,7 +21,7 @@ type Writer struct {
 }
 
 func newWriter(root *os.Root, name string, limit int64, backups int) (*Writer, error) {
-	f, err := root.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	f, err := root.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
 		return nil, err
 	}
@@ -47,6 +47,7 @@ func (w *Writer) Write(p []byte) (int, error) {
 	w.size += int64(n)
 	return n, err
 }
+
 func (w *Writer) rotate() error {
 	if err := errors.Join(w.file.Sync(), w.file.Close()); err != nil {
 		w.closed = true
@@ -59,7 +60,7 @@ func (w *Writer) rotate() error {
 		w.closeErr = err
 		return err
 	}
-	f, err := w.root.OpenFile(w.name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	f, err := w.root.OpenFile(w.name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
 		w.closed = true
 		w.closeErr = err
@@ -74,6 +75,7 @@ func (w *Writer) rotate() error {
 	}
 	return nil
 }
+
 func (w *Writer) segment(sequence int) string {
 	return fmt.Sprintf("%s.%06d.jsonl", strings.TrimSuffix(w.name, ".jsonl"), sequence)
 }

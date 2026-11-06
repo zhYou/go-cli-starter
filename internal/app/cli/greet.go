@@ -23,17 +23,22 @@ func newGreetCommand(call *invocation) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx, span := call.session.Tracer.Start(cmd.Context(), "greeting.run")
 			defer span.End()
+
 			result, err := call.deps.Greet(ctx, greeting.Options{Name: name, Localizer: call.localizer})
 			if err != nil {
 				span.RecordError(err)
 				span.SetStatus(codes.Error, call.localizer.Text("session.failed", nil))
 				return err
 			}
+
 			call.logger.WithContext(ctx).Debugw(call.localizer.Text("cli.greet_log", nil), "event", "greeting_finished")
 			if call.asJSON {
 				return writeJSON(cmd.OutOrStdout(), result)
 			}
-			return writeText(cmd.OutOrStdout(), func(w io.Writer) error { _, err := fmt.Fprintln(w, result.Message); return err })
+			return writeText(cmd.OutOrStdout(), func(w io.Writer) error {
+				_, err := fmt.Fprintln(w, result.Message)
+				return err
+			})
 		},
 	}
 	greet.Flags().StringVar(&name, flagName, "", "问候对象的姓名")

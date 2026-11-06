@@ -26,7 +26,10 @@ func TestCommandErrorsHaveOwnedBilingualDefinitions(t *testing.T) {
 	}
 	emptySpec, err := (Spec[string]{}).Build("")
 	_ = emptySpec
-	_, argErr := (Spec[string]{Program: "tool", Args: []Arg[string]{nil}}).Build("")
+	_, argErr := (Spec[string]{
+		Program: "tool",
+		Args:    []Arg[string]{nil},
+	}).Build("")
 	_, batchErr := RunBatch(t.Context(), nil, Execution{}, BatchOptions{Concurrency: -1})
 	cases := []struct {
 		code, zh, en string
@@ -98,7 +101,12 @@ func TestCommandBrokenDiagnosticsPreserveChildFailure(t *testing.T) {
 	bundle, err := messages.NewBundle(fstest.MapFS{"active.en.toml": {Data: []byte("[\"command.started\"]\nother = \"partial {{.Missing}}\"\n")}})
 	require.NoError(t, err)
 	var sink bytes.Buffer
-	logger := logging.New(logging.RunInfo{}, logging.Options{Config: logging.Config{Level: "debug", Output: "stderr"}, Writer: &sink}, func(err error) { t.Error(err) })
+	logger := logging.New(logging.RunInfo{}, logging.Options{
+		Config: logging.Config{Level: "debug", Output: "stderr"},
+		Writer: &sink,
+	}, func(err error) {
+		t.Error(err)
+	})
 	call, options := helper(t, "exit")
 	options.Logger, options.Localizer = logger, bundle.Localizer("en")
 	err = Run(t.Context(), call, options)
@@ -119,7 +127,12 @@ func TestCommandBrokenDiagnosticsPreserveChildFailure(t *testing.T) {
 
 func TestCommandUninitializedLocalizerUsesEnglishFallback(t *testing.T) {
 	var sink bytes.Buffer
-	logger := logging.New(logging.RunInfo{}, logging.Options{Config: logging.Config{Level: "debug", Output: "stderr"}, Writer: &sink}, func(err error) { t.Error(err) })
+	logger := logging.New(logging.RunInfo{}, logging.Options{
+		Config: logging.Config{Level: "debug", Output: "stderr"},
+		Writer: &sink,
+	}, func(err error) {
+		t.Error(err)
+	})
 	call, options := helper(t, "exit")
 	options.Logger, options.Localizer = logger, &messages.Localizer{}
 	err := Run(t.Context(), call, options)
@@ -135,7 +148,12 @@ func TestCorruptCatalogProcess(t *testing.T) {
 		t.Skip("仅由损坏目录子进程执行")
 	}
 	var sink bytes.Buffer
-	logger := logging.New(logging.RunInfo{}, logging.Options{Config: logging.Config{Level: "debug", Output: "stderr"}, Writer: &sink}, func(err error) { t.Error(err) })
+	logger := logging.New(logging.RunInfo{}, logging.Options{
+		Config: logging.Config{Level: "debug", Output: "stderr"},
+		Writer: &sink,
+	}, func(err error) {
+		t.Error(err)
+	})
 	call, options := helper(t, "exit")
 	options.Logger = logger
 	err := Run(t.Context(), call, options)

@@ -14,7 +14,7 @@ import (
 
 func TestOriginUsesCommandEntry(t *testing.T) {
 	root := projectFixture(t, TemplateModule, TemplateName)
-	require.NoError(t, os.WriteFile(filepath.Join(root, ".template-version"), []byte("0.1.0\n"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(root, ".template-version"), []byte("0.1.0\n"), 0o600))
 	git := func(args ...string) string {
 		t.Helper()
 		//nolint:gosec // G204：测试只运行当前测试二进制或固定 Git/Go 命令，参数来自临时 fixture。
@@ -38,7 +38,7 @@ func TestOriginUsesCommandEntry(t *testing.T) {
 
 func TestOriginWithoutGitAndLegacyProject(t *testing.T) {
 	root := fixture(t)
-	require.NoError(t, os.WriteFile(filepath.Join(root, ".template-version"), []byte("0.1.0\n"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(root, ".template-version"), []byte("0.1.0\n"), 0o600))
 	_, err := Initialize(root, "example.com/tool", "tool")
 	require.NoError(t, err)
 	_, err = makeOrigin(root, "example.com/tool", "tool")
@@ -59,7 +59,7 @@ func TestOriginWithoutGitAndLegacyProject(t *testing.T) {
 
 func TestOriginIsIdempotent(t *testing.T) {
 	root := fixture(t)
-	require.NoError(t, os.WriteFile(filepath.Join(root, ".template-version"), []byte("0.1.0\n"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(root, ".template-version"), []byte("0.1.0\n"), 0o600))
 	_, err := Initialize(root, "example.com/tool", "tool")
 	require.NoError(t, err)
 	before := read(t, root, ".template-origin.json")
@@ -72,14 +72,17 @@ func TestOriginIsIdempotent(t *testing.T) {
 func TestOriginFailureRollsBackRename(t *testing.T) {
 	i, root := memoryInitializer(t)
 	base := i.FS
-	require.NoError(t, afero.WriteFile(base, filepath.Join(root, ".template-version"), []byte("0.1.0\n"), 0600))
+	require.NoError(t, afero.WriteFile(base, filepath.Join(root, ".template-version"), []byte("0.1.0\n"), 0o600))
 	before, _ := afero.ReadFile(base, filepath.Join(root, "go.mod"))
-	i.FS = faultFS{Fs: base, rename: func(a, b string) error {
-		if filepath.Base(b) == ".template-origin.json" {
-			return errors.New("来源写入失败")
-		}
-		return base.Rename(a, b)
-	}}
+	i.FS = faultFS{
+		Fs: base,
+		rename: func(a, b string) error {
+			if filepath.Base(b) == ".template-origin.json" {
+				return errors.New("来源写入失败")
+			}
+			return base.Rename(a, b)
+		},
+	}
 	_, err := i.Initialize(context.Background(), root, "example.com/tool", "tool")
 	require.Error(t, err)
 	after, _ := afero.ReadFile(base, filepath.Join(root, "go.mod"))

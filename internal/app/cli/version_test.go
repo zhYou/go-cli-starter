@@ -26,7 +26,9 @@ func TestVersionJSON(t *testing.T) {
 
 func TestVersionRenderingFailureLeavesStdoutEmpty(t *testing.T) {
 	bundle := catalogFixture(t, "en", "cli.version_text", "other = \"prefix {{.Missing}} suffix\"\n")
-	loader := func() (*messages.Bundle, error) { return bundle, nil }
+	loader := func() (*messages.Bundle, error) {
+		return bundle, nil
+	}
 	var out, stderr bytes.Buffer
 	code := run(context.Background(), []string{"version"}, Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv}, loader)
 	require.Equal(t, 1, code, stderr.String())
@@ -47,7 +49,9 @@ func TestVersionFlagRendersLiteralTextOnce(t *testing.T) {
 			var out, stderr bytes.Buffer
 			var code int
 			require.NotPanics(t, func() {
-				code = run(context.Background(), []string{"--version"}, Options{Name: tc.nameValue, Version: tc.version, Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv}, func() (*messages.Bundle, error) { return bundle, nil })
+				code = run(context.Background(), []string{"--version"}, Options{Name: tc.nameValue, Version: tc.version, Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv}, func() (*messages.Bundle, error) {
+					return bundle, nil
+				})
 			})
 			require.Zero(t, code, stderr.String())
 			require.Equal(t, tc.want, out.String())
@@ -59,7 +63,9 @@ func TestVersionFlagRendersLiteralTextOnce(t *testing.T) {
 func TestVersionFlagRenderingFailureLeavesStdoutEmpty(t *testing.T) {
 	bundle := catalogFixture(t, "en", "cli.version_template", "other = \"prefix {{.Missing}}\"\n")
 	var out, stderr bytes.Buffer
-	code := run(context.Background(), []string{"--version"}, Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv}, func() (*messages.Bundle, error) { return bundle, nil })
+	code := run(context.Background(), []string{"--version"}, Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv}, func() (*messages.Bundle, error) {
+		return bundle, nil
+	})
 	require.Equal(t, 1, code, stderr.String())
 	require.Empty(t, out.String())
 	require.Contains(t, stderr.String(), "cli.version_template")
@@ -78,16 +84,32 @@ func TestVersionUsesExecutingCommandMetadata(t *testing.T) {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
 			bundle := catalogFixture(t, "en", "cli.version_template", "other = "+strconv.Quote(`prefix {{"{{"}} {{.Name}} {{.Version}}`)+"\n")
 			var out bytes.Buffer
-			root, call, err := buildRoot(defaults(Options{Name: "parent", Version: "parent-v1", Out: &out, LookupEnv: noFixtureEnv}), func() (*messages.Bundle, error) { return bundle, nil })
+			root, call, err := buildRoot(defaults(Options{Name: "parent", Version: "parent-v1", Out: &out, LookupEnv: noFixtureEnv}), func() (*messages.Bundle, error) {
+				return bundle, nil
+			})
 			require.NoError(t, err)
-			child := &cobra.Command{Use: "child{{.Name}}", Version: "v{{.Missing}}", RunE: func(*cobra.Command, []string) error { return nil }}
-			grandchild := &cobra.Command{Use: "grandchild", Version: "grand-v3", RunE: func(*cobra.Command, []string) error { return nil }}
+			child := &cobra.Command{
+				Use:     "child{{.Name}}",
+				Version: "v{{.Missing}}",
+				RunE: func(*cobra.Command, []string) error {
+					return nil
+				},
+			}
+			grandchild := &cobra.Command{
+				Use:     "grandchild",
+				Version: "grand-v3",
+				RunE: func(*cobra.Command, []string) error {
+					return nil
+				},
+			}
 			child.AddCommand(grandchild)
 			root.AddCommand(child)
 			configureHelp(child, call)
 			require.NoError(t, call.localizeTree(root, "en"))
 			root.SetArgs(tc.args)
-			require.NotPanics(t, func() { require.NoError(t, root.Execute()) })
+			require.NotPanics(t, func() {
+				require.NoError(t, root.Execute())
+			})
 			require.Equal(t, tc.want, out.String())
 		})
 	}

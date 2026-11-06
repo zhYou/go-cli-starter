@@ -15,7 +15,9 @@ import (
 )
 
 // Project 是从项目文件静态读取的应用身份。
-type Project struct{ Module, Name, CommandPath string }
+type Project struct {
+	Module, Name, CommandPath string
+}
 
 // Inspect 查找唯一命令入口，不执行项目代码。
 func Inspect(root string) (Project, error) {

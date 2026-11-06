@@ -9,8 +9,10 @@ import (
 	"strings"
 )
 
-const initialContractFile = "test/testdata/contracts/initial.json"
-const legacyContractFile = "testdata/contracts/v1.json"
+const (
+	initialContractFile = "test/testdata/contracts/initial.json"
+	legacyContractFile  = "testdata/contracts/v1.json"
+)
 
 // readContractBase 只在两个历史路径均不存在时使用首次基线。
 func readContractBase(ctx context.Context, ref string) ([]byte, bool, error) {

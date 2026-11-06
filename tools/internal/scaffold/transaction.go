@@ -41,14 +41,14 @@ type transactionFile struct {
 	Staged  string      `json:"staged"`
 }
 
-func digest(data []byte) string { sum := sha256.Sum256(data); return hex.EncodeToString(sum[:]) }
 func (i *Initializer) save(root string, tx transaction) error {
 	data, err := json.MarshalIndent(tx, "", "  ")
 	if err != nil {
 		return err
 	}
-	return i.atomicWrite(change{filepath.Join(root, journalDir, journalFile), data, 0600})
+	return i.atomicWrite(change{filepath.Join(root, journalDir, journalFile), data, 0o600})
 }
+
 func (i *Initializer) prepare(root, module, name string, changes []change, move *commandMove) (transaction, error) {
 	tx := transaction{Move: move, FormatVersion: 2, Module: module, Name: name, OriginalModule: TemplateModule, OriginalName: TemplateName, Phase: phasePrepared}
 	if err := i.preflightCommandMove(root, move); err != nil {
@@ -75,7 +75,7 @@ func (i *Initializer) prepare(root, module, name string, changes []change, move 
 			return tx, err
 		}
 	}
-	if err := i.FS.Mkdir(filepath.Join(root, journalDir), 0700); err != nil {
+	if err := i.FS.Mkdir(filepath.Join(root, journalDir), 0o700); err != nil {
 		return tx, err
 	}
 	for index, item := range changes {
@@ -90,7 +90,7 @@ func (i *Initializer) prepare(root, module, name string, changes []change, move 
 		}
 		file := transactionFile{Path: filepath.ToSlash(relative), Mode: item.mode, Existed: existed, Before: digest(before), After: digest(item.data), Backup: fmt.Sprintf("%s/%06d.before", journalDir, index), Staged: fmt.Sprintf("%s/%06d.after", journalDir, index)}
 		for path, data := range map[string][]byte{file.Backup: before, file.Staged: item.data} {
-			if err := i.atomicWrite(change{filepath.Join(root, filepath.FromSlash(path)), data, 0600}); err != nil {
+			if err := i.atomicWrite(change{filepath.Join(root, filepath.FromSlash(path)), data, 0o600}); err != nil {
 				return tx, err
 			}
 		}
@@ -98,6 +98,7 @@ func (i *Initializer) prepare(root, module, name string, changes []change, move 
 	}
 	return tx, i.save(root, tx)
 }
+
 func (i *Initializer) validateTransaction(root string, tx transaction) error {
 	if tx.FormatVersion == 1 {
 		return errors.New("请使用原版本工具恢复格式 1 的初始化日志，已保留现场")
@@ -121,7 +122,7 @@ func (i *Initializer) validateTransaction(root string, tx transaction) error {
 		if !slices.Contains(managedFiles, file.Path) && file.Path != originFile {
 			return fmt.Errorf("恢复路径不在受管清单：%q", file.Path)
 		}
-		if seen[file.Path] || file.Mode&^os.FileMode(0777) != 0 {
+		if seen[file.Path] || file.Mode&^os.FileMode(0o777) != 0 {
 			return errors.New("恢复记录包含重复路径或无效权限")
 		}
 		seen[file.Path] = true
@@ -177,6 +178,7 @@ func (i *Initializer) validateTransaction(root string, tx transaction) error {
 	}
 	return nil
 }
+
 func (i *Initializer) rollback(root string, tx transaction) error {
 	if err := i.validateTransaction(root, tx); err != nil {
 		return err
@@ -233,6 +235,7 @@ func (i *Initializer) rollback(root string, tx transaction) error {
 	}
 	return i.cleanup(root, tx)
 }
+
 func (i *Initializer) recover(root, module, name string) error {
 	dir, err := i.safePath(root, journalDir)
 	if err != nil {
@@ -278,6 +281,7 @@ func (i *Initializer) recover(root, module, name string) error {
 	}
 	return i.rollback(root, tx)
 }
+
 func (i *Initializer) apply(ctx context.Context, root, module, name string, changes []change, move *commandMove) ([]string, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -293,7 +297,9 @@ func (i *Initializer) apply(ctx context.Context, root, module, name string, chan
 	if err := i.save(root, tx); err != nil {
 		return nil, errors.Join(err, i.rollback(root, tx))
 	}
-	fail := func(cause error) ([]string, error) { return nil, errors.Join(cause, i.rollback(root, tx)) }
+	fail := func(cause error) ([]string, error) {
+		return nil, errors.Join(cause, i.rollback(root, tx))
+	}
 	changed := []string{}
 	for index, item := range changes {
 		if err := ctx.Err(); err != nil {
@@ -346,29 +352,6 @@ func (i *Initializer) apply(ctx context.Context, root, module, name string, chan
 	return changed, nil
 }
 
-// UnmarshalJSON 拒绝必需字段缺失或 null，避免把损坏记录解释成合法零值。
-func (file *transactionFile) UnmarshalJSON(data []byte) error {
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(data, &fields); err != nil {
-		return err
-	}
-	for _, key := range []string{"path", "mode", "existed", "before_sha256", "after_sha256", "backup", "staged"} {
-		value, ok := fields[key]
-		if !ok || bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
-			return fmt.Errorf("恢复文件记录缺少有效字段 %s", key)
-		}
-	}
-	type plain transactionFile
-	var decoded plain
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&decoded); err != nil {
-		return err
-	}
-	*file = transactionFile(decoded)
-	return nil
-}
-
 func (i *Initializer) cleanup(root string, tx transaction) error {
 	for _, file := range tx.Files {
 		temporary, err := i.transactionPath(root, tx, transactionTemporary(file.Path))
@@ -414,6 +397,34 @@ func (i *Initializer) cleanup(root string, tx transaction) error {
 	}
 	// 此处若中断，只留下空目录；重试可安全移除。
 	return i.FS.Remove(dir)
+}
+
+// UnmarshalJSON 拒绝必需字段缺失或 null，避免把损坏记录解释成合法零值。
+func (file *transactionFile) UnmarshalJSON(data []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	for _, key := range []string{"path", "mode", "existed", "before_sha256", "after_sha256", "backup", "staged"} {
+		value, ok := fields[key]
+		if !ok || bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+			return fmt.Errorf("恢复文件记录缺少有效字段 %s", key)
+		}
+	}
+	type plain transactionFile
+	var decoded plain
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&decoded); err != nil {
+		return err
+	}
+	*file = transactionFile(decoded)
+	return nil
+}
+
+func digest(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
 }
 
 // transactionTemporary 的路径由持久记录的文件路径唯一确定。

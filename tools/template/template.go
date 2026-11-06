@@ -26,7 +26,9 @@ func verifyTemplate() error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = os.RemoveAll(dir) }()
+	defer func() {
+		_ = os.RemoveAll(dir)
+	}()
 	// 利用 Git 文件列表排除本地凭据、缓存和构建产物。
 	cmd := exec.Command(gitProgram, "ls-files", "--cached", "--others", "--exclude-standard", "-z")
 	cmd.Dir = root
@@ -126,7 +128,9 @@ func verifyCommandInstall(root string, project scaffold.Project) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = os.RemoveAll(installDir) }()
+	defer func() {
+		_ = os.RemoveAll(installDir)
+	}()
 	//nolint:gosec // G204：开发任务显式执行固定工具及拆分参数，不经过 shell；参数来自仓库或调用者。
 	cmd := exec.Command("go", "install", "./"+project.CommandPath)
 	cmd.Dir = root

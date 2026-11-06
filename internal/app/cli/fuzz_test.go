@@ -13,12 +13,16 @@ func FuzzArgv(f *testing.F) {
 		args   []string
 		cancel bool
 	}{
-		{nil, false}, {[]string{""}, false}, {[]string{" "}, false},
-		{[]string{"greet", "--name", ""}, false}, {[]string{"greet", "--name", " "}, false},
+		{nil, false},
+		{[]string{""}, false},
+		{[]string{" "}, false},
+		{[]string{"greet", "--name", ""}, false},
+		{[]string{"greet", "--name", " "}, false},
 		{[]string{"greet", "--name", "你好 世界", "--json"}, false},
 		{[]string{"greet", "--", "--name", "x"}, false},
 		{[]string{"greet", "--name", "--lang"}, false},
-		{[]string{"greet", "--name", "x"}, true}, {[]string{"schema"}, true},
+		{[]string{"greet", "--name", "x"}, true},
+		{[]string{"schema"}, true},
 		{[]string{"completion", "bash"}, false},
 	} {
 		encoded := ""

@@ -88,8 +88,8 @@ func TestCheckPackageDocumentation(t *testing.T) {
 			root := t.TempDir()
 			for name, data := range tc.files {
 				path := filepath.Join(root, filepath.FromSlash(name))
-				require.NoError(t, os.MkdirAll(filepath.Dir(path), 0700))
-				require.NoError(t, os.WriteFile(path, []byte(data), 0600))
+				require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
+				require.NoError(t, os.WriteFile(path, []byte(data), 0o600))
 			}
 			err := checkDocumentation(root)
 			if tc.want == "" {
@@ -107,9 +107,9 @@ func TestCheckRejectsMissingRoot(t *testing.T) {
 
 func TestCheckRejectsLinkedDocumentation(t *testing.T) {
 	root := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(root, "feature.go"), []byte("package feature\n"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "feature.go"), []byte("package feature\n"), 0o600))
 	outside := filepath.Join(t.TempDir(), "outside.go")
-	require.NoError(t, os.WriteFile(outside, []byte("// Package feature 外部说明。\npackage feature\n"), 0600))
+	require.NoError(t, os.WriteFile(outside, []byte("// Package feature 外部说明。\npackage feature\n"), 0o600))
 	if err := os.Symlink(outside, filepath.Join(root, "doc.go")); err != nil {
 		t.Skipf("当前平台无法创建符号链接：%v", err)
 	}

@@ -72,7 +72,9 @@ func duplicateWindowsFile(file *os.File) (windows.Handle, error) {
 	}
 	var handle windows.Handle
 	var duplicateErr error
-	err = conn.Control(func(fd uintptr) { handle, duplicateErr = duplicateWindowsHandle(windows.Handle(fd)) })
+	err = conn.Control(func(fd uintptr) {
+		handle, duplicateErr = duplicateWindowsHandle(windows.Handle(fd))
+	})
 	return handle, errors.Join(err, duplicateErr)
 }
 
@@ -112,7 +114,9 @@ func (streams *windowsIO) output(writer io.Writer) (windows.Handle, error) {
 		if err != nil {
 			return 0, err
 		}
-		defer func() { _ = file.Close() }()
+		defer func() {
+			_ = file.Close()
+		}()
 		return duplicateWindowsFile(file)
 	}
 	read, write, err := os.Pipe()
@@ -126,14 +130,20 @@ func (streams *windowsIO) output(writer io.Writer) (windows.Handle, error) {
 		return 0, err
 	}
 	streams.pipes = append(streams.pipes, read)
-	streams.copies = append(streams.copies, func() error { _, copyErr := io.Copy(writer, read); _ = read.Close(); return copyErr })
+	streams.copies = append(streams.copies, func() error {
+		_, copyErr := io.Copy(writer, read)
+		_ = read.Close()
+		return copyErr
+	})
 	return handle, nil
 }
 
 func (streams *windowsIO) start() {
 	streams.done = make(chan error, len(streams.copies))
 	for _, copyStream := range streams.copies {
-		go func() { streams.done <- copyStream() }()
+		go func() {
+			streams.done <- copyStream()
+		}()
 	}
 }
 

@@ -19,7 +19,10 @@ func TestChildLoggersKeepParentAndSiblingFieldsIndependent(t *testing.T) {
 	var workers sync.WaitGroup
 	for _, name := range []string{"go", "git"} {
 		child := parent.With("tool", name)
-		workers.Go(func() { child.Record(CommandResult{ExitCode: 0}); child.Infow("diagnostic") })
+		workers.Go(func() {
+			child.Record(CommandResult{ExitCode: 0})
+			child.Infow("diagnostic")
+		})
 	}
 	workers.Wait()
 	parent.Infow("parent")
