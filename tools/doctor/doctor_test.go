@@ -199,7 +199,7 @@ func TestDoctorRequiredTools(t *testing.T) {
 		doctorEnvironmentFixture(t, binary, "")
 		require.NoError(t, doctor())
 	})
-	for _, name := range []string{"mise", "git", "gopls"} {
+	for _, name := range []string{"mise", "git", "gopls", "actionlint"} {
 		t.Run("missing-"+name, func(t *testing.T) {
 			doctorEnvironmentFixture(t, binary, name)
 			require.ErrorContains(t, doctor(), name)
@@ -221,6 +221,17 @@ func TestDoctorRequiredTools(t *testing.T) {
 		t.Setenv("DOCTOR_MISE_VERSION", "2026.10.20 linux-x64")
 		require.ErrorContains(t, doctor(), "mise")
 	})
+}
+
+func TestDoctorActionlintVersion(t *testing.T) {
+	binary := doctorToolFixture(t)
+	for _, version := range []string{"1.7.13", "1.7.12-rc.1"} {
+		t.Run(version, func(t *testing.T) {
+			doctorEnvironmentFixture(t, binary, "")
+			t.Setenv("DOCTOR_ACTIONLINT_VERSION", version)
+			require.ErrorContains(t, doctor(), "actionlint")
+		})
+	}
 }
 
 func TestDoctorUserToolsOnlyReport(t *testing.T) {
@@ -335,6 +346,7 @@ func main() {
     }
     arg := "--version"
     if name == "gopls" { arg = "version" }
+    if name == "actionlint" { arg = "-version" }
     if len(os.Args) != 2 || os.Args[1] != arg { os.Exit(2) }
     if name == os.Getenv("DOCTOR_FAULT_TOOL") {
         switch os.Getenv("DOCTOR_FAULT") {
@@ -349,6 +361,7 @@ func main() {
     case "uv":
         if filepath.Dir(os.Args[0]) == os.Getenv("DOCTOR_PROJECT_BIN") { fmt.Println("uv 0.13.7") } else { fmt.Println("uv 0.13.6") }
     case "gopls": fmt.Println("golang.org/x/tools/gopls v" + os.Getenv("DOCTOR_GOPLS_VERSION"))
+    case "actionlint": fmt.Println(os.Getenv("DOCTOR_ACTIONLINT_VERSION"))
     default: fmt.Println(name + " fixture")
     }
 }
@@ -370,12 +383,14 @@ func doctorEnvironmentFixture(t *testing.T, binary, missing string) *os.File {
 		t,
 		os.WriteFile(
 			filepath.Join(root, "mise.toml"),
-			[]byte("min_version = \"2026.10.21\"\n[tools]\n\"go:golang.org/x/tools/gopls\" = \"0.24.0\"\n"),
+			[]byte(
+				"min_version = \"2026.10.21\"\n[tools]\nactionlint = \"1.7.12\"\n\"go:golang.org/x/tools/gopls\" = \"0.24.0\"\n",
+			),
 			0o600,
 		),
 	)
 	bin := t.TempDir()
-	for _, name := range []string{"mise", "git", "gh", "codex", "rtk", "gopls"} {
+	for _, name := range []string{"mise", "git", "gh", "codex", "rtk", "gopls", "actionlint"} {
 		if name == missing {
 			continue
 		}
@@ -391,17 +406,21 @@ func doctorEnvironmentFixture(t *testing.T, binary, missing string) *os.File {
 	}
 	t.Setenv("DOCTOR_MISE_VERSION", "2026.10.25 linux-x64")
 	t.Setenv("DOCTOR_GOPLS_VERSION", "0.24.0")
+	t.Setenv("DOCTOR_ACTIONLINT_VERSION", "1.7.12")
 	t.Setenv("GO_CLI_STARTER_HOME", t.TempDir())
 	t.Chdir(root)
 
 	// 先完成 fixture 的首次启动，避免宿主启动开销占用被测探测的三秒预算。
-	for _, name := range []string{"mise", "git", "gh", "codex", "rtk", "gopls"} {
+	for _, name := range []string{"mise", "git", "gh", "codex", "rtk", "gopls", "actionlint"} {
 		if name == missing {
 			continue
 		}
 		arg := "--version"
 		if name == "gopls" {
 			arg = "version"
+		}
+		if name == "actionlint" {
+			arg = "-version"
 		}
 		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 		//nolint:gosec // G204：只启动 PATH 指向的本次测试 fixture；故障模式在就绪后单独设置。

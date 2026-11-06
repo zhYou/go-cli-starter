@@ -16,6 +16,7 @@ doctor 要求 Git 可用、mise 达到最低版本、项目工具、运行环境
 
 开发 doctor 最多四项并行，每项三秒、每流 2 KiB；govulncheck 核对本地构建来源和版本并执行 `-h`，不访问漏洞库。
 真正联网扫描使用 `mise exec -- govulncheck ./...`，数据库访问失败同样失败。
+actionlint 通过 `-version` 离线核对准确版本，属于必需工具。
 项目关闭 mise 锁文件，准确版本取自 TOML，后端解析并校验下载来源，模块由 `go.sum` 校验。
 产品 CLI 的 doctor 是另一项业务扩展入口，见[设计指南](design-guidelines.md#扩展-doctor)。
 
@@ -26,27 +27,28 @@ doctor 要求 Git 可用、mise 达到最低版本、项目工具、运行环境
 
 mise 聚合流程，领域 Go 入口只处理各自能力；参数不足、未知或多余时立即失败。
 
-| 命令                                                         | 用途                                                                         |
-| ------------------------------------------------------------ | ---------------------------------------------------------------------------- |
-| `mise run setup`                                             | 安装声明的固定版本工具、运行环境和插件，下载模块                             |
-| `mise run doctor`                                            | 检查项目环境，报告用户工具状态                                               |
-| `mise run fmt`                                               | 显式格式化 Go 和五类文本；分项可指定路径                                     |
-| `mise run fmt:go -- <路径...>` / `fmt:text -- <路径...>`     | 仅格式化指定 Go / 文本文件或目录；省略路径处理全部受检文件                   |
-| `mise run lint:text`                                         | 只读检查 JSON、XML、TOML、Markdown、YAML 的格式、语法及规则                  |
-| `mise run lint:syntax`                                       | 用现成 CLI 检查 JSON、XML、TOML 语法和重复键                                 |
-| `mise run lint`                                              | 只读检查格式、双语消息、应用配置、包文档、源码风格、版本声明和 34 项静态规则 |
-| `mise run lint:i18n` / `lint:config`                         | 校验双语消息目录 / 受管应用配置；均纳入 lint 和 check                        |
-| `mise run lint:style`                                        | 检查具名和匿名结构体字段逐项声明；纳入 lint 和 check                         |
-| `mise run lint:doc`                                          | 检查正式 Go 包的 doc.go 与包说明位置；纳入 lint 和 check                     |
-| `mise run lint:test`                                         | 用真实 fixture 测试静态规则自身；仅纳入 check                                |
-| `mise run build`                                             | 构建到 bin，注入版本信息                                                     |
-| `mise run check`                                             | 完整源码检查，含测试、构建、契约和模板验收                                   |
-| `mise run template:check`                                    | 在临时副本中验证改名、lint、测试、构建、安装和发布配置                       |
-| `mise run template:init --module <模块路径> --name <命令名>` | 初始化模板身份                                                               |
-| `mise run contract:check` / `contract:update`                | 检查 / 显式更新机器契约                                                      |
-| `mise run lint:versions`                                     | 检查工具、模块、CI 和文档版本一致性                                          |
-| `mise run mcp:check`                                         | 验证 gopls MCP 的实际连接和诊断                                              |
-| `mise run release:verify`                                    | 验证发布归档，并隔离安装宿主程序                                             |
+| 命令                                                         | 用途                                                                           |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `mise run setup`                                             | 安装声明的固定版本工具、运行环境和插件，下载模块                               |
+| `mise run doctor`                                            | 检查项目环境，报告用户工具状态                                                 |
+| `mise run fmt`                                               | 显式格式化 Go 和五类文本；分项可指定路径                                       |
+| `mise run fmt:go -- <路径...>` / `fmt:text -- <路径...>`     | 仅格式化指定 Go / 文本文件或目录；省略路径处理全部受检文件                     |
+| `mise run lint:text`                                         | 只读检查 JSON、XML、TOML、Markdown、YAML 的格式、语法及规则                    |
+| `mise run lint:workflow`                                     | 检查 GitHub Actions 工作流的语法、表达式、上下文与任务依赖；纳入 lint 和 check |
+| `mise run lint:syntax`                                       | 用现成 CLI 检查 JSON、XML、TOML 语法和重复键                                   |
+| `mise run lint`                                              | 只读检查格式、双语消息、应用配置、包文档、源码风格、版本声明和 34 项静态规则   |
+| `mise run lint:i18n` / `lint:config`                         | 校验双语消息目录 / 受管应用配置；均纳入 lint 和 check                          |
+| `mise run lint:style`                                        | 检查具名和匿名结构体字段逐项声明；纳入 lint 和 check                           |
+| `mise run lint:doc`                                          | 检查正式 Go 包的 doc.go 与包说明位置；纳入 lint 和 check                       |
+| `mise run lint:test`                                         | 用真实 fixture 测试静态规则自身；仅纳入 check                                  |
+| `mise run build`                                             | 构建到 bin，注入版本信息                                                       |
+| `mise run check`                                             | 完整源码检查，含测试、构建、契约和模板验收                                     |
+| `mise run template:check`                                    | 在临时副本中验证改名、lint、测试、构建、安装和发布配置                         |
+| `mise run template:init --module <模块路径> --name <命令名>` | 初始化模板身份                                                                 |
+| `mise run contract:check` / `contract:update`                | 检查 / 显式更新机器契约                                                        |
+| `mise run lint:versions`                                     | 检查工具、模块、CI 和文档版本一致性                                            |
+| `mise run mcp:check`                                         | 验证 gopls MCP 的实际连接和诊断                                                |
+| `mise run release:verify`                                    | 验证发布归档，并隔离安装宿主程序                                               |
 
 直接调用纳管工具无需 shell 激活；以下直接工具命令也可用于针对性验证：
 
@@ -69,7 +71,7 @@ mise exec -- go test ./internal/app/cli -run=^$ -fuzz=FuzzArgv -fuzztime=5s
 mise exec -- go test ./internal/app/cli -run=^$ -bench=. -benchmem
 ```
 
-`lint` 聚合五类文本、消息、配置、包文档、源码风格、版本、格式及静态规则；`lint:test` 验证规则自身，仅纳入 check。
+`lint` 聚合五类文本、工作流语义、消息、配置、包文档、源码风格、版本、格式及静态规则；`lint:test` 验证规则自身，仅纳入 check。
 `check` 进一步完成测试、vet、模块元数据、构建、机器契约和模板副本验收；它不改源码，但会写缓存、临时文件和 bin。
 
 ## 文本格式与检查
@@ -87,6 +89,10 @@ README 的应用路径表随模板改名改变列宽，用局部 `prettier-ignor
 `.yamllint.yaml` 检查重复键、锚点和布尔值歧义，允许 Actions 的 `on` 键；排版由 Prettier 检查。
 JSON、XML、TOML 的语法由 pre-commit-hooks 包的 `check-json`、`check-xml`、`check-toml` 检查，
 只运行现成命令，不启用 Git hooks。没有业务 Schema、拼写或联网链接检查。
+
+`lint:workflow` 使用固定版本 actionlint 检查 GitHub Actions 工作流，支持 YAML 锚点与别名。
+显式关闭 ShellCheck 和 Pyflakes 集成，不受本机是否安装可选检查器影响。
+远端 Action 输入检查受 actionlint 内置元数据及引用形式限制，不承诺解析所有固定 SHA 的输入；修改这些输入仍须核对对应 Action 定义。
 
 文件选择覆盖隐藏配置，遵循仓库 Git 忽略规则；vendor 和 `tools/lint/testdata/` 明确排除。
 `test/testdata/contracts/` 和 `.template-origin.json` 保留生成器格式，仍检查语法。
@@ -372,18 +378,20 @@ containedctx 约束结构体保存 Context；OTel 固定接口与 Session 生命
 testifylint 使用默认规则但关闭 float-compare，JSON 整数码与计数的 float64 表示继续精确比较；
 modernize 关闭 omitzero，保留 JSON 零值、nil 和空容器的省略行为。
 
-revive 仅启用以下 14 项，indent-error-flow 保留原变量作用域：
+revive 仅启用以下 15 项，indent-error-flow 保留原变量作用域：
 
 ```text
 blank-imports context-as-argument context-keys-type dot-imports error-return error-strings
-errorf increment-decrement indent-error-flow range receiver-naming unexported-return
+errorf import-shadowing increment-decrement indent-error-flow range receiver-naming unexported-return
 unused-parameter var-naming
 ```
+
+import-shadowing 检查局部变量、参数及 range 变量等声明对导入包名的遮蔽，避免路径和命令等名称混淆。
 
 `mise run lint:style` 直接解析所有平台的 Go AST，检查具名、匿名、泛型结构体和外部测试包，
 不限制函数参数或返回值的合并声明。扫描跳过 testdata、vendor、隐藏或下划线开头的目录与源码、
 根 bin/dist、生成代码和 docs/superpowers 工作记录；拒绝符号链接 Go 源文件。
-`mise run lint:test` 在临时模块运行真实类型分析，验证架构、koanf、日志键值和错误处理的违规与合规 fixture；模板改名后的副本也运行该检查。它测试规则自身，只纳入 check，不作为普通 lint 的依赖。
+`mise run lint:test` 在临时模块运行真实类型分析，验证架构、koanf、日志键值、错误处理和 revive 规则的违规与合规 fixture；模板改名后的副本也运行该检查。它测试规则自身，只纳入 check，不作为普通 lint 的依赖。
 
 `mise run lint:i18n` 检查 `internal/locales/active.en.toml` 与 `active.zh-CN.toml`：
 目录非空，消息 ID 不重复，字段与消息内容有效，模板语法正确；两种语言的 ID 和模板参数集合一致，

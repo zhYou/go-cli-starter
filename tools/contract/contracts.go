@@ -104,12 +104,12 @@ func validateContract(base, snapshot, actual []byte, records []contract.Record, 
 }
 
 func readRecords(against string) ([]contract.Record, error) {
-	paths, err := filepath.Glob("docs/compatibility/changes/*.json")
+	recordPaths, err := filepath.Glob("docs/compatibility/changes/*.json")
 	if err != nil {
 		return nil, err
 	}
 	records := []contract.Record{}
-	for _, path := range paths {
+	for _, path := range recordPaths {
 		//nolint:gosec // G304：开发任务只读取调用者指定的项目目录或本地构建 fixture，不作为服务接收外部路径。
 		data, err := os.ReadFile(path)
 		if err != nil {

@@ -61,7 +61,7 @@ func Spec(key string) (ToolSpec, error) {
 		return ToolSpec{
 			miseProgram,
 			miseProgram,
-			`(?m)^([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`,
+			plainVersionPattern,
 			[]string{versionFlag},
 		}, nil
 	case "go":
@@ -79,6 +79,13 @@ func Spec(key string) (ToolSpec, error) {
 			lintProgram,
 			`\bgolangci-lint has version ([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`,
 			[]string{versionCommand},
+		}, nil
+	case actionlintProgram:
+		return ToolSpec{
+			actionlintProgram,
+			actionlintProgram,
+			plainVersionPattern,
+			[]string{"-version"},
 		}, nil
 	case releaseProgram:
 		return ToolSpec{
@@ -109,7 +116,7 @@ func Spec(key string) (ToolSpec, error) {
 		return ToolSpec{
 			"prettier",
 			"Prettier",
-			`(?m)^([0-9]+\.[0-9]+\.[0-9]+)(?:[ \t\r\n]|$)`,
+			plainVersionPattern,
 			[]string{versionFlag},
 		}, nil
 	case "pypi:yamllint":

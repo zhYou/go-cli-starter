@@ -31,6 +31,7 @@ PR 改目标、标题或描述会重新检查；同一 PR 新运行取消旧运�
 Linux 源码、race、fuzz/benchmark、snapshot/安装及 MCP 验收分组并行，macOS/Windows 保留原生任务，并运行五类文本的格式和 lint 验收。
 CI 的 `check` 汇总全部作业，任一失败、取消或跳过都不能通过。平台运行、MCP、漏洞和发布验收独立于本地 `mise run check`。
 基础 CI 无需安装 Codex、RTK 或 superpowers；MCP job 复用统一 setup。
+源码任务通过统一 lint 运行 actionlint 工作流语义检查，模板副本验收同样复用该入口。
 
 Go 缓存区分 OS、架构、Go 版本和依赖摘要，编译缓存再区分任务及提交；lint 独立缓存，项目工具复用 mise 缓存。
 Windows 只跨运行缓存模块，编译结果在当前 runner 内复用。缓存不包含应用状态、诊断文件或发布资产，命中不能跳过验证。

@@ -87,15 +87,15 @@ func TestBusinessErrorWithCustomPreRun(t *testing.T) {
 
 func TestCobraRequiredFlagIsUsageError(t *testing.T) {
 	root := metadataRoot(Options{Out: io.Discard, ErrOut: io.Discard})
-	command := &cobra.Command{
+	requiredCommand := &cobra.Command{
 		Use: "required",
 		RunE: wrapRun(func(*cobra.Command, []string) error {
 			return nil
 		}),
 	}
-	command.Flags().String("token", "", "令牌")
-	require.NoError(t, command.MarkFlagRequired("token"))
-	root.AddCommand(command)
+	requiredCommand.Flags().String("token", "", "令牌")
+	require.NoError(t, requiredCommand.MarkFlagRequired("token"))
+	root.AddCommand(requiredCommand)
 	root.SetArgs([]string{"required"})
 	err := classifyExecutionError(root.Execute())
 	require.Error(t, err)

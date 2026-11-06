@@ -105,8 +105,10 @@ func (i *Initializer) prepare(root, module, name string, changes []change, move 
 			Backup:  fmt.Sprintf("%s/%06d.before", journalDir, index),
 			Staged:  fmt.Sprintf("%s/%06d.after", journalDir, index),
 		}
-		for path, data := range map[string][]byte{file.Backup: before, file.Staged: item.data} {
-			if err := i.atomicWrite(change{filepath.Join(root, filepath.FromSlash(path)), data, 0o600}); err != nil {
+		for backupPath, data := range map[string][]byte{file.Backup: before, file.Staged: item.data} {
+			if err := i.atomicWrite(
+				change{filepath.Join(root, filepath.FromSlash(backupPath)), data, 0o600},
+			); err != nil {
 				return tx, err
 			}
 		}
@@ -144,11 +146,11 @@ func (i *Initializer) validateTransaction(root string, tx transaction) error {
 			return errors.New("恢复记录包含重复路径或无效权限")
 		}
 		seen[file.Path] = true
-		path, err := i.transactionPath(root, tx, file.Path)
+		targetPath, err := i.transactionPath(root, tx, file.Path)
 		if err != nil {
 			return err
 		}
-		if info, err := i.FS.Stat(path); err == nil && !info.Mode().IsRegular() {
+		if info, err := i.FS.Stat(targetPath); err == nil && !info.Mode().IsRegular() {
 			return fmt.Errorf("恢复目标不是常规文件：%s", file.Path)
 		}
 		if file.Backup != fmt.Sprintf("%s/%06d.before", journalDir, index) ||
@@ -184,7 +186,7 @@ func (i *Initializer) validateTransaction(root string, tx transaction) error {
 		} else if err != nil && !os.IsNotExist(err) {
 			return err
 		}
-		data, err := afero.ReadFile(i.FS, path)
+		data, err := afero.ReadFile(i.FS, targetPath)
 		exists := err == nil
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
@@ -217,11 +219,11 @@ func (i *Initializer) rollback(root string, tx transaction) error {
 		}
 	}
 	for _, file := range slices.Backward(tx.Files) {
-		path, err := i.transactionPath(root, tx, file.Path)
+		targetPath, err := i.transactionPath(root, tx, file.Path)
 		if err != nil {
 			return err
 		}
-		current, err := afero.ReadFile(i.FS, path)
+		current, err := afero.ReadFile(i.FS, targetPath)
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
@@ -240,11 +242,11 @@ func (i *Initializer) rollback(root string, tx transaction) error {
 			if err := i.FS.Remove(temporary); err != nil && !os.IsNotExist(err) {
 				return err
 			}
-			if err := i.atomicWriteAt(change{path, data, file.Mode}, temporary); err != nil {
+			if err := i.atomicWriteAt(change{targetPath, data, file.Mode}, temporary); err != nil {
 				return err
 			}
 		} else if err == nil {
-			if err := i.FS.Remove(path); err != nil {
+			if err := i.FS.Remove(targetPath); err != nil {
 				return err
 			}
 		}
@@ -267,11 +269,11 @@ func (i *Initializer) recover(root, module, name string) error {
 	} else if err != nil {
 		return err
 	}
-	path, err := i.safePath(root, journalDir+"/journal.json")
+	journalPath, err := i.safePath(root, journalDir+"/journal.json")
 	if err != nil {
 		return err
 	}
-	data, err := afero.ReadFile(i.FS, path)
+	data, err := afero.ReadFile(i.FS, journalPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			entries, listErr := afero.ReadDir(i.FS, dir)
@@ -395,11 +397,11 @@ func (i *Initializer) cleanup(root string, tx transaction) error {
 	// 终态日志保留到最后，备份允许已被此前的清理删除。
 	for _, file := range tx.Files {
 		for _, relative := range []string{file.Backup, file.Staged} {
-			path, err := i.safePath(root, relative)
+			artifactPath, err := i.safePath(root, relative)
 			if err != nil {
 				return err
 			}
-			if err := i.FS.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			if err := i.FS.Remove(artifactPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 				return err
 			}
 		}
