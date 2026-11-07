@@ -397,7 +397,7 @@ GoLand 使用分号分隔子后缀，完整文件名也可以作为后缀匹配�
 
 ## 静态规则与开发探测
 
-`mise run lint` 检查五类文本、双语消息、应用配置、包文档、源码风格和版本声明，再检查 Go 格式并启用以下 34 项，生产导出 API 需中文 GoDoc；测试仅豁免 GoDoc，其他边界仍生效：
+`mise run lint` 检查五类文本、双语消息、应用配置、包文档、源码风格和版本声明，再检查 Go 格式并启用以下 34 项，生产导出 API 需中文 GoDoc；测试的 GoDoc 和新增入口规则豁免见下文，其他既有边界仍生效：
 
 ```text
 errcheck govet ineffassign staticcheck unused bodyclose errorlint gosec godoclint
@@ -411,6 +411,26 @@ koanf 只可在精确的 `internal/app/config/load.go` 导入，且仅整体解�
 Get、Raw、All 等绕过结构体的入口。zap 只在 base/logging，OTel SDK/exporter 只在 base/telemetry。
 base 不得导入 app、command、tools 或 Cobra；运行时代码及其测试不得导入 tools，开发包内部可复用。
 `.golangci.yml` 纳入初始化的身份文件白名单；模块路径变更后继续匹配架构边界和 logging 包装器。
+
+可配置、可观测、可诊断的自动检查按以下边界执行；错误提示包含规则标识及应使用的入口：
+
+| 原则   | 检查                                                                                                         | 行为测试继续保证                                       |
+| ------ | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| 可配置 | 既有 koanf 导入与逐键读取限制；CFG001/CFG002 限制直接读取或枚举进程环境                                      | 默认值、覆盖优先级、严格校验及副作用前校验             |
+| 可观测 | 标准日志包导入限制；OBS001–OBS004 禁止全局输出、退出、zap logger 和 OTel 全局入口；TRACE001 统一安全错误记录 | 关键阶段、耗时、结果、run_id、取消和诊断资源收尾       |
+| 可诊断 | DIAG001 检查静态错误码与恢复消息引用，双语目录检查保持生效                                                   | 阶段和副作用准确、敏感内容边界、恢复建议及 doctor 行为 |
+
+新增入口规则仅约束 internal 下的手写生产代码，测试、cmd 和 tools 不受这些新增规则约束；既有规则范围不变。
+CFG001 针对 os.Getenv/LookupEnv/ExpandEnv，仅豁免精确的 app/config/load.go、app/cli/language.go、
+base/paths/paths.go 和 base/telemetry/environment.go；CFG002 的 os.Environ 仅豁免 command/process.go，
+以上路径均相对于 internal。OBS001 约束 os 标准流和 Exit，OBS002 约束 fmt.Print/Printf/Println 及内建 print/println，
+向显式 writer 的 fmt.Fprint* 仍可使用。OBS003 约束 zap.L/S/ReplaceGlobals，OBS004 约束 OTel 根包的全局
+provider、Tracer/Meter 和诊断处理器入口。业务使用注入的 IO、logging.Logger、tracer 和环境依赖。
+TRACE001 仅允许 internal/base/telemetry/diagnostic.go 直接调用 trace.Span.RecordError；其他调用使用 telemetry.RecordError。
+所有豁免同时限定规则和精确路径，不按同名文件或整包放开。
+
+这些检查阻断确定的违规，不证明每项业务都记录了正确阶段或恢复建议；对应行为证据见[能力验证](#能力验证与交付证据)。
+第三方组件的隐式输出仍须用真实进程验收；检查不执行敏感数据流分析，也不要求每项能力新增配置或恢复动作。
 
 errcheck 同时检查显式丢弃的错误和未检查的类型断言。清理失败应返回、告警或在测试中断言；
 已经由资源所有者报告的诊断错误可加精确中文说明，避免重复告警或改变业务退出码。
@@ -434,7 +454,7 @@ import-shadowing 检查局部变量、参数及 range 变量等声明对导入�
 `mise run lint:style` 直接解析所有平台的 Go AST，检查具名、匿名、泛型结构体和外部测试包，
 不限制函数参数或返回值的合并声明。扫描跳过 testdata、vendor、隐藏或下划线开头的目录与源码、
 根 bin/dist、生成代码和 docs/superpowers 工作记录；拒绝符号链接 Go 源文件。
-`mise run lint:test` 在临时模块运行真实类型分析，验证架构、koanf、日志键值、错误处理和 revive 规则的违规与合规 fixture；模板改名后的副本也运行该检查。它测试规则自身，只纳入 check，不作为普通 lint 的依赖。
+`mise run lint:test` 在临时模块运行真实类型分析，验证架构、koanf、日志键值、错误处理、入口边界和 revive 规则的违规与合规 fixture；模板改名后的副本也运行该检查。它测试规则自身，只纳入 check，不作为普通 lint 的依赖。
 
 `mise run lint:i18n` 检查 `internal/locales/active.en.toml` 与 `active.zh-CN.toml`：
 目录非空，消息 ID 不重复，字段与消息内容有效，模板语法正确；两种语言的 ID 和模板参数集合一致，
@@ -445,6 +465,13 @@ import-shadowing 检查局部变量、参数及 range 变量等声明对导入�
 控制结构或其分支内的变量赋值，以及嵌套管道中的变量声明或赋值会报错；请改为直接字段或在分支外
 确定的变量。子对象上的动态键
 不会引入额外的根参数。新增或修改消息时同时维护两种语言，稳定 ID 不随语言改变。
+
+消息检查还通过固定版本 go/packages 的类型信息检查当前 Go 构建上下文中 cmd/internal 生产代码的
+fault.Definition.Code 和 fault.Recovery.Code：显式结构体初始化及普通字段赋值中，常量值必须存在双语目录。
+支持导入别名、类型别名、无键初始化、字符串常量拼接及类型转换；错误按文件和位置排序，并使用相对路径。
+省略或空 Definition.Code 的归一化包装不新增引用；动态值、跨函数传播及业务语义由领域测试保证。
+测试、testdata、生成代码和非当前构建文件不检查引用；三平台原生 CI 分别覆盖平台代码。
+源码加载、类型分析或取消失败均使检查失败，模块以只读模式加载；不执行产品逻辑，也不重写 go.mod/go.sum。
 
 `mise run lint:config` 递归检查 `configs/` 应用配置、`internal/locales/` 语言资源，以及根目录
 明确登记的 `config.toml`、`config.example.toml` 和同名 JSON/YAML 变体。`configs/config.example.toml`

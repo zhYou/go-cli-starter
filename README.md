@@ -207,4 +207,4 @@ task 内由 mise 提供工具环境，无需额外包装。
 | [安全报告](SECURITY.md)               | 目标项目须填写的私密报告入口         |
 | [项目待办](docs/backlog.md)           | 明确要求记录的探索想法               |
 
-模板版本为 0.4.0；Claude Code 和 OpenCode 支持列在待办中，TUI 和 CLI 自身的 MCP 服务暂不在范围内。
+模板版本为 0.4.1；Claude Code 和 OpenCode 支持列在待办中，TUI 和 CLI 自身的 MCP 服务暂不在范围内。

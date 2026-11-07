@@ -76,7 +76,7 @@ Cobra 提供命令与元数据；前置顺序、schema 输出及退出码是项�
 
 每个实际新增配置项须说明类型、默认值、允许来源、覆盖关系、范围及组合约束；默认值由模块的 Defaults 提供，
 经统一加载入口组合。先校验参数和完整配置，再创建资源或执行业务副作用；直接业务调用也校验输入。
-本次诊断能力不新增业务配置或隐藏环境开关。
+业务环境输入通过统一加载入口或注入的 LookupEnv 获取；基础设施的直接环境读取保持精确登记，见[静态规则](development.md#静态规则与开发探测)。
 
 凭据由具体业务声明来源，优先通过调用级依赖、注入的 LookupEnv 或受控凭据提供者取得；不预建凭据配置框架。
 需要文件、环境或 flag 输入时，明确读取时机和优先级，不用日志证明凭据存在，不把凭据写入配置示例。
@@ -172,7 +172,7 @@ if err != nil {
 
 加载失败、缺译、模板错误或缺少参数会返回错误；Format 失败时返回空字符串，不使用部分渲染文本。
 Text/Render 仅用于安全诊断兜底，不能凭非空字符串判断渲染成功；诊断故障不吞掉原始业务错误。
-`mise run lint:i18n` 检查双语目录、模板和参数，细则见[开发说明](development.md#静态规则与开发探测)。
+`mise run lint:i18n` 检查双语目录、模板参数和静态诊断消息引用，细则见[开发说明](development.md#静态规则与开发探测)。
 项目暂不支持运行时翻译覆盖或 `[i18n]` 配置。CLI 按 `--lang` > `<PREFIX>_LANG` > en 选语言，
 zh-CN 是中文、zh 是别名，不从 OS 区域推断。稳定命令、选项、JSON 字段、错误码和状态枚举不翻译；
 第三方错误叶子在经过敏感边界审查后保留原文。Help、version、completion、schema 在坏配置下仍可运行，不创建诊断目录。
@@ -237,7 +237,8 @@ call.logger.WithContext(ctx).Record(greetingFinished{
 `Logger.Record(logging.CommandResult{...})` 或 `logging.ToolCall`，普通临时诊断才用 Debugw/Infow。
 工具事件只记录操作、程序名、结果、耗时与结构化错误，不记录 argv、环境和原始输出。
 新领域事件由所属模块实现 `logging.Event` 的 Emit 方法，显式使用调用级 logger 和 tracer；
-telemetry.RecordError 逐分支记录安全错误文本、error.code、error.phase、已知副作用和恢复标识。
+生产代码的全局日志、provider、进程输出和退出入口由[静态规则](development.md#静态规则与开发探测)约束。
+Trace 错误统一通过 telemetry.RecordError 逐分支记录安全错误文本、error.code、error.phase、已知副作用和恢复标识。
 命令结束日志保留既有错误字段，并增加 error_details 数组。日志门面没有 Fatal/Panic，业务不得绕过入口退出进程。
 
 并发工作通过 `Session.Go(context.Context, func(context.Context)) bool` 登记，工作接收本次显式传入的 Context；Finish 开始后拒绝新任务。
