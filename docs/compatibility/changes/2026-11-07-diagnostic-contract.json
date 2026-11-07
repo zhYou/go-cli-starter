@@ -1,0 +1,9 @@
+{
+  "id": "2026-11-07-diagnostic-contract",
+  "compatibility": "breaking",
+  "summary": "--json 的 stderr 改为按行结构化错误与告警；新增统一错误阶段、已确认副作用及恢复说明，敏感配置原因不再回显。",
+  "paths": ["/schema/diagnostic_schema", "/results/diagnostics"],
+  "previous_version": "v0.3.1",
+  "target_version": "v0.4.0",
+  "migration": "逐行解析 --json stderr，按 type=error/warning 识别诊断，现有日志保留 JSONL event 字段；成功 stdout、doctor 完成负向报告及退出码保持。completed_effects=null 表示副作用未知，空数组表示确认没有副作用；业务须先核实未知状态再决定重试。同步 fault、消息、CLI、Session、日志、Trace、双语资源及契约工具。greet 阶段事件提高至 info，日志追加 error_details。模板版本为0.4.0，来源与事务格式保持；实际发布v0.1.0→v0.4.0还须执行历史TOML、语言、路径和默认日志迁移。详见docs/template-upgrades.md。"
+}
