@@ -54,6 +54,13 @@ func DiagnosticOf(err error) (Diagnostic, bool) {
 	return Diagnostic{}, false
 }
 
+// WithDetails 快照边界归一化后的分支列表，原始原因仍由 Unwrap 保留。
+// 分支错误须保持不可变；空列表不改变默认呈现，敏感原因不会通过分支展开。
+func WithDetails(details []*Error) Option {
+	snapshot := slices.Clone(details)
+	return func(e *Error) { e.details = slices.Clone(snapshot) }
+}
+
 func cloneDiagnostic(d Diagnostic) Diagnostic {
 	d.CompletedEffects = slices.Clone(d.CompletedEffects)
 	if d.Recovery != nil {

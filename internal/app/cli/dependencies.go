@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"sync"
 
 	"github.com/zhYou/go-cli-starter/internal/app/config"
 	"github.com/zhYou/go-cli-starter/internal/app/doctor"
@@ -22,6 +23,7 @@ type Dependencies struct {
 	Logger     *logging.Logger
 }
 type invocation struct {
+	diagnosticMu    sync.RWMutex
 	languageFlag    *languageValue
 	bundle          *messages.Bundle
 	localizer       *messages.Localizer
@@ -61,4 +63,28 @@ func newInvocation(provided *Dependencies) *invocation {
 		deps.NewLogger = logging.New
 	}
 	return &invocation{phase: phaseArguments, deps: deps, logLevel: defaultLogLevel, logger: logging.NewNop()}
+}
+
+func (call *invocation) setPhase(phase string) {
+	call.diagnosticMu.Lock()
+	defer call.diagnosticMu.Unlock()
+	call.phase = phase
+}
+
+func (call *invocation) setSession(owned *session.Session) {
+	call.diagnosticMu.Lock()
+	defer call.diagnosticMu.Unlock()
+	call.phase = "execute"
+	call.session = owned
+}
+
+func (call *invocation) diagnosticView() *invocation {
+	call.diagnosticMu.RLock()
+	defer call.diagnosticMu.RUnlock()
+	return &invocation{
+		phase:           call.phase,
+		session:         call.session,
+		localizer:       call.localizer,
+		jsonDiagnostics: call.jsonDiagnostics,
+	}
 }

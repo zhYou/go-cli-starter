@@ -49,14 +49,15 @@ type recoveryDiagnostic struct {
 }
 
 func (call *invocation) reportDiagnostic(out io.Writer, category string, err error, code int) {
-	record := diagnosticRecord{Type: category, SchemaVersion: 1, Diagnostics: call.diagnosticDetails(err)}
+	view := call.diagnosticView()
+	record := diagnosticRecord{Type: category, SchemaVersion: 1, Diagnostics: view.diagnosticDetails(err)}
 	if category == diagnosticError {
 		record.ExitCode = &code
 	}
-	if call.session != nil {
-		record.RunID = call.session.RunID
+	if view.session != nil {
+		record.RunID = view.session.RunID
 	}
-	if call.jsonDiagnostics {
+	if view.jsonDiagnostics {
 		//nolint:errcheck // 诊断出口失败不可覆盖业务结果，也不能递归告警。
 		_ = writeJSON(out, record)
 		return
@@ -65,16 +66,16 @@ func (call *invocation) reportDiagnostic(out io.Writer, category string, err err
 	for _, detail := range record.Diagnostics {
 		text := detail.Message
 		if detail.Phase != "" {
-			text += call.diagnosticText("cli.failure_phase", map[string]any{"Phase": detail.Phase})
+			text += view.diagnosticText("cli.failure_phase", map[string]any{"Phase": detail.Phase})
 		}
 		if detail.CompletedEffects != nil {
-			text += call.diagnosticText(
+			text += view.diagnosticText(
 				"cli.completed_effects",
 				map[string]any{"Effects": strings.Join(detail.CompletedEffects, ", ")},
 			)
 		}
 		if detail.Recovery != nil {
-			text += call.diagnosticText("cli.recovery", map[string]any{"Advice": detail.Recovery.Message})
+			text += view.diagnosticText("cli.recovery", map[string]any{"Advice": detail.Recovery.Message})
 		}
 		lines = append(lines, text)
 	}
@@ -83,7 +84,7 @@ func (call *invocation) reportDiagnostic(out io.Writer, category string, err err
 		id = diagnosticWarningMessage
 	}
 	//nolint:errcheck // 错误或告警写入失败保留已确定的业务退出状态。
-	_, _ = fmt.Fprintln(out, call.diagnosticText(id, map[string]any{paramMessage: strings.Join(lines, "; ")}))
+	_, _ = fmt.Fprintln(out, view.diagnosticText(id, map[string]any{paramMessage: strings.Join(lines, "; ")}))
 }
 
 func (call *invocation) diagnosticDetails(err error) []errorDiagnostic {
@@ -156,6 +157,14 @@ func (call *invocation) diagnosticText(code string, params map[string]any) strin
 
 // selectJSON 只读取元数据；参数错误即使先于 --json 发生，也遵守最后一个合法布尔设置。
 func selectJSON(root *cobra.Command, args []string) bool {
+	if index, completion := completionRequest(root, args); completion {
+		end := len(args)
+		if end > index+1 {
+			end--
+		}
+		complete := append([]string(nil), args[:index]...)
+		args = append(complete, args[index+1:end]...)
+	}
 	//nolint:errcheck // 正式执行路径负责命令查找错误，预选不执行 Set 或 hook。
 	target, scan, _ := root.Find(args)
 	if target == nil {

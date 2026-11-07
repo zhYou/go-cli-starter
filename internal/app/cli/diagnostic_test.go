@@ -5,10 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
+
+	"github.com/zhYou/go-cli-starter/internal/app/config"
+	"github.com/zhYou/go-cli-starter/internal/app/doctor"
+	"github.com/zhYou/go-cli-starter/internal/base/logging"
 
 	"github.com/stretchr/testify/require"
 	"github.com/zhYou/go-cli-starter/internal/app/greeting"
@@ -198,5 +203,100 @@ func TestRuntimeFallbackSharedWithLogsAndTrace(t *testing.T) {
 		require.NoError(t, err)
 		require.Contains(t, string(data), "cli.runtime")
 		require.Contains(t, string(data), "greeting.run")
+	}
+}
+
+func TestDiagnosticWarningsUseSynchronizedInvocationState(t *testing.T) {
+	for range 16 {
+		done := make(chan struct{})
+		code := Run(
+			t.Context(),
+			[]string{"greet", "--name", "fixture", "--json"},
+			Options{Out: io.Discard, ErrOut: io.Discard, LookupEnv: noFixtureEnv, Dependencies: &Dependencies{
+				LoadConfig: func(context.Context, config.Options) (config.Config, error) {
+					cfg := config.Defaults()
+					cfg.Logging.Output = "none"
+					return cfg, nil
+				},
+				NewLogger: func(_ logging.RunInfo, _ logging.Options, warn func(error)) *logging.Logger {
+					go func() { defer close(done); warn(errors.New("fixture warning")) }()
+					return logging.NewNop()
+				},
+				Greet: func(context.Context, greeting.Options) (greeting.Result, error) {
+					<-done
+					return greeting.Result{Message: "fixture"}, nil
+				},
+			}},
+		)
+		require.Zero(t, code)
+	}
+}
+
+func TestDoctorExecutionFailureHasExecutionPhase(t *testing.T) {
+	var out, stderr bytes.Buffer
+	code := Run(
+		t.Context(),
+		[]string{"doctor", "--json"},
+		Options{
+			Out:       &out,
+			ErrOut:    &stderr,
+			LookupEnv: noFixtureEnv,
+			Dependencies: &Dependencies{Doctor: func(context.Context, doctor.Options) (doctor.Result, error) {
+				return doctor.Result{}, errors.New("probe failed")
+			}},
+		},
+	)
+	require.Equal(t, 1, code)
+	require.Empty(t, out.String())
+	var record diagnosticRecord
+	require.NoError(t, json.Unmarshal(stderr.Bytes(), &record))
+	require.Equal(t, "doctor.run", record.Diagnostics[0].Phase)
+	require.Nil(t, record.Diagnostics[0].CompletedEffects)
+}
+
+func TestMixedJoinedErrorsKeepKnownBranchAndOriginalIdentity(t *testing.T) {
+	partial := (fault.Definition{Code: "fixture.partial", Kind: fault.Runtime}).New(
+		fault.WithDiagnostic(
+			fault.Diagnostic{
+				Phase:            "fixture.publish",
+				CompletedEffects: []string{"fixture.saved"},
+				Recovery:         &fault.Recovery{Code: "config.recover"},
+			},
+		),
+	)
+	original := errors.Join(fault.New(fault.Runtime, "first failure"), partial)
+	classified := classifyExecutionError(original, "execute")
+	require.ErrorIs(t, classified, original)
+	require.ErrorIs(t, classified, partial)
+	branches := fault.Details(classified)
+	require.Len(t, branches, 2)
+	require.Equal(t, fault.Code("cli.runtime"), branches[0].Code)
+	require.Equal(t, fault.Code("fixture.partial"), branches[1].Code)
+	diagnostic, ok := fault.DiagnosticOf(branches[1])
+	require.True(t, ok)
+	require.Equal(t, "fixture.publish", diagnostic.Phase)
+	require.Equal(t, []string{"fixture.saved"}, diagnostic.CompletedEffects)
+	require.Equal(t, "config.recover", diagnostic.Recovery.Code)
+}
+
+func TestCompletionFlagValuesDoNotSelectJSONDiagnostics(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		json bool
+	}{
+		{[]string{"__complete", "greet", "--name", "--json", ""}, false},
+		{[]string{"--json", "__complete", "greet", "--name", "fixture", ""}, true},
+	} {
+		var out, stderr bytes.Buffer
+		code := run(
+			t.Context(),
+			tc.args,
+			Options{Out: &out, ErrOut: &stderr, LookupEnv: noFixtureEnv},
+			func() (*messages.Bundle, error) { return nil, errors.New("private bootstrap data") },
+		)
+		require.Equal(t, 1, code)
+		require.Empty(t, out.String())
+		require.Equal(t, tc.json, json.Valid(stderr.Bytes()), stderr.String())
+		require.NotContains(t, stderr.String(), "private bootstrap data")
 	}
 }

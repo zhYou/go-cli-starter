@@ -128,7 +128,7 @@ CompletedEffects 仅列已确认的脱敏副作用标识，Recovery 保存双语
 nil 副作用列表表示未知，空列表表示确认没有副作用；非空列表不保证穷尽。
 副作用未知时，应指导先核实业务状态，不能建议直接重试非幂等操作。
 WithDiagnostic 快照切片和参数映射；嵌套参数须不可变。DiagnosticOf 读取最近的完整诊断，
-聚合错误按 Details 的分支分别呈现，不合并或猜测副作用。恢复说明按业务编写，不执行自动恢复。
+聚合错误按 Details 的分支分别呈现，不合并或猜测副作用。边界使用 WithDetails 补齐逐分支呈现时仍保留原始错误链，不修改借用错误或用外层默认值覆盖已知事实。恢复说明按业务编写，不执行自动恢复。
 
 含敏感输入的原始原因使用 fault.WithSensitiveCause；Error.Error、Localizer.Render、日志与 Trace
 均隐藏该原因，errors.Is/As 仍可遍历。该选项不扫描或脱敏 Params、Message、Recovery 参数及任意业务日志，

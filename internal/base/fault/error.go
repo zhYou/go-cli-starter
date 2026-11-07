@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
+	"strings"
 )
 
 // Kind 表示错误对应的调用、配置或运行分类。
@@ -39,6 +41,7 @@ type Error struct {
 	Cause          error
 	Diagnostic     Diagnostic
 	sensitiveCause bool
+	details        []*Error
 }
 
 // Option 在构造错误时补充调用级信息。
@@ -73,6 +76,13 @@ func (d Definition) Wrap(cause error, opts ...Option) error {
 
 // Error 组合领域标识、参数与原始原因，返回诊断文本。
 func (e *Error) Error() string {
+	if !e.sensitiveCause && len(e.details) > 0 {
+		texts := make([]string, 0, len(e.details))
+		for _, detail := range e.details {
+			texts = append(texts, detail.Error())
+		}
+		return strings.Join(texts, "; ")
+	}
 	text := e.Message
 	if text == "" {
 		text = string(e.Code)
@@ -112,6 +122,9 @@ func Details(err error) []*Error {
 	//nolint:errorlint // 此处逐层遍历保留最外层分类，errors.As 会跳过聚合结构。
 	switch e := err.(type) {
 	case *Error:
+		if !e.sensitiveCause && len(e.details) > 0 {
+			return slices.Clone(e.details)
+		}
 		if !e.sensitiveCause {
 			children := Details(e.Cause)
 			if len(children) > 1 {

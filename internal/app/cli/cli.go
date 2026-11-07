@@ -183,13 +183,14 @@ func buildRoot(
 			return err
 		}
 		if skipsConfig(cmd, root) {
+			call.setPhase("execute")
 			return nil
 		}
 		var override *string
 		if cmd.Flags().Changed(flagLogLevel) {
 			override = &call.logLevel
 		}
-		call.phase = "configuration"
+		call.setPhase("configuration")
 		cfg, err := call.deps.LoadConfig(
 			cmd.Context(),
 			config.Options{
@@ -224,8 +225,7 @@ func buildRoot(
 			},
 			func(err error) { call.reportDiagnostic(opts.ErrOut, diagnosticWarning, err, 0) },
 		)
-		call.phase = "execute"
-		call.session = owned
+		call.setSession(owned)
 		call.logger = owned.Logger
 		cmd.SetContext(ctx)
 		return nil

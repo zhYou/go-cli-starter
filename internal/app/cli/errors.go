@@ -25,39 +25,50 @@ func classifyExecutionError(err error, phase string) error {
 	if err == nil {
 		return nil
 	}
-	kind := fault.Runtime
-	if phase == phaseArguments {
-		kind = fault.Usage
-	}
-	if problem, ok := errors.AsType[*fault.Error](err); ok {
+	details := fault.Details(err)
+	normalized := make([]*fault.Error, 0, len(details))
+	changed := false
+	_, typed := errors.AsType[*fault.Error](err)
+	for _, problem := range details {
 		if problem.Code != "" {
-			return err
+			normalized = append(normalized, problem)
+			continue
 		}
-		kind = fault.KindOf(err)
+		kind := problem.Kind
+		if phase == phaseArguments && !typed {
+			kind = fault.Usage
+		}
+		code := codeUsage
+		if kind != fault.Usage {
+			code = codeRuntime
+		}
+		if errors.Is(problem, context.Canceled) {
+			code = codeCancelled
+			kind = fault.Runtime
+		}
+		if errors.Is(problem, context.DeadlineExceeded) {
+			code = codeDeadline
+			kind = fault.Runtime
+		}
+		d, known := fault.DiagnosticOf(problem)
+		if d.Phase == "" {
+			d.Phase = phase
+		}
+		if !known && phase == phaseArguments {
+			d.CompletedEffects = []string{}
+		}
+		if kind == fault.Usage && d.Recovery == nil {
+			d.Recovery = &fault.Recovery{Code: "cli.recover_usage"}
+		}
+		classified := (fault.Definition{Code: fault.Code(code), Kind: kind}).New(fault.WithDiagnostic(d))
+		classified.Cause = problem
+		normalized = append(normalized, classified)
+		changed = true
 	}
-	code := codeUsage
-	if kind != fault.Usage {
-		code = codeRuntime
+	if !changed {
+		return err
 	}
-	if errors.Is(err, context.Canceled) {
-		code = codeCancelled
-		kind = fault.Runtime
-	}
-	if errors.Is(err, context.DeadlineExceeded) {
-		code = codeDeadline
-		kind = fault.Runtime
-	}
-	d, known := fault.DiagnosticOf(err)
-	if d.Phase == "" {
-		d.Phase = phase
-	}
-	if !known && phase == phaseArguments {
-		d.CompletedEffects = []string{}
-	}
-	if kind == fault.Usage && d.Recovery == nil {
-		d.Recovery = &fault.Recovery{Code: "cli.recover_usage"}
-	}
-	return (fault.Definition{Code: fault.Code(code), Kind: kind}).Wrap(err, fault.WithDiagnostic(d))
+	return (fault.Definition{Kind: fault.KindOf(err)}).Wrap(err, fault.WithDetails(normalized))
 }
 
 func wrapRun(run func(*cobra.Command, []string) error) func(*cobra.Command, []string) error {
