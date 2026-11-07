@@ -62,7 +62,7 @@ depends = ["lint:i18n", "lint:config", "lint:doc", "lint:style", "lint:versions"
 run = ["golangci-lint fmt --diff --color=never", "golangci-lint run --allow-serial-runners"]
 
 [tasks."lint:i18n"]
-description = "检查双语消息、模板和参数一致性"
+description = "检查双语消息、模板参数和静态诊断引用"
 run = "go run ./tools/lint i18n"
 
 [tasks."lint:config"]
