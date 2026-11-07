@@ -32,11 +32,13 @@ type Definition struct {
 
 // Error 保存错误分类、消息和原始原因。
 type Error struct {
-	Code    Code
-	Kind    Kind
-	Params  Params
-	Message string
-	Cause   error
+	Code           Code
+	Kind           Kind
+	Params         Params
+	Message        string
+	Cause          error
+	Diagnostic     Diagnostic
+	sensitiveCause bool
 }
 
 // Option 在构造错误时补充调用级信息。
@@ -78,11 +80,11 @@ func (e *Error) Error() string {
 			text += fmt.Sprint(e.Params)
 		}
 	}
-	if e.Cause != nil {
+	if cause := e.DisplayCause(); cause != nil {
 		if text == "" {
-			return e.Cause.Error()
+			return cause.Error()
 		}
-		return text + "：" + e.Cause.Error()
+		return text + "：" + cause.Error()
 	}
 	return text
 }
@@ -110,6 +112,18 @@ func Details(err error) []*Error {
 	//nolint:errorlint // 此处逐层遍历保留最外层分类，errors.As 会跳过聚合结构。
 	switch e := err.(type) {
 	case *Error:
+		if !e.sensitiveCause {
+			children := Details(e.Cause)
+			if len(children) > 1 {
+				result := make([]*Error, 0, len(children))
+				for _, child := range children {
+					branch := *e
+					branch.Cause = child
+					result = append(result, &branch)
+				}
+				return result
+			}
+		}
 		return []*Error{e}
 	case interface{ Unwrap() []error }:
 		var result []*Error

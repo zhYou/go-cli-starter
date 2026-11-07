@@ -22,20 +22,22 @@ type Dependencies struct {
 	Logger     *logging.Logger
 }
 type invocation struct {
-	languageFlag   *languageValue
-	bundle         *messages.Bundle
-	localizer      *messages.Localizer
-	commandTexts   []commandTextBinding
-	flagTexts      []flagTextBinding
-	helpErr        error
-	reportExitCode int
-	results        resultRegistry
-	asJSON         bool
-	configPath     string
-	logLevel       string
-	deps           Dependencies
-	logger         *logging.Logger
-	session        *session.Session
+	languageFlag    *languageValue
+	bundle          *messages.Bundle
+	localizer       *messages.Localizer
+	commandTexts    []commandTextBinding
+	flagTexts       []flagTextBinding
+	helpErr         error
+	reportExitCode  int
+	results         resultRegistry
+	asJSON          bool
+	jsonDiagnostics bool
+	phase           string
+	configPath      string
+	logLevel        string
+	deps            Dependencies
+	logger          *logging.Logger
+	session         *session.Session
 }
 
 func newInvocation(provided *Dependencies) *invocation {
@@ -58,5 +60,5 @@ func newInvocation(provided *Dependencies) *invocation {
 	if deps.NewLogger == nil {
 		deps.NewLogger = logging.New
 	}
-	return &invocation{deps: deps, logLevel: defaultLogLevel, logger: logging.NewNop()}
+	return &invocation{phase: phaseArguments, deps: deps, logLevel: defaultLogLevel, logger: logging.NewNop()}
 }

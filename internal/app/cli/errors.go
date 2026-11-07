@@ -21,14 +21,43 @@ func exitCode(err error) int {
 	return 1
 }
 
-func classifyExecutionError(err error) error {
+func classifyExecutionError(err error, phase string) error {
 	if err == nil {
 		return nil
 	}
-	if _, ok := errors.AsType[*fault.Error](err); ok {
-		return err
+	kind := fault.Runtime
+	if phase == phaseArguments {
+		kind = fault.Usage
 	}
-	return fault.Wrap(fault.Usage, "", err)
+	if problem, ok := errors.AsType[*fault.Error](err); ok {
+		if problem.Code != "" {
+			return err
+		}
+		kind = fault.KindOf(err)
+	}
+	code := codeUsage
+	if kind != fault.Usage {
+		code = codeRuntime
+	}
+	if errors.Is(err, context.Canceled) {
+		code = codeCancelled
+		kind = fault.Runtime
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		code = codeDeadline
+		kind = fault.Runtime
+	}
+	d, known := fault.DiagnosticOf(err)
+	if d.Phase == "" {
+		d.Phase = phase
+	}
+	if !known && phase == phaseArguments {
+		d.CompletedEffects = []string{}
+	}
+	if kind == fault.Usage && d.Recovery == nil {
+		d.Recovery = &fault.Recovery{Code: "cli.recover_usage"}
+	}
+	return (fault.Definition{Code: fault.Code(code), Kind: kind}).Wrap(err, fault.WithDiagnostic(d))
 }
 
 func wrapRun(run func(*cobra.Command, []string) error) func(*cobra.Command, []string) error {
