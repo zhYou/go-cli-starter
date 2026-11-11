@@ -16,7 +16,7 @@ setup 只安装 mise 工具并下载 Go 模块，不强制预热 npx/uvx 或语�
 doctor 要求 Git 可用、mise 达到最低版本、mise 工具及运行环境版本准确，并确认 npx、uvx 入口存在。
 它不扫描 npm/Python 包缓存，不通过逐包版本探测触发安装；工具功能由实际 task 验收。gh、Codex、RTK 仅报告状态，
 缺失、执行失败、超时或截断不影响结果，不检查认证或固定版本。superpowers 以会话技能列表为准。
-基础检查无需 Codex、RTK 或 superpowers；Serena MCP 的真实验收独立运行。
+基础检查无需 Codex、RTK 或 superpowers；Serena、Graphify MCP 的真实验收独立运行。
 
 开发 doctor 最多四项并行，每项三秒、每流 2 KiB；govulncheck 核对本地构建来源和版本并执行 `-h`，不访问漏洞库。
 真正联网扫描使用 `mise exec -- govulncheck ./...`，数据库访问失败同样失败。
@@ -51,7 +51,10 @@ mise 聚合流程，领域 Go 入口只处理各自能力；参数不足、未�
 | `mise run template:init --module <模块路径> --name <命令名>` | 初始化模板身份                                                                 |
 | `mise run contract:check` / `contract:update`                | 检查 / 显式更新机器契约                                                        |
 | `mise run lint:versions`                                     | 检查工具、模块、CI 和文档版本一致性                                            |
-| `mise run mcp:check`                                         | 验收 Serena 六后端、真实调用和同连接 worktree 切换                             |
+| `mise run mcp:check`                                         | 验收 Serena 六后端、Graphify 代码图与 CLI，以及同连接 worktree 隔离            |
+| `mise run graphify -- <参数...>`                             | 运行固定版本 Graphify CLI，透传上游参数和退出码                                |
+| `mise run graphify:build` / `graphify:update`                | 构建 / 增量更新当前 checkout 的本地代码图，无需模型或 API Key                  |
+| `mise run graphify:serve`                                    | 启动 Graphify MCP，查询显式传当前 checkout 的绝对 `project_path`               |
 | `mise run release:verify`                                    | 验证发布归档，并隔离安装宿主程序                                               |
 
 直接调用纳管工具无需 shell 激活；以下直接工具命令也可用于针对性验证：
@@ -222,7 +225,7 @@ bin/dist、`docs/superpowers/` 工作记录、生成代码和外部 `*_test` 包
 | 受检版本表、工具声明格式                      | `mise run lint:versions`；工具或模块实质变更还须运行完整 check，并按 Go/依赖、MCP、打包与发布的影响补充对应验证                                   |
 | 文档中的模板身份或可执行示例                  | 身份和受管文件变更运行 `mise run template:check`；修改示例时验证对应入口、参数或 API，执行时隔离应用 HOME                                         |
 | Go 代码、测试、依赖、应用配置                 | 格式化受影响的 Go 文件，运行针对性测试、`mise run check`；支持的宿主运行 `mise exec -- go test -race ./...`                                       |
-| MCP 配置、验收工具或影响 MCP 的 Go/gopls 升级 | 增加 `mise run mcp:check`；Codex 客户端配置变更在受信任会话核对 `codex mcp list` 包含 Serena，并验证实际调用                                      |
+| MCP 配置、验收工具或影响 MCP 的 Go/gopls 升级 | 增加 `mise run mcp:check`；Codex 客户端配置变更在受信任会话核对 `codex mcp list` 包含 Serena、Graphify，并验证实际调用                            |
 | 打包与发布流程                                | 按[发布验收](maintenance.md#升级和发布)完成 snapshot、release:verify 及发布前检查                                                                 |
 
 消息和配置编辑期间分别可用 `lint:i18n`、`lint:config` 快速反馈；它们及 `lint:doc`、`lint:style`、`lint:versions`、
@@ -252,7 +255,39 @@ Go 专用能力和 Serena 未支持的操作使用当前 checkout 的 gopls CLI�
 `mise exec -- gopls codeaction <位置>`、`mise exec -- gopls check <文件...>`。
 包 API、测试、漏洞检查继续使用 Go、现有 task 和 govulncheck。Serena 不可用时可使用 CLI，并报告限制；
 不得使用其他 checkout 的结果证明当前改动正确。同一 checkout 串行修改。
-MCP 集成变更必须通过真实 mcp:check，验证六后端、引用/重命名/诊断和同连接新建 worktree；CLI 回退不能代替验收。
+MCP 集成变更必须通过真实 mcp:check，验证六后端、引用/重命名/诊断、Graphify 代码图及同连接新建 worktree；CLI 回退不能代替验收。
+
+### Graphify 与工具分工
+
+[Graphify](https://github.com/Graphify-Labs/graphify) 的官方包名为 `graphifyy`。项目通过固定版本 uvx 和独立 Python 3.14.10 运行，
+不使用项目 Python 3.15；`.codex/config.toml` 复用 `graphify:serve`，启动和调用超时与 Serena 相同。
+两项 MCP 在受信任项目中默认启用；使用 README 的单次关闭参数时，不自动重新开启服务。用户级配置不由项目修改。
+
+```sh
+mise run graphify:build
+mise run graphify -- query "Greet" --budget 1000
+mise run graphify:update
+```
+
+`graphify:build` 使用 `extract . --code-only`，`graphify:update` 使用本地增量更新，不调用模型。
+需要其他 CLI 能力时通过 `mise run graphify -- <参数...>` 调用；参数、输出及退出码沿用固定上游版本，未匹配节点为 4、名称歧义为 3。
+不安装用户 Skill、Git hooks 或 watcher，不配置语义提取后端；CLI 与 MCP 均设置 `GRAPHIFY_NO_AUTO_REFRESH=1`，禁用上游对用户 Skill 的自动刷新。
+
+索引固定在当前 checkout 的 `graphify-out/`，不提交或复制到新项目。扫描遵循 Git 忽略规则，`.graphifyignore` 额外排除 `testdata` 夹具，普通测试保留。
+首次需要图时建图，切换 checkout 或修改代码后再次依赖图结论前增量更新；仅比较图的提交与 HEAD 不能发现未提交改动。
+服务启动不自动建图；无图或坏图时查询返回错误，修复后同一连接可继续使用。每次 MCP 调用都传当前 checkout 的绝对 `project_path`，不依赖启动目录或项目名称。
+坏图恢复时先保留排查所需的损坏索引，再移除 `graphify-out/graph.json` 并运行 `graphify:build`；固定版本的 `--force` 仍会读取旧图，不能绕过损坏文件。
+
+| 任务                        | 首选工具                  | 不可用时的处理                                        |
+| --------------------------- | ------------------------- | ----------------------------------------------------- |
+| 架构关系、初步影响范围      | Graphify MCP              | 使用 Graphify CLI；图不可用时用源码工具并说明限制     |
+| 符号、引用和结构化修改      | Serena                    | Go 使用当前 checkout 的 gopls；其他修改核对源码和检查 |
+| Go 专用诊断、代码操作及验证 | gopls、Go 和现有检查 task | 报告缺少的能力，不以图查询代替验证                    |
+| 精确文本、配置和文档检索    | rg、文件读取              | rg 缺失时通过 mise 安装并显式使用已安装版本           |
+
+按问题选择工具，不为每个任务依次调用全部工具。图中的推断或歧义关系只是定位线索，修改前仍核对源码和语言工具结果。
+MCP 仅开放七项图查询工具，不开放 GitHub PR 查询；相关操作继续使用 gh。查询默认预算为 2000 tokens，按需缩小，不默认读取完整图或报告。
+真实验收检查本地建图、CLI 退出码、夹具排除、未提交更新热加载、坏图恢复及同连接 checkout 隔离；无图或坏图的错误可能是普通文本，不能只看协议 `isError`。
 
 ### 测试与示例隔离
 

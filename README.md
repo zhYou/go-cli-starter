@@ -24,7 +24,7 @@ mise run check
 ## 本地环境
 
 [安装 mise](https://mise.jdx.dev/getting-started.html)。mise、Git、gh、Codex、RTK 和 superpowers 由用户维护；
-mise 安装声明的运行时、Go 和原生工具；文本工具与 Serena 通过固定版本的 npx/uvx 在外部缓存按需准备。
+mise 安装声明的运行时、Go 和原生工具；文本工具、Serena 与 Graphify 通过固定版本的 npx/uvx 在外部缓存按需准备。
 
 <!-- tool-versions:start -->
 
@@ -38,7 +38,7 @@ mise 安装声明的运行时、Go 和原生工具；文本工具与 Serena 通�
 
 | 工具                 | 固定版本 |
 | -------------------- | -------- |
-| Go                   | 1.27.3   |
+| Go                   | 1.27.4   |
 | golangci-lint        | 2.15.0   |
 | actionlint           | 1.7.12   |
 | GoReleaser           | 2.19.0   |
@@ -57,6 +57,8 @@ mise 安装声明的运行时、Go 和原生工具；文本工具与 Serena 通�
 | pre-commit-hooks     | 6.0.0    |
 | Serena               | 2.1.0    |
 | Serena Python        | 3.14.10  |
+| Graphify             | 0.9.106  |
+| Graphify Python      | 3.14.10  |
 
 <!-- tool-versions:end -->
 
@@ -166,10 +168,20 @@ GO_CLI_STARTER_HOME="$example_home" ./bin/go-cli-starter greet --name Codex --la
 ## Codex 开发
 
 环境准备完成后，从仓库根目录启动 `codex`。当前仅支持 Codex，RTK 和 superpowers 使用用户级安装。
-受信任项目通过 `.codex/config.toml` 和统一 `mcp:serve` 启动 uvx Serena，服务启动失败不阻塞 Codex。
+受信任项目通过 `.codex/config.toml` 和 `mcp:serve`、`graphify:serve` 启动 Serena 与 Graphify，服务启动失败不阻塞 Codex。
 Serena 使用独立兼容 Python 并关闭 dashboard，覆盖 Go、JavaScript、JSON、YAML、TOML 和 Markdown。
-创建或切换 worktree 后，以绝对路径激活并核对项目根目录；未覆盖的 Go 能力使用当前 checkout 的 gopls CLI。
-连接验证和 CLI 回退见[开发说明](docs/development.md#实现与检查)；协作、分支及交付规则见 [AGENTS.md](AGENTS.md)。
+Graphify 使用独立兼容 Python 建立本地代码图，CLI 负责建图和更新，MCP 查询关系；不需要 API Key。
+创建或切换 worktree 后，以绝对路径激活 Serena 并核对根目录；Graphify 每次查询传当前 checkout 的绝对 `project_path`。
+未覆盖的 Go 能力使用当前 checkout 的 gopls CLI，精确文本使用 rg；职责与回退见[开发说明](docs/development.md#graphify-与工具分工)。
+
+需要代码图时执行 `mise run graphify:build`，修改后使用 `mise run graphify:update`；索引位于被忽略的 `graphify-out/`，各 checkout 独立维护。
+单次会话不需要这两个 MCP 时：
+
+```sh
+codex -c 'mcp_servers.serena.enabled=false' -c 'mcp_servers.graphify.enabled=false'
+```
+
+连接验收见[开发说明](docs/development.md#实现与检查)，协作、分支及交付规则见 [AGENTS.md](AGENTS.md)。
 
 ## 开发命令
 
