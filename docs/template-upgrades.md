@@ -105,6 +105,16 @@ Serena 使用 uvx 和独立兼容 Python，关闭 dashboard；后台依赖与真
 setup 继续显式准备 mise 工具与 Go 模块；npx/uvx 可在外部缓存按需下载，不再要求预热或禁止安装。
 不在项目中生成 node_modules、.venv、package.json 或 npm 锁文件，检查不改写源码和配置。
 
+## 项目级 Graphify 与 worktree 路径
+
+合并 Graphify 的 mise 版本变量、CLI/建图/更新/服务 task 和项目 Codex 配置；使用官方 `graphifyy[mcp]` 包及独立兼容 Python。
+同步版本检查、README 表、MCP 验收客户端和模板受管清单；已有 `mcp:check` 同时验收 Serena 与 Graphify，继续沿用三平台 MCP CI。
+合并 `.graphifyignore` 和生成目录忽略规则，各 checkout 按需重建本地代码图，不复制旧索引或用户配置。
+项目不安装用户 Skill，不迁移用户级 MCP；职责、单次会话关闭和故障处理见[开发说明](development.md#graphify-与工具分工)。
+
+协作规则改为新建开发 worktree 固定放主工作区 `.worktrees/`；原生工具不能指定该位置时使用 Git，失败后不自动改放其他目录。
+已有适合本任务且可写的 worktree 可继续复用，不批量搬迁或清理已有工作区。
+
 ## 迁移到 0.4.0：诊断契约
 
 本节对应模板 0.4.0；准确来源提交以已审查 PR 或 Release 的完整提交 SHA 为准，不能仅凭版本号认定已同步。
