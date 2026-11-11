@@ -182,7 +182,7 @@ zh-CN 是中文、zh 是别名，不从 OS 区域推断。稳定命令、选项�
 错误与告警协议见[结构化诊断](#结构化诊断)；doctor 的完成负向报告不额外产生错误记录。
 默认文本；帮助为文本、补全为原生脚本、schema 始终为 JSON。错误和告警写 stderr，日志使用独立出口。
 只有 `cmd/<name>` 处理进程退出，业务和日志返回错误。库依据：
-[Go errors](https://pkg.go.dev/errors@go1.27.3)、
+[Go errors](https://pkg.go.dev/errors@go1.27.4)、
 [go-i18n v2.7.0](https://pkg.go.dev/github.com/nicksnyder/go-i18n/v2@v2.7.0/i18n)。
 错误分类、目录组织和语言优先级是项目契约；go-i18n 的 Bundle 在 Localizer 读取时不能继续修改。
 
@@ -261,7 +261,7 @@ CLI 自有 stderr 路径串行化错误、日志和告警，但不能替嵌入�
 库依据：[zap v1.28.0](https://pkg.go.dev/go.uber.org/zap@v1.28.0)、
 [OTel SDK v1.47.0](https://pkg.go.dev/go.opentelemetry.io/otel/sdk@v1.47.0/trace)、
 [stdouttrace WithWriter](https://pkg.go.dev/go.opentelemetry.io/otel/exporters/stdout/stdouttrace@v1.47.0#WithWriter)、
-[context](https://pkg.go.dev/context@go1.27.3)、[flock v0.13.1](https://pkg.go.dev/github.com/gofrs/flock@v0.13.1)。
+[context](https://pkg.go.dev/context@go1.27.4)、[flock v0.13.1](https://pkg.go.dev/github.com/gofrs/flock@v0.13.1)。
 库提供记录、导出、锁与取消机制；上述生命周期、失败继续策略和删除白名单是项目选择。
 
 ## 调外部工具时保留 argv、错误和取消原因
@@ -310,7 +310,7 @@ setsid/detach 或交给外部服务的进程不在保证内。Windows 10/Server 
 Windows 终止失败先关闭 Job 再等待根进程，返回前验证活动进程清空，异常与超时保留错误。
 WaitDelay 默认 250ms，控制取消终止及根进程退出后的管道排空宽限；永久阻塞的借用 IO 不保证被打断。
 
-库依据：[os/exec](https://pkg.go.dev/os/exec@go1.27.3)、
+库依据：[os/exec](https://pkg.go.dev/os/exec@go1.27.4)、
 [errgroup v0.24.0](https://pkg.go.dev/golang.org/x/sync@v0.24.0/errgroup)、
 [Windows Job 创建属性](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-updateprocthreadattribute)。
 CommandContext 默认取消单个进程，并不承诺清理整棵树；errgroup.WithContext 的首错取消也不是 collect-all。

@@ -36,7 +36,7 @@ func prepareMCPFixture(ctx context.Context, root, base string) error {
 	}
 	if err := os.WriteFile(
 		filepath.Join(base, "go.mod"),
-		[]byte("module example.com/mcp-fixture\n\ngo 1.27.3\n"),
+		[]byte("module example.com/mcp-fixture\n\ngo 1.27.4\n"),
 		0o600,
 	); err != nil {
 		return err
