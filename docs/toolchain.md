@@ -82,7 +82,7 @@ GitHub Actions 中的 `jdx/mise-action` 负责安装 mise 本体。作业通过 
 | `fuzz-benchmark` | Go；短时 fuzz 和 benchmark                                        |
 | `package`        | Go、GoReleaser、Syft；六目标 snapshot 与归档验收                  |
 | `agent-mcp`      | Go、Node、uv、Taplo、gopls；uv 管理独立 Python，三平台 MCP 验收   |
-| `platform-tests` | Go、Node、Python、uv；macOS/Windows 原生全量测试                  |
+| `platform-tests` | Go、Node、Python、uv；PR 原生运行时子集，main/release 全量测试    |
 | `platforms`      | 全部 `[tools]`；原生 doctor、文本检查与构建                       |
 | `vulnerability`  | Go、govulncheck；PR、main 更新和每日漏洞扫描                      |
 
