@@ -29,7 +29,7 @@ func scanSources(root string, visit func(*token.FileSet, sourceFile)) error {
 		relative = filepath.ToSlash(relative)
 		if entry.IsDir() {
 			if path != root &&
-				(strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") || name == testdataDirectory || name == "vendor" || relative == "bin" || relative == "dist" || relative == "docs/superpowers") {
+				(strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") || name == testdataDirectory || name == "vendor" || relative == "bin" || relative == "dist") {
 				return filepath.SkipDir
 			}
 			return nil
