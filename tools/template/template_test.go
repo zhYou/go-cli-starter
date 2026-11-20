@@ -116,7 +116,7 @@ func TestTemplateMetadataAndGuidesSurviveRename(t *testing.T) {
 		"SECURITY.md",
 		".github/PULL_REQUEST_TEMPLATE.md",
 		".github/CODEOWNERS.example",
-		".opencode/opencode.json",
+		".opencode/opencode.jsonc",
 		"docs/adr/0001-shared-agent-rules-client-adapters.md",
 		"docs/maintenance.md",
 	} {
@@ -136,7 +136,7 @@ func TestTemplateMetadataAndGuidesSurviveRename(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, scaffold.TemplateModule, origin.Template)
 	require.Equal(t, "example.com/copied/tool", origin.Module)
-	require.FileExists(t, filepath.Join(dir, ".opencode/opencode.json"))
+	require.FileExists(t, filepath.Join(dir, ".opencode/opencode.jsonc"))
 	require.FileExists(t, filepath.Join(dir, "docs/adr/0001-shared-agent-rules-client-adapters.md"))
 	require.FileExists(t, filepath.Join(dir, "docs/template-upgrades.md"))
 	require.NoError(t, validateTemplateMetadata(dir))

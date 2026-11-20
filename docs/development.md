@@ -37,9 +37,9 @@ mise 聚合流程，领域 Go 入口只处理各自能力；参数不足、未�
 | ------------------------------------------------------------ | ------------------------------------------------------------------------------ |
 | `mise run setup`                                             | 安装 mise 声明的运行时与工具，下载 Go 模块                                     |
 | `mise run doctor`                                            | 检查项目环境，报告用户工具状态                                                 |
-| `mise run fmt`                                               | 显式格式化 Go 和五类文本；分项可指定路径                                       |
+| `mise run fmt`                                               | 显式格式化 Go 和六类文本；分项可指定路径                                       |
 | `mise run fmt:go -- <路径...>` / `fmt:text -- <路径...>`     | 仅格式化指定 Go / 文本文件或目录；省略路径处理全部受检文件                     |
-| `mise run lint:text`                                         | 只读检查 JSON、XML、TOML、Markdown、YAML 的格式、语法及规则                    |
+| `mise run lint:text`                                         | 只读检查 JSON、JSONC、XML、TOML、Markdown、YAML 的格式、语法及规则             |
 | `mise run lint:workflow`                                     | 检查 GitHub Actions 工作流的语法、表达式、上下文与任务依赖；纳入 lint 和 check |
 | `mise run lint:syntax`                                       | 用现成 CLI 检查 JSON、XML、TOML 语法和重复键                                   |
 | `mise run lint`                                              | 只读检查格式、双语消息、应用及客户端配置、包文档、源码风格、版本声明和静态规则 |
@@ -81,7 +81,7 @@ mise exec -- go test ./internal/app/cli -run=^$ -fuzz=FuzzArgv -fuzztime=5s
 mise exec -- go test ./internal/app/cli -run=^$ -bench=. -benchmem
 ```
 
-`lint` 聚合五类文本、工作流语义、消息、配置、包文档、源码风格、版本、格式及静态规则；`lint:test` 验证规则自身，仅纳入 check。
+`lint` 聚合六类文本、工作流语义、消息、配置、包文档、源码风格、版本、格式及静态规则；`lint:test` 验证规则自身，仅纳入 check。
 `check` 进一步完成测试、vet、模块元数据、构建、机器契约和模板副本验收；它不改源码，但会写缓存、临时文件和 bin。
 
 ## 文本格式与检查
@@ -271,7 +271,7 @@ CLI 回退不能代替验收。
 ### Graphify 与工具分工
 
 [Graphify](https://github.com/Graphify-Labs/graphify) 的官方包名为 `graphifyy`。项目通过固定版本 uvx 和独立 Python 3.14.10 运行，
-不使用项目 Python 3.15；`.codex/config.toml` 和 `.opencode/opencode.json` 复用 `graphify:serve`，
+不使用项目 Python 3.15；`.codex/config.toml` 和 `.opencode/opencode.jsonc` 复用 `graphify:serve`，
 启动和调用超时与各自 Serena 配置一致。两项 MCP 在受信任项目中默认启用；Codex 使用 README 的单次关闭参数时，
 不自动重新开启服务。OpenCode V2.3.2 在 Windows 的项目级 MCP 受上游缺陷限制。用户级配置不由项目修改。
 
@@ -458,7 +458,7 @@ IntelliJ IDEA 与 GoLand 使用分号分隔子后缀，完整文件名也可以�
 
 ## 静态规则与开发探测
 
-`mise run lint` 检查五类文本、双语消息、应用配置、包文档、源码风格和版本声明，再检查 Go 格式并启用以下 34 项，生产导出 API 需中文 GoDoc；测试的 GoDoc 和新增入口规则豁免见下文，其他既有边界仍生效：
+`mise run lint` 检查六类文本、双语消息、应用配置、包文档、源码风格和版本声明，再检查 Go 格式并启用以下 34 项，生产导出 API 需中文 GoDoc；测试的 GoDoc 和新增入口规则豁免见下文，其他既有边界仍生效：
 
 ```text
 errcheck govet ineffassign staticcheck unused bodyclose errorlint gosec godoclint
@@ -546,9 +546,10 @@ fault.Definition.Code 和 fault.Recovery.Code：显式结构体初始化及普�
 业务 JSON、测试数据和协议/契约数据不纳入扫描。这些检查由 lint 调用并纳入 check；它们不会自动安装
 工具或修复文件。
 
-`mise run lint:opencode` 只校验仓库级 `.opencode/opencode.json`：固定 MCP 启动命令、
-300 秒启动与 180 秒执行超时、`.worktrees` 路径、shell 审批边界和 Graphify 七工具面。
-它不解析 `.codex/rules`，也不替代真实 OpenCode 客户端验收。
+`mise run lint:opencode` 只校验仓库级 `.opencode/opencode.jsonc`：接受 JSONC 注释和尾逗号，
+固定 MCP 启动命令、300 秒启动与 180 秒执行超时、`.worktrees` 路径、shell 审批边界和 Graphify 七工具面。
+注释与尾逗号在解析前替换为空白，结构仍按严格 JSON 解码；它不解析 `.codex/rules`，也不替代真实
+OpenCode 客户端验收。
 
 `mise exec -- golangci-lint fmt --color=never` 使用 gofumpt、goimports 和 golines；
 加上 `--diff` 只展示差异并失败，不改源码。

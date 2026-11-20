@@ -12,7 +12,7 @@ import (
 	"sort"
 )
 
-const openCodeConfigPath = ".opencode/opencode.json"
+const openCodeConfigPath = ".opencode/opencode.jsonc"
 
 const (
 	openCodeActionShell = "shell"
@@ -85,10 +85,14 @@ func loadOpenCodeConfig(path string) (openCodeConfig, error) {
 	if err != nil {
 		return openCodeConfig{}, fmt.Errorf(readPathError, path, err)
 	}
+	data, err = normalizeJSONC(data)
+	if err != nil {
+		return openCodeConfig{}, fmt.Errorf("%s 的 JSONC 无效: %w", path, err)
+	}
 	var config openCodeConfig
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	if err := decoder.Decode(&config); err != nil {
-		return openCodeConfig{}, fmt.Errorf("%s 的 JSON 无效: %w", path, err)
+		return openCodeConfig{}, fmt.Errorf("%s 的 JSONC 无效: %w", path, err)
 	}
 	var extra any
 	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
@@ -98,6 +102,87 @@ func loadOpenCodeConfig(path string) (openCodeConfig, error) {
 		return openCodeConfig{}, fmt.Errorf("%s 存在多余内容: %w", path, err)
 	}
 	return config, nil
+}
+
+// normalizeJSONC 将注释和尾逗号替换为空白，保留原始行结构，再交给 encoding/json 严格校验。
+func normalizeJSONC(data []byte) ([]byte, error) {
+	normalized := bytes.Clone(data)
+	inString := false
+	escaped := false
+	for i := 0; i < len(normalized); i++ {
+		switch {
+		case inString && escaped:
+			escaped = false
+		case inString && normalized[i] == '\\':
+			escaped = true
+		case inString && normalized[i] == '"':
+			inString = false
+		case inString:
+			continue
+		case normalized[i] == '"':
+			inString = true
+		case normalized[i] == '/' && i+1 < len(normalized) && normalized[i+1] == '/':
+			end := bytes.IndexByte(normalized[i+2:], '\n')
+			if end < 0 {
+				end = len(normalized)
+			} else {
+				end += i + 2
+			}
+			blankJSONCRange(normalized, i, end)
+			i = end - 1
+		case normalized[i] == '/' && i+1 < len(normalized) && normalized[i+1] == '*':
+			end := bytes.Index(normalized[i+2:], []byte("*/"))
+			if end < 0 {
+				return nil, errors.New("块注释未闭合")
+			}
+			end += i + 4
+			blankJSONCRange(normalized, i, end)
+			i = end - 1
+		}
+	}
+	return removeJSONCTrailingCommas(normalized), nil
+}
+
+// blankJSONCRange 用空格覆盖注释，保留换行以便 JSON 错误继续指向原始行。
+func blankJSONCRange(data []byte, start, end int) {
+	for i := start; i < end; i++ {
+		if data[i] != '\n' && data[i] != '\r' {
+			data[i] = ' '
+		}
+	}
+}
+
+// removeJSONCTrailingCommas 删除对象或数组末尾多余的逗号，允许 OpenCode 支持的标准 JSONC。
+func removeJSONCTrailingCommas(data []byte) []byte {
+	inString := false
+	escaped := false
+	for i := range len(data) {
+		switch {
+		case inString && escaped:
+			escaped = false
+		case inString && data[i] == '\\':
+			escaped = true
+		case inString && data[i] == '"':
+			inString = false
+		case inString:
+			continue
+		case data[i] == '"':
+			inString = true
+		case data[i] == ',':
+			next := i + 1
+			for next < len(data) && isJSONCWhitespace(data[next]) {
+				next++
+			}
+			if next < len(data) && (data[next] == '}' || data[next] == ']') {
+				data[i] = ' '
+			}
+		}
+	}
+	return data
+}
+
+func isJSONCWhitespace(c byte) bool {
+	return c == ' ' || c == '\t' || c == '\n' || c == '\r'
 }
 
 func validateOpenCodeConfig(path string, config openCodeConfig) error {
