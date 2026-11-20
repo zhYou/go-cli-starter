@@ -1,6 +1,6 @@
 # 模板升级
 
-模板版本在 `.template-version`，当前为 0.4.2，与应用发布版本独立；同版本内的调整还须按来源提交识别。
+模板版本在 `.template-version`，当前为 0.5.0，与应用发布版本独立；同版本内的调整还须按来源提交识别。
 初始化只对原始模板改名，不升级既有业务。新副本的 `.template-origin.json` 记录原模板、版本、目标身份和可确认的来源提交；
 未知来源使用 unknown，同参数初始化保留来源字节，不拿派生项目 HEAD 冒充来源。无元数据的旧项目仍可构建检查。
 
@@ -153,4 +153,22 @@ setup 继续显式准备 mise 工具与 Go 模块；npx/uvx 可在外部缓存�
 5. 合并根级身份文档门禁、隐藏文件审计命令、模板删除前暂存说明和旧工作流清理规则。更新文本后运行 `fmt:text` 与 `lint:text`，最终运行完整 `check` 和 `mise exec -- go test -race ./...`；MCP 变更运行 `mcp:check`，使用 `codex mcp list` 核对配置并真实验证 Serena/Graphify 调用，最后核对平台 CI。
 
 无需重新运行 `template:init` 或用 `0.4.2` 覆盖业务文件。升级来源以 `v0.4.2` 标签的准确提交为准；
+不把派生项目 HEAD 写作模板来源，也不改写既有 `.template-origin.json`。
+
+## 迁移到 0.5.0：OpenCode 开发支持
+
+此版本保持产品 CLI、配置、诊断协议、机器接口和退出码不变，新增 OpenCode V2 作为受支持的开发客户端。
+
+1. 同步根目录 `AGENTS.md`、`GLOSSARY.md` 和 `docs/adr/0001-shared-agent-rules-client-adapters.md`，
+   把共享流程规则与 Codex、OpenCode 客户端适配层分开；个人模型、凭据、权限和 skills 不进入模板。
+2. 合并 `.opencode/opencode.json`、OpenCode mise 任务、`lint:opencode` 和 `mcp:check` 的双 context 验收。
+   Serena 的 OpenCode 入口使用 `ide` context 绑定启动目录，Graphify 继续使用 `graphify:serve`。
+3. 同步 OpenCode shell 审批规则、`.worktrees` 路径和 Graphify 七工具限制，但不复制 Codex 的 RTK 规则。
+   把现有命令规则按目标项目工具清单复核后合并，不直接覆盖派生项目自己的权限。
+4. 更新 doctor、README、开发说明和维护清单中的客户端探测与验收。OpenCode V2.3.2 在 Windows 上存在
+   项目级 MCP 未加载的上游缺陷；修复前保留共享规则和开发命令，不声称 OpenCode MCP 原生可用。
+5. 修改文本后运行 `fmt:text`、`lint:text` 和 `lint:opencode`；最终运行完整 `check`、宿主 race 和
+   `mcp:check`。真实 OpenCode 客户端验收须从目标 checkout 启动，核对配置、MCP 和权限后验证实际工具调用。
+
+无需重新运行 `template:init` 或用 `0.5.0` 覆盖业务文件。升级来源以 `v0.5.0` 标签的准确提交为准；
 不把派生项目 HEAD 写作模板来源，也不改写既有 `.template-origin.json`。
