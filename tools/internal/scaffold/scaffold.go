@@ -27,6 +27,7 @@ var managedFiles = []string{
 	"internal/app/cli/diagnostic_test.go",
 	"internal/app/config/load_test.go",
 	"internal/base/telemetry/diagnostic.go",
+	"GLOSSARY.md",
 	".serena/project.yml",
 	"tools/mcp/client.go",
 	"tools/mcp/fixture.go",

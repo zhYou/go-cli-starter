@@ -34,8 +34,6 @@ go.work.sum
 
 /bin/
 /dist/
-/.superpowers/
-/docs/superpowers/
 /.worktrees/
 /.tmp/
 /graphify-out/

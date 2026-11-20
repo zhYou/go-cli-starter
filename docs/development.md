@@ -12,11 +12,11 @@ npx、uvx 可按固定版本下载并在外部缓存准备工具环境；不生�
 检查不改写源码和配置，下载失败保留非零退出；缓存命中不跳过检查。
 
 `mise.toml` 的 `[tools]` 固定运行时、Go 和原生工具，`[vars]` 固定按需执行工具及插件版本；禁止 latest 和版本范围。
-setup 只安装 mise 工具并下载 Go 模块，不强制预热 npx/uvx 或语言服务。mise、Git、gh、Codex、RTK 和 superpowers 由用户维护。
+setup 只安装 mise 工具并下载 Go 模块，不强制预热 npx/uvx 或语言服务。mise、Git、gh、Codex、RTK 和 Matt Pocock skills 由用户维护。
 doctor 要求 Git 可用、mise 达到最低版本、mise 工具及运行环境版本准确，并确认 npx、uvx 入口存在。
 它不扫描 npm/Python 包缓存，不通过逐包版本探测触发安装；工具功能由实际 task 验收。gh、Codex、RTK 仅报告状态，
-缺失、执行失败、超时或截断不影响结果，不检查认证或固定版本。superpowers 以会话技能列表为准。
-基础检查无需 Codex、RTK 或 superpowers；Serena、Graphify MCP 的真实验收独立运行。
+缺失、执行失败、超时或截断不影响结果，不检查认证或固定版本。Matt Pocock skills 以会话技能列表为准。
+基础检查无需 Codex、RTK 或 Matt Pocock skills；Serena、Graphify MCP 的真实验收独立运行。
 
 开发 doctor 最多四项并行，每项三秒、每流 2 KiB；govulncheck 核对本地构建来源和版本并执行 `-h`，不访问漏洞库。
 真正联网扫描使用 `mise exec -- govulncheck ./...`，数据库访问失败同样失败。
@@ -209,7 +209,7 @@ package greeting
 `mise run lint:doc` 按目录解析 Go AST，不依赖当前主机的 GOOS/GOARCH，也检查平台专用文件。
 它拒绝缺失或空白的包说明、只有包名前缀与标点的占位说明、包名不一致、包说明位置错误，
 以及 `doc.go` 中的实现声明。测试夹具 `testdata`、vendor、隐藏或下划线开头目录、根目录
-bin/dist、`docs/superpowers/` 工作记录、生成代码和外部 `*_test` 包不受约束；普通 `*_test.go` 不需各自编写包说明。
+bin/dist、生成代码和外部 `*_test` 包不受约束；普通 `*_test.go` 不需各自编写包说明。
 现有 godoclint 继续检查注释格式、重复包说明和导出 API 文档，描述是否准确、有用由代码审查确认。
 该任务纳入 lint 和 check，不会安装工具或修改文件。
 
@@ -500,7 +500,7 @@ import-shadowing 检查局部变量、参数及 range 变量等声明对导入�
 
 `mise run lint:style` 直接解析所有平台的 Go AST，检查具名、匿名、泛型结构体和外部测试包，
 不限制函数参数或返回值的合并声明。扫描跳过 testdata、vendor、隐藏或下划线开头的目录与源码、
-根 bin/dist、生成代码和 docs/superpowers 工作记录；拒绝符号链接 Go 源文件。
+根 bin/dist 和生成代码；拒绝符号链接 Go 源文件。
 `mise run lint:test` 在临时模块运行真实类型分析，验证架构、koanf、日志键值、错误处理、入口边界和 revive 规则的违规与合规 fixture；模板改名后的副本也运行该检查。它测试规则自身，只纳入 check，不作为普通 lint 的依赖。
 
 `mise run lint:i18n` 检查 `internal/locales/active.en.toml` 与 `active.zh-CN.toml`：

@@ -277,6 +277,17 @@ func TestDoctorUserToolsOnlyReport(t *testing.T) {
 	}
 }
 
+func TestDoctorReportsMattPocockSkills(t *testing.T) {
+	binary := doctorToolFixture(t)
+	out := doctorEnvironmentFixture(t, binary, "")
+	require.NoError(t, doctor())
+	_, err := out.Seek(0, 0)
+	require.NoError(t, err)
+	data, err := io.ReadAll(out)
+	require.NoError(t, err)
+	require.Contains(t, string(data), "用户工具：Matt Pocock skills")
+}
+
 func TestDoctorUsesMiseSelectedExecutable(t *testing.T) {
 	binary := doctorToolFixture(t)
 	doctorEnvironmentFixture(t, binary, "")

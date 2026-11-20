@@ -34,6 +34,18 @@ func main() {}
 	require.Empty(t, changed)
 }
 
+func TestInitializeReplacesGlossaryIdentity(t *testing.T) {
+	root := projectFixture(t, TemplateModule, TemplateName)
+	path := filepath.Join(root, "GLOSSARY.md")
+	require.NoError(t, os.WriteFile(path, []byte("# "+TemplateName+"\n\n由 "+TemplateName+" 维护。\n"), 0o600))
+	_, err := Initialize(root, "example.com/team/mycli", "my-cli")
+	require.NoError(t, err)
+	//nolint:gosec // G304：仅读取本测试临时目录中的文件。
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, "# my-cli\n\n由 my-cli 维护。\n", string(data))
+}
+
 func TestInitializeSameNameDoesNotMove(t *testing.T) {
 	root := projectFixture(t, TemplateModule, TemplateName)
 	_, err := Initialize(root, "example.com/team/repository", TemplateName)

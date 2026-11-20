@@ -23,7 +23,7 @@ mise run check
 
 ## 本地环境
 
-[安装 mise](https://mise.jdx.dev/getting-started.html)。mise、Git、gh、Codex、RTK 和 superpowers 由用户维护；
+[安装 mise](https://mise.jdx.dev/getting-started.html)。mise、Git、gh、Codex、RTK 和 Matt Pocock skills 由用户维护；
 mise 安装声明的运行时、Go 和原生工具；文本工具、Serena 与 Graphify 通过固定版本的 npx/uvx 在外部缓存按需准备。
 
 <!-- tool-versions:start -->
@@ -167,7 +167,7 @@ GO_CLI_STARTER_HOME="$example_home" ./bin/go-cli-starter greet --name Codex --la
 
 ## Codex 开发
 
-环境准备完成后，从仓库根目录启动 `codex`。当前仅支持 Codex，RTK 和 superpowers 使用用户级安装。
+环境准备完成后，从仓库根目录启动 `codex`。当前仅支持 Codex，RTK 和 Matt Pocock skills 使用用户级安装。
 受信任项目通过 `.codex/config.toml` 和 `mcp:serve`、`graphify:serve` 启动 Serena 与 Graphify，服务启动失败不阻塞 Codex。
 Serena 使用独立兼容 Python 并关闭 dashboard，覆盖 Go、JavaScript、JSON、YAML、TOML 和 Markdown。
 Graphify 使用独立兼容 Python 建立本地代码图，CLI 负责建图和更新，MCP 查询关系；不需要 API Key。
@@ -217,6 +217,5 @@ task 内由 mise 提供工具环境，无需额外包装。
 | [模板升级](docs/template-upgrades.md) | 来源记录、旧事务和迁移步骤           |
 | [维护清单](docs/maintenance.md)       | 托管配置、CI、发布与验收证据         |
 | [安全报告](SECURITY.md)               | 目标项目须填写的私密报告入口         |
-| [项目待办](docs/backlog.md)           | 明确要求记录的探索想法               |
 
-模板版本为 0.4.1；Claude Code 和 OpenCode 支持列在待办中，TUI 和 CLI 自身的 MCP 服务暂不在范围内。
+模板版本为 0.4.1；当前仅支持 Codex，TUI 和 CLI 自身的 MCP 服务暂不在范围内。

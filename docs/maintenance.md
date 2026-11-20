@@ -2,7 +2,6 @@
 
 本文记录目标仓库须由维护者落实的托管、CI、发布和诊断操作。配置文件存在不代表平台功能已启用。
 日常开发见[开发说明](development.md)，工作区和交付遵循[协作约定](../AGENTS.md)。
-探索想法仅按[待办约定](backlog.md#约定)记录，当前实施任务不自动新增待办。
 
 ## 责任与审查
 
@@ -31,7 +30,7 @@ PR 改目标、标题或描述会重新检查；同一 PR 新运行取消旧运�
 Linux 源码、race、fuzz/benchmark、snapshot/安装及 MCP 验收分组并行；Linux/macOS/Windows 均真实运行 Serena、Graphify MCP，
 macOS/Windows 保留原生任务。三平台实际验证 npx/uvx、XML/TOML 插件、五类文本与冷/热缓存，不能用命令替换或跨编译代替。
 CI 的 `check` 汇总全部作业，任一失败、取消或跳过都不能通过。平台运行、MCP、漏洞和发布验收独立于本地 `mise run check`。
-基础 CI 无需安装 Codex、RTK 或 superpowers；MCP job 复用统一 setup，再通过 uvx 按需准备 Serena、Graphify 与后台依赖。
+基础 CI 无需安装 Codex、RTK 或 Matt Pocock skills；MCP job 复用统一 setup，再通过 uvx 按需准备 Serena、Graphify 与后台依赖。
 源码任务通过统一 lint 运行 actionlint 工作流语义检查，模板副本验收同样复用该入口。
 
 Go 缓存区分 OS、架构、Go 版本和依赖摘要，编译缓存再区分任务及提交；lint 独立缓存，项目工具复用 mise 缓存，npx/uvx 与独立 Python 仅缓存外部工具目录，按 OS、架构及版本声明区分。
