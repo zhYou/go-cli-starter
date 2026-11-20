@@ -21,16 +21,35 @@ func checkMCP() error {
 	if err != nil {
 		return err
 	}
-	if err := checkSerenaMCP(ctx, root); err != nil {
-		return fmt.Errorf("验收 Serena MCP：%w", err)
+	return runMCPChecks(ctx, root, []mcpCheck{
+		{name: "Serena MCP", run: checkSerenaMCP},
+		{name: "OpenCode Serena MCP", run: checkOpenCodeSerenaMCP},
+		{name: "Graphify MCP", run: checkGraphifyMCP},
+	})
+}
+
+type mcpCheck struct {
+	name string
+	run  func(context.Context, string) error
+}
+
+// runMCPChecks 并行运行互不共享状态的客户端验收，并在返回前汇总全部失败。
+func runMCPChecks(ctx context.Context, root string, checks []mcpCheck) error {
+	results := make(chan error, len(checks))
+	for _, check := range checks {
+		go func(check mcpCheck) {
+			if err := check.run(ctx, root); err != nil {
+				results <- fmt.Errorf("验收 %s：%w", check.name, err)
+				return
+			}
+			results <- nil
+		}(check)
 	}
-	if err := checkOpenCodeSerenaMCP(ctx, root); err != nil {
-		return fmt.Errorf("验收 OpenCode Serena MCP：%w", err)
+	var result error
+	for range checks {
+		result = errors.Join(result, <-results)
 	}
-	if err := checkGraphifyMCP(ctx, root); err != nil {
-		return fmt.Errorf("验收 Graphify MCP：%w", err)
-	}
-	return nil
+	return result
 }
 
 func checkSerenaMCP(ctx context.Context, root string) (resultErr error) {
