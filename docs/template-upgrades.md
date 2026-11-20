@@ -142,6 +142,19 @@ setup 继续显式准备 mise 工具与 Go 模块；npx/uvx 可在外部缓存�
 无需重新运行 template:init 或覆盖业务文件。同步时以 v0.4.1 标签的准确提交作为来源，人工记录本次合并范围；
 不把派生项目 HEAD 写作模板来源，也不改写既有 .template-origin.json。
 
+## 迁移到 0.4.2：Matt Pocock skills、Graphify 与项目门禁
+
+此版本保持产品 CLI、配置、诊断协议、机器接口和退出码不变，更新 Matt Pocock skills 的工程流程、项目级 MCP 和静态门禁。
+
+1. 按工具维护要求同步 Go 1.27.4、gopls、mise 工具及版本声明，运行 setup 和 doctor。
+2. 合并 `.codex/config.toml`、`.graphifyignore`、`tools/mcp`、Graphify mise 任务和版本检查；Graphify 细节见上文“项目级 Graphify 与 worktree 路径”。三平台 MCP 真实验收仍由 CI 执行。
+3. 采用 Matt Pocock skills：同步 `docs/agents/`、根目录 `GLOSSARY.md`、`AGENTS.md` 的 Agent skills 导航和 doctor 用户技能提示，按目标仓库配置 tracker 与 triage 标签。把现有根级身份文档登记到 `managedFiles`，并人工更新项目名称；不要复制或安装用户级 skills。
+4. 同步 `.codex/rules/` 的项目命令规则，并调整其中与目标项目工具清单不一致的部分。项目继续以 GitHub Issues 为可执行待办来源；如删除本地 backlog，同步移除 `.github/PULL_REQUEST_TEMPLATE.md` 中的旧文件和编号引用，并在删除前由维护者处理仍有价值的条目。
+5. 合并根级身份文档门禁、隐藏文件审计命令、模板删除前暂存说明和旧工作流清理规则。更新文本后运行 `fmt:text` 与 `lint:text`，最终运行完整 `check` 和 `mise exec -- go test -race ./...`；MCP 变更运行 `mcp:check`，使用 `codex mcp list` 核对配置并真实验证 Serena/Graphify 调用，最后核对平台 CI。
+
+无需重新运行 `template:init` 或用 `0.4.2` 覆盖业务文件。升级来源以 `v0.4.2` 标签的准确提交为准；
+不把派生项目 HEAD 写作模板来源，也不改写既有 `.template-origin.json`。
+
 ## 迁移到 0.5.0：OpenCode 开发支持
 
 此版本保持产品 CLI、配置、诊断协议、机器接口和退出码不变，新增 OpenCode V2 作为受支持的开发客户端。
