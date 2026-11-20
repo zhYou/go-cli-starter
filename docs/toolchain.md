@@ -75,16 +75,17 @@ Go 工具链、应用依赖和 Go 开发工具属于三个不同范围：
 GitHub Actions 中的 `jdx/mise-action` 负责安装 mise 本体。作业通过 `install_args` 只安装自身需要的
 `[tools]` 子集，随后下载 Go 模块；不再在 action 安装完整工具集后重复调用 `mise run setup`。
 
-| CI 作业          | 主要工具与验收                                                    |
-| ---------------- | ----------------------------------------------------------------- |
-| `source`         | Go、lint、文本工具、GoReleaser 配置；源码、契约和模板副本完整检查 |
-| `race`           | Go、Node、Python、uv；竞态测试及测试内调用的文本任务              |
-| `fuzz-benchmark` | Go；短时 fuzz 和 benchmark                                        |
-| `package`        | Go、GoReleaser、Syft；六目标 snapshot 与归档验收                  |
-| `agent-mcp`      | Go、Node、uv、Taplo、gopls；uv 管理独立 Python，三平台 MCP 验收   |
-| `platform-tests` | Go、Node、Python、uv；macOS/Windows 原生全量测试                  |
-| `platforms`      | 全部 `[tools]`；原生 doctor、文本检查与构建                       |
-| `vulnerability`  | Go、govulncheck；PR、main 更新和每日漏洞扫描                      |
+| CI 作业               | 主要工具与验收                                                    |
+| --------------------- | ----------------------------------------------------------------- |
+| `source`              | Go、lint、文本工具、GoReleaser 配置；源码、契约和模板副本完整检查 |
+| `race`                | Go、Node、Python、uv；竞态测试及测试内调用的文本任务              |
+| `fuzz-benchmark`      | Go；短时 fuzz 和 benchmark                                        |
+| `package`             | Go、GoReleaser、Syft；六目标 snapshot 与归档验收                  |
+| `agent-mcp`           | Ubuntu MCP 验收；接入 Go、Node、uv、Taplo 和 gopls                |
+| `agent-mcp-platforms` | macOS/Windows MCP；main/release 运行，依赖相同工具子集            |
+| `platform-tests`      | Go、Node、Python、uv；PR 原生关键路径，main/release 全量测试      |
+| `platforms`           | 全部 `[tools]`；原生 doctor、文本检查与构建                       |
+| `vulnerability`       | Go、govulncheck；PR、main 更新和每日漏洞扫描                      |
 
 `codex`、`opencode`、`rtk`、`gh` 和 Matt Pocock skills 不进入基础 CI 必需工具集。
 同一 PR 的新提交会取消旧运行；标题和描述编辑不触发完整重跑，因为检查内容不读取这些字段。

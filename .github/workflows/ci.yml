@@ -135,10 +135,30 @@ jobs:
       - run: mise run release:verify
   agent-mcp:
     env: *isolated-env
+    runs-on: ubuntu-latest
+    steps:
+      - *checkout
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+        with:
+          version: 2026.10.21
+          install_args: go node uv taplo go:golang.org/x/tools/gopls
+      - *go-env
+      - *module-cache
+      - *build-cache
+      - name: 缓存 Serena、Graphify 与独立 Python
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.CI_CACHE_ROOT }}/tool-cache
+          key: tool-cache-agent-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('mise.toml') }}
+      - *go-deps
+      - run: mise run mcp:check
+  agent-mcp-platforms:
+    if: ${{ github.event_name != 'pull_request' }}
+    env: *isolated-env
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - *checkout
@@ -171,16 +191,15 @@ jobs:
       - *build-cache
       - *text-tool-cache
       - *go-deps
-      # 先验证原生关键路径并预热 Windows 测试编译，避免随后全量测试从零构建。
-      - name: 原生进程树、取消与资源所有权验收
-        env:
-          GO_CLI_STARTER_HOME: ${{ runner.temp }}/native-command-home
-        run: mise exec -- go test -count=1 -timeout=90s ./internal/command -run 'Test(Windows|OwnedDescendants|RootExits|CleanupDoes|CancellationRetains)'
-      - name: 原生模板构建与二进制验收
-        env:
-          GO_CLI_STARTER_HOME: ${{ runner.temp }}/template-starter-home
-        run: mise exec -- go test -count=1 ./tools/template -run '^TestTemplateExecutable(Path|Acceptance)$'
-      - run: mise exec -- go test ./...
+      - name: PR 原生命令、模板与二进制测试
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          mise exec -- go test -count=1 -timeout=90s ./internal/command -run 'Test(Windows|OwnedDescendants|RootExits|CleanupDoes|CancellationRetains)'
+          mise exec -- go test -count=1 ./tools/template -run '^TestTemplateExecutable(Path|Acceptance)$'
+          mise exec -- go test -count=1 ./test/integration
+      - name: 非 PR 全量测试
+        if: ${{ github.event_name != 'pull_request' }}
+        run: mise exec -- go test ./...
   platforms:
     env: *isolated-env
     strategy:
@@ -203,7 +222,7 @@ jobs:
       - run: mise run build
   check:
     if: ${{ always() }}
-    needs: [source, race, fuzz-benchmark, package, agent-mcp, platform-tests, platforms]
+    needs: [source, race, fuzz-benchmark, package, agent-mcp, agent-mcp-platforms, platform-tests, platforms]
     runs-on: ubuntu-latest
     steps:
       - name: 汇总全部 CI 检查
@@ -212,4 +231,4 @@ jobs:
           NEEDS_RESULTS: ${{ toJSON(needs) }}
         run: |
           jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$NEEDS_RESULTS"
-          jq -e 'length > 0 and all(.[]; .result == "success")' <<< "$NEEDS_RESULTS" > /dev/null
+          jq -e 'length > 0 and all(to_entries[]; .value.result == "success" or (.key == "agent-mcp-platforms" and .value.result == "skipped"))' <<< "$NEEDS_RESULTS" > /dev/null
