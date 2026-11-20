@@ -1,0 +1,20 @@
+# Go 漏洞检查。
+
+prefix_rule(
+    pattern = ["govulncheck"],
+    decision = "allow",
+    justification = "Check Go dependencies for known vulnerabilities",
+    match = [
+        "govulncheck ./...",
+        "govulncheck -mode=source ./...",
+    ],
+    not_match = ["gopls check ./..."],
+)
+
+prefix_rule(
+    pattern = ["rtk", "govulncheck"],
+    decision = "allow",
+    justification = "Check Go dependencies for known vulnerabilities through RTK",
+    match = ["rtk govulncheck ./..."],
+    not_match = ["rtk gopls check ./..."],
+)
