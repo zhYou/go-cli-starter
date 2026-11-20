@@ -171,6 +171,15 @@ jobs:
       - *build-cache
       - *text-tool-cache
       - *go-deps
+      # 先验证原生关键路径并预热 Windows 测试编译，避免随后全量测试从零构建。
+      - name: 原生进程树、取消与资源所有权验收
+        env:
+          GO_CLI_STARTER_HOME: ${{ runner.temp }}/native-command-home
+        run: mise exec -- go test -count=1 -timeout=90s ./internal/command -run 'Test(Windows|OwnedDescendants|RootExits|CleanupDoes|CancellationRetains)'
+      - name: 原生模板构建与二进制验收
+        env:
+          GO_CLI_STARTER_HOME: ${{ runner.temp }}/template-starter-home
+        run: mise exec -- go test -count=1 ./tools/template -run '^TestTemplateExecutable(Path|Acceptance)$'
       - run: mise exec -- go test ./...
   platforms:
     env: *isolated-env
