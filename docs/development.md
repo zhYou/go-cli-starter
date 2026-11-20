@@ -287,7 +287,7 @@ mise run graphify:update
 
 按问题选择工具，不为每个任务依次调用全部工具。图中的推断或歧义关系只是定位线索，修改前仍核对源码和语言工具结果。
 全仓迁移、清理和引用审计使用包含隐藏文件的命令：
-`rg --hidden --glob '!.git/**' --glob '!.worktrees/**' <pattern> .`。
+`rg --hidden --glob '!.git' --glob '!.git/**' --glob '!.worktrees' --glob '!.worktrees/**' <pattern> .`。
 MCP 仅开放七项图查询工具，不开放 GitHub PR 查询；相关操作继续使用 gh。查询默认预算为 2000 tokens，按需缩小，不默认读取完整图或报告。
 真实验收检查本地建图、CLI 退出码、夹具排除、未提交更新热加载、坏图恢复及同连接 checkout 隔离；无图或坏图的错误可能是普通文本，不能只看协议 `isError`。
 
