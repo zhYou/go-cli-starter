@@ -171,13 +171,13 @@ description = "格式化文本，可指定文件或目录；默认覆盖全部�
 usage = 'arg "[paths]" var=#true'
 shell = "{{ os(windows='powershell -NoProfile -Command', linux='sh -eu -c', macos='sh -eu -c') }}"
 run = """
-npx --yes --package=prettier@{{vars.prettier_version}} --package=@prettier/plugin-xml@{{vars.xml_plugin_version}} --package=prettier-plugin-toml@{{vars.toml_plugin_version}} prettier --write {% if usage.paths | length > 0 %}{% for path in usage.paths %}{% if os() == 'windows' %}'{{ path | replace(from="'", to="''") }}'{% else %}{{ path | quote }}{% endif %} {% endfor %}{% else %}"**/*.{json,xml,toml,md,yaml,yml}" .prettierrc.cjs{% endif %}
+npx --yes --package=prettier@{{vars.prettier_version}} --package=@prettier/plugin-xml@{{vars.xml_plugin_version}} --package=prettier-plugin-toml@{{vars.toml_plugin_version}} prettier --write {% if usage.paths | length > 0 %}{% for path in usage.paths %}{% if os() == 'windows' %}'{{ path | replace(from="'", to="''") }}'{% else %}{{ path | quote }}{% endif %} {% endfor %}{% else %}"**/*.{json,jsonc,xml,toml,md,yaml,yml}" .prettierrc.cjs{% endif %}
 """
 
 [tasks."lint:text"]
-description = "只读检查五类文本的格式、语法及 Markdown/YAML 规则"
+description = "只读检查六类文本的格式、语法及 Markdown/YAML 规则"
 run = [
-  'npx --yes --package=prettier@{{vars.prettier_version}} --package=@prettier/plugin-xml@{{vars.xml_plugin_version}} --package=prettier-plugin-toml@{{vars.toml_plugin_version}} prettier --check "**/*.{json,xml,toml,md,yaml,yml}" .prettierrc.cjs',
+  'npx --yes --package=prettier@{{vars.prettier_version}} --package=@prettier/plugin-xml@{{vars.xml_plugin_version}} --package=prettier-plugin-toml@{{vars.toml_plugin_version}} prettier --check "**/*.{json,jsonc,xml,toml,md,yaml,yml}" .prettierrc.cjs',
   "npx --yes --package=markdownlint-cli2@{{vars.markdownlint_version}} markdownlint-cli2 --config .markdownlint-cli2.yaml",
   "uvx --python python --from yamllint=={{vars.yamllint_version}} yamllint -c .yamllint.yaml .",
   { task = "lint:syntax" },

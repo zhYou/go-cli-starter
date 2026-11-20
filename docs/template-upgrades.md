@@ -1,6 +1,6 @@
 # 模板升级
 
-模板版本在 `.template-version`，当前为 0.5.1，与应用发布版本独立；同版本内的调整还须按来源提交识别。
+模板版本在 `.template-version`，当前为 0.6.0，与应用发布版本独立；同版本内的调整还须按来源提交识别。
 初始化只对原始模板改名，不升级既有业务。新副本的 `.template-origin.json` 记录原模板、版本、目标身份和可确认的来源提交；
 未知来源使用 unknown，同参数初始化保留来源字节，不拿派生项目 HEAD 冒充来源。无元数据的旧项目仍可构建检查。
 
@@ -189,4 +189,24 @@ setup 继续显式准备 mise 工具与 Go 模块；npx/uvx 可在外部缓存�
    `mcp:check`，实际发布前按维护清单验证 CI、snapshot、归档和来源证明。
 
 无需重新运行 `template:init` 或用 `0.5.1` 覆盖业务文件。升级来源以 `v0.5.1` 标签的准确提交为准；
+不把派生项目 HEAD 写作模板来源，也不改写既有 `.template-origin.json`。
+
+## 迁移到 0.6.0：OpenCode 配置改用 JSONC
+
+此版本保持产品 CLI、配置、诊断协议、机器接口和退出码不变，把项目级 OpenCode 配置迁到 JSONC，
+允许用注释说明 MCP 和权限边界。
+
+1. 将 `.opencode/opencode.json` 重命名为 `.opencode/opencode.jsonc`，保留现有 `$schema`、worktree、
+   MCP 超时和权限规则；新增注释只说明原因和边界，不改变客户端行为。
+2. 同步 `.opencode/opencode.jsonc`、`tools/lint/opencode.go` 和测试：按 `.jsonc` 读取，接受 `//`、
+   `/* */` 注释与尾逗号，注释先替换为空白，结构仍按严格 JSON 解码。
+3. 保留 `lint:opencode` 的固定边界：MCP 启动命令、300 秒启动与 180 秒执行超时、`.worktrees`、
+   shell 审批规则和 Graphify 七工具面。同步 `tools/template/template_test.go` 中的受管文件路径。
+4. `fmt:text` 和 `lint:text` 的默认范围新增 `.jsonc`；`lint:syntax` 仍只检查严格 JSON、XML 和 TOML，
+   `.opencode` 的 JSONC 语法由 `lint:opencode` 校验。修改后运行 `fmt:text`、`lint:text`、`lint:opencode`、
+   `mise run check` 和宿主 `go test -race ./...`。
+5. 从目标 checkout 启动 OpenCode，使用 `opencode debug config`、`opencode mcp list` 和真实会话核对
+   配置加载、MCP 与权限；配置存在或命令成功不能替代工具调用验收。
+
+无需重新运行 `template:init` 或用 `0.6.0` 覆盖业务文件。升级来源以 `v0.6.0` 标签的准确提交为准；
 不把派生项目 HEAD 写作模板来源，也不改写既有 `.template-origin.json`。

@@ -1,211 +1,220 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  // 原生 worktree 统一放在被 Git 忽略的目录，便于隔离和清理。
   "worktree": {
-    "directory": ".worktrees"
+    "directory": ".worktrees",
   },
   "mcp": {
+    // 首次启动可按需准备 uvx 缓存；超时与 Codex 对齐。
     "timeout": {
       "startup": 300000,
-      "execution": 180000
+      "execution": 180000,
     },
     "servers": {
+      // 从当前 checkout 启动，ide context 在启动时绑定项目根目录。
       "serena": {
         "type": "local",
         "command": ["mise", "run", "--quiet", "mcp:serve:opencode"],
-        "cwd": "."
+        "cwd": ".",
       },
+      // 复用同一代码图入口；查询时由调用方显式传 project_path。
       "graphify": {
         "type": "local",
         "command": ["mise", "run", "--quiet", "graphify:serve"],
-        "cwd": "."
-      }
-    }
+        "cwd": ".",
+      },
+    },
   },
   "permissions": [
+    // 默认审批未匹配操作，只自动允许与 Codex 非 RTK 规则相同范围的开发命令。
     {
       "action": "shell",
       "resource": "*",
-      "effect": "ask"
+      "effect": "ask",
     },
+    // 项目任务与会话内的固定工具调用。
     {
       "action": "shell",
       "resource": "mise run *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "mise exec -- *",
-      "effect": "allow"
+      "effect": "allow",
     },
+    // Go 构建、检查、依赖与发布校验。
     {
       "action": "shell",
       "resource": "go test *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "go vet *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "go build *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "go install *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "go list *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "go version *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "go mod tidy -diff *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "golangci-lint fmt *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "golangci-lint run *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "gopls *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "actionlint *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "govulncheck *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "goreleaser check *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "goreleaser release --snapshot *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "taplo *",
-      "effect": "allow"
+      "effect": "allow",
     },
+    // GitHub 只读查询；写操作和流水线触发仍需审批。
     {
       "action": "shell",
       "resource": "gh pr view *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "gh pr list *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "gh pr checks *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "gh pr diff *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "gh pr status *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "gh issue view *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "gh issue list *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "gh repo view *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "gh label list *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "gh run list *",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "shell",
       "resource": "gh event listen *",
-      "effect": "allow"
+      "effect": "allow",
     },
+    // 只开放七个只读图查询；建图、更新和写操作走项目任务并另行审批。
     {
       "action": "graphify_*",
       "resource": "*",
-      "effect": "deny"
+      "effect": "deny",
     },
     {
       "action": "graphify_query_graph",
       "resource": "*",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "graphify_get_node",
       "resource": "*",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "graphify_get_neighbors",
       "resource": "*",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "graphify_get_community",
       "resource": "*",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "graphify_god_nodes",
       "resource": "*",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "graphify_graph_stats",
       "resource": "*",
-      "effect": "allow"
+      "effect": "allow",
     },
     {
       "action": "graphify_shortest_path",
       "resource": "*",
-      "effect": "allow"
-    }
-  ]
+      "effect": "allow",
+    },
+  ],
 }

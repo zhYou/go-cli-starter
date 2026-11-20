@@ -183,9 +183,10 @@ codex -c 'mcp_servers.serena.enabled=false' -c 'mcp_servers.graphify.enabled=fal
 
 ### OpenCode
 
-`.opencode/opencode.json` 让 OpenCode 从当前 checkout 启动 Serena 与 Graphify，并把原生 worktree 放在
+`.opencode/opencode.jsonc` 让 OpenCode 从当前 checkout 启动 Serena 与 Graphify，并把原生 worktree 放在
 `.worktrees/`。Serena 通过 `mcp:serve:opencode` 使用 `ide` context，在启动时绑定当前项目；
-Graphify 复用 `graphify:serve`。MCP 启动和执行超时与 Codex 对齐。
+Graphify 复用 `graphify:serve`。MCP 启动和执行超时与 Codex 对齐。配置使用 JSONC，以中文注释说明权限和
+MCP 边界；`lint:opencode` 接受注释和尾逗号，但仍严格校验结构。
 
 权限配置保留 OpenCode 对未匹配操作的审批，只自动允许与 Codex 非 RTK 规则相同范围的开发命令、
 GitHub 只读查询和 Graphify 七个图查询工具。Code Mode 沿用 OpenCode 默认值。
@@ -218,14 +219,14 @@ Codex 创建或切换 worktree 后以绝对路径激活 Serena；OpenCode 的 `i
 优先使用已有 task；直接调用项目纳管工具使用 `mise exec -- <命令>`，Git、gh 等其他命令直接执行。
 task 内由 mise 提供工具环境，无需额外包装。
 
-| 命令                                                         | 用途                                             |
-| ------------------------------------------------------------ | ------------------------------------------------ |
-| `mise run setup` / `mise run doctor`                         | 显式准备并检查环境                               |
-| `mise run build`                                             | 构建到 bin，注入版本信息                         |
-| `mise run fmt`                                               | 显式格式化 Go 和 JSON、XML、TOML、Markdown、YAML |
-| `mise run lint`                                              | 只读检查 Go、五类文本、工作流语义、资源和声明    |
-| `mise run check`                                             | 完整源码、测试、构建、契约与模板验收             |
-| `mise run template:init --module <模块路径> --name <命令名>` | 初始化模板身份                                   |
+| 命令                                                         | 用途                                                    |
+| ------------------------------------------------------------ | ------------------------------------------------------- |
+| `mise run setup` / `mise run doctor`                         | 显式准备并检查环境                                      |
+| `mise run build`                                             | 构建到 bin，注入版本信息                                |
+| `mise run fmt`                                               | 显式格式化 Go 和 JSON、JSONC、XML、TOML、Markdown、YAML |
+| `mise run lint`                                              | 只读检查 Go、六类文本、工作流语义、资源和声明           |
+| `mise run check`                                             | 完整源码、测试、构建、契约与模板验收                    |
+| `mise run template:init --module <模块路径> --name <命令名>` | 初始化模板身份                                          |
 
 完整任务表、直接工具命令和按改动选择的检查见[开发说明](docs/development.md#开发命令)。
 本地检查不等于全部 CI；平台运行、发布、安全和托管要求见[维护清单](docs/maintenance.md)。
@@ -250,4 +251,4 @@ task 内由 mise 提供工具环境，无需额外包装。
 | [架构决策](docs/adr/)                 | 客户端边界等难以逆转的架构决策       |
 | [安全报告](SECURITY.md)               | 目标项目须填写的私密报告入口         |
 
-模板版本为 0.5.1；支持 Codex 和 OpenCode，TUI 和 CLI 自身的 MCP 服务暂不在范围内。
+模板版本为 0.6.0；支持 Codex 和 OpenCode，TUI 和 CLI 自身的 MCP 服务暂不在范围内。
