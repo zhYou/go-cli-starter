@@ -218,4 +218,4 @@ task 内由 mise 提供工具环境，无需额外包装。
 | [维护清单](docs/maintenance.md)       | 托管配置、CI、发布与验收证据         |
 | [安全报告](SECURITY.md)               | 目标项目须填写的私密报告入口         |
 
-模板版本为 0.4.1；当前仅支持 Codex，TUI 和 CLI 自身的 MCP 服务暂不在范围内。
+模板版本为 0.4.2；当前仅支持 Codex，TUI 和 CLI 自身的 MCP 服务暂不在范围内。
