@@ -286,6 +286,8 @@ mise run graphify:update
 | 精确文本、配置和文档检索    | rg、文件读取              | rg 缺失时通过 mise 安装并显式使用已安装版本           |
 
 按问题选择工具，不为每个任务依次调用全部工具。图中的推断或歧义关系只是定位线索，修改前仍核对源码和语言工具结果。
+全仓迁移、清理和引用审计使用包含隐藏文件的命令：
+`rg --hidden --glob '!.git' --glob '!.git/**' --glob '!.worktrees' --glob '!.worktrees/**' <pattern> .`。
 MCP 仅开放七项图查询工具，不开放 GitHub PR 查询；相关操作继续使用 gh。查询默认预算为 2000 tokens，按需缩小，不默认读取完整图或报告。
 真实验收检查本地建图、CLI 退出码、夹具排除、未提交更新热加载、坏图恢复及同连接 checkout 隔离；无图或坏图的错误可能是普通文本，不能只看协议 `isError`。
 
@@ -542,7 +544,7 @@ CI、缓存及平台验收见[维护清单](maintenance.md#ci-与验收证据)�
 初始化只重写 `tools/internal/scaffold/scaffold.go` 的 managedFiles 白名单。
 新增身份文件须明确登记；保留初始化实现的原模板身份和 fixture，禁止全仓替换。
 初始化不修改 remote、不创建提交或发布，也不复制本地密钥、诊断数据和用户级配置。
-移动或新增文件先暂存，再运行使用 Git 索引清单复制项目的 `template:check`。
+移动、新增或删除文件先暂存，再运行使用 Git 索引清单复制项目的 `template:check`。
 它验证改名、幂等、测试、真实构建与 go install 后的绝对路径二进制、version/help/schema/TOML。
 旧项目迁移与事务恢复见[模板升级](template-upgrades.md)，初始化不承担升级。
 
