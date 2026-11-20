@@ -1,6 +1,6 @@
 # 模板升级
 
-模板版本在 `.template-version`，当前为 0.5.0，与应用发布版本独立；同版本内的调整还须按来源提交识别。
+模板版本在 `.template-version`，当前为 0.5.1，与应用发布版本独立；同版本内的调整还须按来源提交识别。
 初始化只对原始模板改名，不升级既有业务。新副本的 `.template-origin.json` 记录原模板、版本、目标身份和可确认的来源提交；
 未知来源使用 unknown，同参数初始化保留来源字节，不拿派生项目 HEAD 冒充来源。无元数据的旧项目仍可构建检查。
 
@@ -171,4 +171,22 @@ setup 继续显式准备 mise 工具与 Go 模块；npx/uvx 可在外部缓存�
    `mcp:check`。真实 OpenCode 客户端验收须从目标 checkout 启动，核对配置、MCP 和权限后验证实际工具调用。
 
 无需重新运行 `template:init` 或用 `0.5.0` 覆盖业务文件。升级来源以 `v0.5.0` 标签的准确提交为准；
+不把派生项目 HEAD 写作模板来源，也不改写既有 `.template-origin.json`。
+
+## 迁移到 0.5.1：CI 关键路径与工具链边界
+
+此版本保持产品 CLI、配置、诊断协议、机器接口和退出码不变，调整 CI 门禁位置并集中说明工具链所有权。
+
+1. 同步 `.github/workflows/ci.yml`、`security.yml` 和 `release.yml`：各 job 通过 mise action 的
+   `install_args` 只安装所需工具，随后下载 Go 模块，不再重复运行完整 setup。
+2. 采用新的 PR 门禁位置：Linux 运行完整源码检查；macOS/Windows 验证原生命令、integration 和模板；
+   main 与 release 再运行两平台完整测试和 Linux/macOS/Windows 三平台 MCP。
+3. 合并 `UV_TOOL_DIR`、文本工具与 MCP 工具分离缓存、浅 checkout 及契约基准按需获取等配置。
+   MCP 验收中的 Codex Serena、OpenCode Serena 和 Graphify 可并行执行。
+4. 增加并同步 `docs/toolchain.md`，按系统工具、用户工具、项目 mise、npx/uvx、Go 模块和仓库 Go 工具划分职责；
+   不复制用户级客户端、skills、凭据、权限或个人配置。
+5. 修改后运行 `fmt:text`、`lint:text`、`lint:workflow`、`lint:versions` 和完整 `check`；MCP 变更运行
+   `mcp:check`，实际发布前按维护清单验证 CI、snapshot、归档和来源证明。
+
+无需重新运行 `template:init` 或用 `0.5.1` 覆盖业务文件。升级来源以 `v0.5.1` 标签的准确提交为准；
 不把派生项目 HEAD 写作模板来源，也不改写既有 `.template-origin.json`。
