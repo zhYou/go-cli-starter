@@ -6,6 +6,7 @@
 ## 协作与环境
 
 项目命令在仓库根目录执行；优先使用 task，直接调用项目 `[tools]` 纳管工具时用 `mise exec --`，其他命令直接执行。
+系统工具、用户工具、mise、npx/uvx 和 Go 模块之间的完整边界见[工具链](toolchain.md)。
 首次准备环境、工具版本或 Go 模块变更后显式 setup，再 doctor；声明未变且环境已准备时不重复安装。
 mise 普通任务和 exec 关闭运行时自动安装，`GOTOOLCHAIN=local` 禁止隐式下载 Go 工具链。
 npx、uvx 可按固定版本下载并在外部缓存准备工具环境；不生成项目内依赖目录、npm 工程或锁文件。
@@ -227,6 +228,7 @@ bin/dist、生成代码和外部 `*_test` 包不受约束；普通 `*_test.go` �
 | 受检版本表、工具声明格式                      | `mise run lint:versions`；工具或模块实质变更还须运行完整 check，并按 Go/依赖、MCP、打包与发布的影响补充对应验证                                   |
 | 文档中的模板身份或可执行示例                  | 身份和受管文件变更运行 `mise run template:check`；修改示例时验证对应入口、参数或 API，执行时隔离应用 HOME                                         |
 | Go 代码、测试、依赖、应用配置                 | 格式化受影响的 Go 文件，运行针对性测试、`mise run check`；支持的宿主运行 `mise exec -- go test -race ./...`                                       |
+| GitHub Actions、CI 缓存的工具安装或作业结构   | `mise run lint:workflow`、`mise run lint:versions`、`git diff --check`；行为变化须在 PR 或手动运行中核对实际作业与缓存命中                        |
 | MCP 配置、验收工具或影响 MCP 的 Go/gopls 升级 | 增加 `mise run mcp:check`；Codex 核对 `codex mcp list`，OpenCode 核对 `opencode debug config`、`opencode mcp list` 并验证真实工具调用             |
 | 打包与发布流程                                | 按[发布验收](maintenance.md#升级和发布)完成 snapshot、release:verify 及发布前检查                                                                 |
 
@@ -564,6 +566,7 @@ CI、缓存及平台验收见[维护清单](maintenance.md#ci-与验收证据)�
 
 升级选择官方最新 LTS 补丁，无 LTS 则最新稳定版，排除预发布；先查 Go、gopls、golangci-lint 兼容性。
 同步 mise.toml、Go 声明、doctor 预期、README 受检工具表及 CI 引导，再执行：
+工具所属层级和新增工具的放置规则见[工具链边界](toolchain.md#新增或升级工具)。
 
 ```sh
 mise run setup

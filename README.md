@@ -25,6 +25,7 @@ mise run check
 
 [安装 mise](https://mise.jdx.dev/getting-started.html)。mise、Git、gh、Codex、OpenCode、RTK 和 Matt Pocock skills 由用户维护；
 mise 安装声明的运行时、Go 和原生工具；文本工具、Serena 与 Graphify 通过固定版本的 npx/uvx 在外部缓存按需准备。
+各层所有权、依赖方向和 CI 工具子集见[工具链边界](docs/toolchain.md)。
 
 <!-- tool-versions:start -->
 
@@ -242,6 +243,7 @@ task 内由 mise 提供工具环境，无需额外包装。
 | [协作约定](AGENTS.md)                 | 智能体入口、命令、工作区、交付与保护 |
 | [设计指南](docs/design-guidelines.md) | 架构、CLI 契约、API 示例与所有权     |
 | [开发说明](docs/development.md)       | 完整命令、验证、测试组织与工具维护   |
+| [工具链边界](docs/toolchain.md)       | 系统、用户、mise、npx/uvx 与 Go 生态 |
 | [兼容性规则](docs/compatibility.md)   | 机器接口与变更记录                   |
 | [模板升级](docs/template-upgrades.md) | 来源记录、旧事务和迁移步骤           |
 | [维护清单](docs/maintenance.md)       | 托管配置、CI、发布与验收证据         |
