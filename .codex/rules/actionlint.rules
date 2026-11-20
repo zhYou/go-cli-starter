@@ -1,0 +1,20 @@
+# GitHub Actions workflow 静态检查。
+
+prefix_rule(
+    pattern = ["actionlint"],
+    decision = "allow",
+    justification = "Check GitHub Actions workflows",
+    match = [
+        "actionlint",
+        "actionlint -shellcheck= -pyflakes=",
+    ],
+    not_match = ["golangci-lint run"],
+)
+
+prefix_rule(
+    pattern = ["rtk", "actionlint"],
+    decision = "allow",
+    justification = "Check GitHub Actions workflows through RTK",
+    match = ["rtk actionlint -shellcheck= -pyflakes="],
+    not_match = ["rtk golangci-lint run"],
+)
