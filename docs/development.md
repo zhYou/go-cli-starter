@@ -12,11 +12,12 @@ npx、uvx 可按固定版本下载并在外部缓存准备工具环境；不生�
 检查不改写源码和配置，下载失败保留非零退出；缓存命中不跳过检查。
 
 `mise.toml` 的 `[tools]` 固定运行时、Go 和原生工具，`[vars]` 固定按需执行工具及插件版本；禁止 latest 和版本范围。
-setup 只安装 mise 工具并下载 Go 模块，不强制预热 npx/uvx 或语言服务。mise、Git、gh、Codex、RTK 和 Matt Pocock skills 由用户维护。
+setup 只安装 mise 工具并下载 Go 模块，不强制预热 npx/uvx 或语言服务。mise、Git、gh、Codex、OpenCode、RTK 和 Matt Pocock skills 由用户维护。
 doctor 要求 Git 可用、mise 达到最低版本、mise 工具及运行环境版本准确，并确认 npx、uvx 入口存在。
-它不扫描 npm/Python 包缓存，不通过逐包版本探测触发安装；工具功能由实际 task 验收。gh、Codex、RTK 仅报告状态，
+它不扫描 npm/Python 包缓存，不通过逐包版本探测触发安装；工具功能由实际 task 验收。gh、Codex、OpenCode、RTK 仅报告状态，
 缺失、执行失败、超时或截断不影响结果，不检查认证或固定版本。Matt Pocock skills 以会话技能列表为准。
-基础检查无需 Codex、RTK 或 Matt Pocock skills；Serena、Graphify MCP 的真实验收独立运行。
+基础检查无需 Codex、OpenCode、RTK 或 Matt Pocock skills；Serena、Graphify MCP 的真实验收独立运行。
+OpenCode 使用自身用户级技能发现机制；项目不安装、复制或探测具体路径。
 
 开发 doctor 最多四项并行，每项三秒、每流 2 KiB；govulncheck 核对本地构建来源和版本并执行 `-h`，不访问漏洞库。
 真正联网扫描使用 `mise exec -- govulncheck ./...`，数据库访问失败同样失败。
@@ -40,8 +41,8 @@ mise 聚合流程，领域 Go 入口只处理各自能力；参数不足、未�
 | `mise run lint:text`                                         | 只读检查 JSON、XML、TOML、Markdown、YAML 的格式、语法及规则                    |
 | `mise run lint:workflow`                                     | 检查 GitHub Actions 工作流的语法、表达式、上下文与任务依赖；纳入 lint 和 check |
 | `mise run lint:syntax`                                       | 用现成 CLI 检查 JSON、XML、TOML 语法和重复键                                   |
-| `mise run lint`                                              | 只读检查格式、双语消息、应用配置、包文档、源码风格、版本声明和 34 项静态规则   |
-| `mise run lint:i18n` / `lint:config`                         | 校验双语消息目录 / 受管应用配置；均纳入 lint 和 check                          |
+| `mise run lint`                                              | 只读检查格式、双语消息、应用及客户端配置、包文档、源码风格、版本声明和静态规则 |
+| `mise run lint:i18n` / `lint:config` / `lint:opencode`       | 校验双语消息、受管应用配置 / OpenCode MCP 与权限边界；均纳入 lint 和 check     |
 | `mise run lint:style`                                        | 检查具名和匿名结构体字段逐项声明；纳入 lint 和 check                           |
 | `mise run lint:doc`                                          | 检查正式 Go 包的 doc.go 与包说明位置；纳入 lint 和 check                       |
 | `mise run lint:test`                                         | 用真实 fixture 测试静态规则自身；仅纳入 check                                  |
@@ -51,7 +52,8 @@ mise 聚合流程，领域 Go 入口只处理各自能力；参数不足、未�
 | `mise run template:init --module <模块路径> --name <命令名>` | 初始化模板身份                                                                 |
 | `mise run contract:check` / `contract:update`                | 检查 / 显式更新机器契约                                                        |
 | `mise run lint:versions`                                     | 检查工具、模块、CI 和文档版本一致性                                            |
-| `mise run mcp:check`                                         | 验收 Serena 六后端、Graphify 代码图与 CLI，以及同连接 worktree 隔离            |
+| `mise run mcp:check`                                         | 验收两客户端 Serena context、六后端、Graphify 及同连接 worktree 隔离           |
+| `mise run mcp:serve:opencode`                                | 以 `ide` context 启动绑定当前 checkout 的 OpenCode Serena MCP                  |
 | `mise run graphify -- <参数...>`                             | 运行固定版本 Graphify CLI，透传上游参数和退出码                                |
 | `mise run graphify:build` / `graphify:update`                | 构建 / 增量更新当前 checkout 的本地代码图，无需模型或 API Key                  |
 | `mise run graphify:serve`                                    | 启动 Graphify MCP，查询显式传当前 checkout 的绝对 `project_path`               |
@@ -225,19 +227,20 @@ bin/dist、生成代码和外部 `*_test` 包不受约束；普通 `*_test.go` �
 | 受检版本表、工具声明格式                      | `mise run lint:versions`；工具或模块实质变更还须运行完整 check，并按 Go/依赖、MCP、打包与发布的影响补充对应验证                                   |
 | 文档中的模板身份或可执行示例                  | 身份和受管文件变更运行 `mise run template:check`；修改示例时验证对应入口、参数或 API，执行时隔离应用 HOME                                         |
 | Go 代码、测试、依赖、应用配置                 | 格式化受影响的 Go 文件，运行针对性测试、`mise run check`；支持的宿主运行 `mise exec -- go test -race ./...`                                       |
-| MCP 配置、验收工具或影响 MCP 的 Go/gopls 升级 | 增加 `mise run mcp:check`；Codex 客户端配置变更在受信任会话核对 `codex mcp list` 包含 Serena、Graphify，并验证实际调用                            |
+| MCP 配置、验收工具或影响 MCP 的 Go/gopls 升级 | 增加 `mise run mcp:check`；Codex 核对 `codex mcp list`，OpenCode 核对 `opencode debug config`、`opencode mcp list` 并验证真实工具调用             |
 | 打包与发布流程                                | 按[发布验收](maintenance.md#升级和发布)完成 snapshot、release:verify 及发布前检查                                                                 |
 
-消息和配置编辑期间分别可用 `lint:i18n`、`lint:config` 快速反馈；它们及 `lint:doc`、`lint:style`、`lint:versions`、
+消息和配置编辑期间分别可用 `lint:i18n`、`lint:config`、`lint:opencode` 快速反馈；它们及 `lint:doc`、`lint:style`、`lint:versions`、
 `lint:test`、`template:check`、`contract:check` 已由完整 check 覆盖。MCP、漏洞扫描、发布验收及其他 OS 原生运行独立执行。
 只格式化授权的 Go 文件或目录，例如 `mise exec -- golangci-lint fmt --color=never internal/app/cli/greet.go`。
 无法执行的检查说明原因，不把配置存在、启动成功或 mock 当作真实验收。
 
 ### Serena 查询与 Go CLI 补充
 
-项目通过 `mise run mcp:serve` 启动固定版本的 uvx Serena。它使用独立 Python 3.14.10、LSP 后端和独立工具接口，
+项目分别通过 `mise run mcp:serve` 和 `mise run mcp:serve:opencode` 启动同一固定版本 uvx Serena 的 Codex 与
+OpenCode context。它使用独立 Python 3.14.10、LSP 后端和独立工具接口，
 关闭 web dashboard、自动打开浏览器和 GUI 日志窗口；首次使用可在外部缓存下载运行环境与后台依赖。
-Codex 启动超时为 300 秒、工具调用为 180 秒；独立 mcp:check 总超时为 10 分钟。
+两个客户端启动超时均配置为 300 秒、工具调用为 180 秒；独立 mcp:check 总超时为 10 分钟。
 
 项目工作区为根目录 `.`，配置启用 go、typescript、json、yaml、toml、markdown；JavaScript/CommonJS 由 typescript 服务处理。
 后台依赖为 gopls 0.24.0、TypeScript 5.9.3、typescript-language-server 5.1.3、vscode-json-languageserver 1.3.4、
@@ -245,23 +248,30 @@ yaml-language-server 1.19.2、Taplo 0.10.0 和 Marksman 2024-12-18。gopls、Tap
 其余后台依赖沿用固定 Serena 版本的内置准确版本，由 Serena 在外部缓存按需准备，不新增禁止安装或强制预热层。
 Taplo 纳入 mise 可避免 Serena 将 PATH 中未配置的旧 shim 误认为可用后台程序。
 
-首次读取 `initial_instructions` 并取得 session 信息。创建、切换或恢复 worktree 后，
-先用绝对路径调用 `activate_project`，核对返回的根目录，再查询或编辑；共享项目名不能证明 checkout 身份。
+首次读取 `initial_instructions` 并取得 session 信息。Codex context 创建、切换或恢复 worktree 后，
+先用绝对路径调用 `activate_project` 并核对根目录。OpenCode 使用 `ide` context 和 `single_project`，
+MCP 从目标 checkout 启动，启动后通过 `initial_instructions` 中的绝对项目路径核对上下文，不能再切换项目。
+共享项目名不能证明 checkout 身份。
 六种语言各按后端实际能力提供符号与结构查询；JSON 不承诺跨文件引用。
-隐藏配置、文档、CI 和故障夹具均纳入项目；普通文本、go.mod、go.sum 和 txtar 可通过非代码文本检索与 Codex 文件操作处理。
+隐藏配置、文档、CI 和故障夹具均纳入项目；普通文本、go.mod、go.sum 和 txtar 可通过非代码文本检索和客户端文件操作处理。
 遵循 Git 忽略规则，排除构建产物、缓存和嵌套 worktree；Serena 项目配置提交，memory、日志、缓存及本地覆盖不提交。
 
 Go 专用能力和 Serena 未支持的操作使用当前 checkout 的 gopls CLI，例如 `mise exec -- gopls call_hierarchy <位置>`、
 `mise exec -- gopls codeaction <位置>`、`mise exec -- gopls check <文件...>`。
 包 API、测试、漏洞检查继续使用 Go、现有 task 和 govulncheck。Serena 不可用时可使用 CLI，并报告限制；
 不得使用其他 checkout 的结果证明当前改动正确。同一 checkout 串行修改。
-MCP 集成变更必须通过真实 mcp:check，验证六后端、引用/重命名/诊断、Graphify 代码图及同连接新建 worktree；CLI 回退不能代替验收。
+MCP 集成变更必须通过真实 mcp:check：Codex context 验证六后端、引用/重命名/诊断及同连接新建 worktree，
+OpenCode context 验证 `ide` context、启动目录绑定和代表性符号查询，Graphify 继续验证代码图；
+真实 OpenCode 客户端仍须在本地会话中验证 MCP 与权限；冷目录首次 `mcp list` 应按
+[上游竞态](https://github.com/anomalyco/opencode/issues/63722)等待服务就绪后重试，`pending` 表示配置已加载而非连接失败。
+CLI 回退不能代替验收。
 
 ### Graphify 与工具分工
 
 [Graphify](https://github.com/Graphify-Labs/graphify) 的官方包名为 `graphifyy`。项目通过固定版本 uvx 和独立 Python 3.14.10 运行，
-不使用项目 Python 3.15；`.codex/config.toml` 复用 `graphify:serve`，启动和调用超时与 Serena 相同。
-两项 MCP 在受信任项目中默认启用；使用 README 的单次关闭参数时，不自动重新开启服务。用户级配置不由项目修改。
+不使用项目 Python 3.15；`.codex/config.toml` 和 `.opencode/opencode.json` 复用 `graphify:serve`，
+启动和调用超时与各自 Serena 配置一致。两项 MCP 在受信任项目中默认启用；Codex 使用 README 的单次关闭参数时，
+不自动重新开启服务。OpenCode V2.3.2 在 Windows 的项目级 MCP 受上游缺陷限制。用户级配置不由项目修改。
 
 ```sh
 mise run graphify:build
@@ -530,9 +540,13 @@ fault.Definition.Code 和 fault.Recovery.Code：显式结构体初始化及普�
 语言 TOML 检查语法，消息语义由 lint:i18n 检查。
 
 新增应用配置放入 `configs/` 并通过 `internal/app/config/load.go` 统一加载；确需其他路径时先登记到
-`tools/lint/config.go`。mise、`.codex`、CI、golangci 等工具配置沿用工具自身格式，其他位置的
-业务 JSON、测试数据和协议/契约数据不纳入扫描。两项检查由 lint 调用并纳入 check；它们不会自动安装
+`tools/lint/config.go`。mise、`.codex`、`.opencode`、CI、golangci 等工具配置沿用工具自身格式，其他位置的
+业务 JSON、测试数据和协议/契约数据不纳入扫描。这些检查由 lint 调用并纳入 check；它们不会自动安装
 工具或修复文件。
+
+`mise run lint:opencode` 只校验仓库级 `.opencode/opencode.json`：固定 MCP 启动命令、
+300 秒启动与 180 秒执行超时、`.worktrees` 路径、shell 审批边界和 Graphify 七工具面。
+它不解析 `.codex/rules`，也不替代真实 OpenCode 客户端验收。
 
 `mise exec -- golangci-lint fmt --color=never` 使用 gofumpt、goimports 和 golines；
 加上 `--diff` 只展示差异并失败，不改源码。

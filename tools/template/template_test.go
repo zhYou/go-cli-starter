@@ -112,7 +112,14 @@ func TestTemplateMetadataAndGuidesSurviveRename(t *testing.T) {
 		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0o755))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(data), 0o600))
 	}
-	for _, name := range []string{"SECURITY.md", ".github/PULL_REQUEST_TEMPLATE.md", ".github/CODEOWNERS.example", "docs/maintenance.md"} {
+	for _, name := range []string{
+		"SECURITY.md",
+		".github/PULL_REQUEST_TEMPLATE.md",
+		".github/CODEOWNERS.example",
+		".opencode/opencode.json",
+		"docs/adr/0001-shared-agent-rules-client-adapters.md",
+		"docs/maintenance.md",
+	} {
 		//nolint:gosec // G301：测试路径和权限只来自当前临时 fixture，不读取用户文件。
 		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0o755))
 		require.NoError(t, fixture.CopyFile(filepath.Join("../..", name), filepath.Join(dir, name)))
@@ -129,6 +136,8 @@ func TestTemplateMetadataAndGuidesSurviveRename(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, scaffold.TemplateModule, origin.Template)
 	require.Equal(t, "example.com/copied/tool", origin.Module)
+	require.FileExists(t, filepath.Join(dir, ".opencode/opencode.json"))
+	require.FileExists(t, filepath.Join(dir, "docs/adr/0001-shared-agent-rules-client-adapters.md"))
 	require.FileExists(t, filepath.Join(dir, "docs/template-upgrades.md"))
 	require.NoError(t, validateTemplateMetadata(dir))
 }

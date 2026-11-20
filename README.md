@@ -23,7 +23,7 @@ mise run check
 
 ## 本地环境
 
-[安装 mise](https://mise.jdx.dev/getting-started.html)。mise、Git、gh、Codex、RTK 和 Matt Pocock skills 由用户维护；
+[安装 mise](https://mise.jdx.dev/getting-started.html)。mise、Git、gh、Codex、OpenCode、RTK 和 Matt Pocock skills 由用户维护；
 mise 安装声明的运行时、Go 和原生工具；文本工具、Serena 与 Graphify 通过固定版本的 npx/uvx 在外部缓存按需准备。
 
 <!-- tool-versions:start -->
@@ -165,22 +165,51 @@ cp configs/config.example.toml "$example_home/config.toml"
 GO_CLI_STARTER_HOME="$example_home" ./bin/go-cli-starter greet --name Codex --lang zh-CN --json
 ```
 
-## Codex 开发
+## 智能体客户端开发
 
-环境准备完成后，从仓库根目录启动 `codex`。当前仅支持 Codex，RTK 和 Matt Pocock skills 使用用户级安装。
-受信任项目通过 `.codex/config.toml` 和 `mcp:serve`、`graphify:serve` 启动 Serena 与 Graphify，服务启动失败不阻塞 Codex。
-Serena 使用独立兼容 Python 并关闭 dashboard，覆盖 Go、JavaScript、JSON、YAML、TOML 和 Markdown。
-Graphify 使用独立兼容 Python 建立本地代码图，CLI 负责建图和更新，MCP 查询关系；不需要 API Key。
-创建或切换 worktree 后，以绝对路径激活 Serena 并核对根目录；Graphify 每次查询传当前 checkout 的绝对 `project_path`。
-未覆盖的 Go 能力使用当前 checkout 的 gopls CLI，精确文本使用 rg；职责与回退见[开发说明](docs/development.md#graphify-与工具分工)。
+环境准备完成后，从仓库根目录启动 Codex 或 OpenCode。RTK 仅用于 Codex；Matt Pocock skills 使用用户级安装，
+项目不复制个人技能、模型、凭据或客户端权限。OpenCode 从其用户级技能发现目录加载用户已安装的 skills；
+模板不安装、不探测也不限定这些路径。OpenCode 正式支持 V2。
 
-需要代码图时执行 `mise run graphify:build`，修改后使用 `mise run graphify:update`；索引位于被忽略的 `graphify-out/`，各 checkout 独立维护。
-单次会话不需要这两个 MCP 时：
+### Codex
+
+受信任项目通过 `.codex/config.toml`、`mcp:serve` 和 `graphify:serve` 启动 Serena 与 Graphify，
+服务启动失败不阻塞会话。单次会话不需要这两个 MCP 时：
 
 ```sh
 codex -c 'mcp_servers.serena.enabled=false' -c 'mcp_servers.graphify.enabled=false'
 ```
 
+### OpenCode
+
+`.opencode/opencode.json` 让 OpenCode 从当前 checkout 启动 Serena 与 Graphify，并把原生 worktree 放在
+`.worktrees/`。Serena 通过 `mcp:serve:opencode` 使用 `ide` context，在启动时绑定当前项目；
+Graphify 复用 `graphify:serve`。MCP 启动和执行超时与 Codex 对齐。
+
+权限配置保留 OpenCode 对未匹配操作的审批，只自动允许与 Codex 非 RTK 规则相同范围的开发命令、
+GitHub 只读查询和 Graphify 七个图查询工具。Code Mode 沿用 OpenCode 默认值。
+
+```sh
+opencode debug config
+opencode mcp list
+```
+
+冷目录的第一次 `mcp list` 可能受 OpenCode
+[初始化竞态](https://github.com/anomalyco/opencode/issues/63722)影响而暂时为空；等服务就绪后再执行一次。随后应在真实会话中确认
+`pending` 只表示项目配置已加载，实际连接在会话使用时建立。Serena `ide` context 应绑定当前 checkout，
+并实际调用 Serena 与 Graphify。OpenCode V2.3.2 在 Windows 上
+存在项目级 MCP 未加载的[上游缺陷](https://github.com/anomalyco/opencode/issues/64941)；
+Windows 仍可使用共享规则和开发命令，但在修复前不能声称 OpenCode MCP 原生可用。
+
+### MCP 与工具回退
+
+Serena 使用独立兼容 Python 并关闭 dashboard，覆盖 Go、JavaScript、JSON、YAML、TOML 和 Markdown。
+Graphify 使用独立兼容 Python 建立本地代码图，CLI 负责建图和更新，MCP 查询关系；不需要 API Key。
+Codex 创建或切换 worktree 后以绝对路径激活 Serena；OpenCode 的 `ide` context 从目标 checkout 启动并核对
+当前项目。Graphify 每次查询传当前 checkout 的绝对 `project_path`。
+未覆盖的 Go 能力使用当前 checkout 的 gopls CLI，精确文本使用 rg；职责与回退见[开发说明](docs/development.md#graphify-与工具分工)。
+
+需要代码图时执行 `mise run graphify:build`，修改后使用 `mise run graphify:update`；索引位于被忽略的 `graphify-out/`，各 checkout 独立维护。
 连接验收见[开发说明](docs/development.md#实现与检查)，协作、分支及交付规则见 [AGENTS.md](AGENTS.md)。
 
 ## 开发命令
@@ -216,6 +245,7 @@ task 内由 mise 提供工具环境，无需额外包装。
 | [兼容性规则](docs/compatibility.md)   | 机器接口与变更记录                   |
 | [模板升级](docs/template-upgrades.md) | 来源记录、旧事务和迁移步骤           |
 | [维护清单](docs/maintenance.md)       | 托管配置、CI、发布与验收证据         |
+| [架构决策](docs/adr/)                 | 客户端边界等难以逆转的架构决策       |
 | [安全报告](SECURITY.md)               | 目标项目须填写的私密报告入口         |
 
-模板版本为 0.4.1；当前仅支持 Codex，TUI 和 CLI 自身的 MCP 服务暂不在范围内。
+模板版本为 0.5.0；支持 Codex 和 OpenCode，TUI 和 CLI 自身的 MCP 服务暂不在范围内。

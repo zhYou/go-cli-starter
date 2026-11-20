@@ -30,7 +30,8 @@ PR 改目标、标题或描述会重新检查；同一 PR 新运行取消旧运�
 Linux 源码、race、fuzz/benchmark、snapshot/安装及 MCP 验收分组并行；Linux/macOS/Windows 均真实运行 Serena、Graphify MCP，
 macOS/Windows 保留原生任务。三平台实际验证 npx/uvx、XML/TOML 插件、五类文本与冷/热缓存，不能用命令替换或跨编译代替。
 CI 的 `check` 汇总全部作业，任一失败、取消或跳过都不能通过。平台运行、MCP、漏洞和发布验收独立于本地 `mise run check`。
-基础 CI 无需安装 Codex、RTK 或 Matt Pocock skills；MCP job 复用统一 setup，再通过 uvx 按需准备 Serena、Graphify 与后台依赖。
+基础 CI 无需安装 Codex、OpenCode、RTK 或 Matt Pocock skills；MCP job 复用统一 setup，再通过 uvx 按需准备
+Serena、Graphify 与后台依赖，并用项目 MCP 客户端验收 Codex 与 OpenCode 两个 Serena context。
 源码任务通过统一 lint 运行 actionlint 工作流语义检查，模板副本验收同样复用该入口。
 
 Go 缓存区分 OS、架构、Go 版本和依赖摘要，编译缓存再区分任务及提交；lint 独立缓存，项目工具复用 mise 缓存，npx/uvx 与独立 Python 仅缓存外部工具目录，按 OS、架构及版本声明区分。
@@ -39,6 +40,8 @@ Windows 只跨运行缓存模块，编译结果在当前 runner 内复用。缓�
 
 交付分别列出已完成的 Linux 测试、macOS/Windows 原生 CI、六目标交叉构建及宿主安装。
 未完成的项目写为待验证；三 OS 配置或交叉编译不能替代原生运行证据。
+OpenCode V2.3.2 的 Windows 项目级 MCP 受上游缺陷限制；CI 的协议级 OpenCode context 验收不等于
+该客户端在 Windows 原生加载项目配置。修复前交付须明确此边界。
 
 ## 升级和发布
 
