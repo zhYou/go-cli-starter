@@ -166,7 +166,8 @@ func checkOpenCodeSerenaMCP(ctx context.Context, root string) (resultErr error) 
 	if err != nil {
 		return err
 	}
-	if !strings.Contains(instructions, canonical) {
+	if !strings.Contains(instructions, canonical) &&
+		!strings.Contains(filepath.ToSlash(instructions), filepath.ToSlash(canonical)) {
 		return fmt.Errorf("启动上下文未绑定当前 checkout %s：%s", canonical, instructions)
 	}
 	if _, err := sessionFromInstructions(instructions); err != nil {
