@@ -17,6 +17,20 @@
 | 模板身份或已有项目升级                          | [模板升级](docs/template-upgrades.md) |
 | CI、托管安全和发布                              | [维护清单](docs/maintenance.md)       |
 
+## Agent skills
+
+### Issue tracker
+
+本仓库使用 GitHub Issues 跟踪 issue、规格和门票，通过 `gh` 操作。见 `docs/agents/issue-tracker.md`。
+
+### Triage labels
+
+五种标准 triage 角色使用同名标签。见 `docs/agents/triage-labels.md`。
+
+### Domain docs
+
+领域文档采用 single-context：根目录 `GLOSSARY.md` 与 `docs/adr/`。见 `docs/agents/domain.md`。
+
 ## 命令与环境
 
 - 在仓库根目录执行项目命令。已有 mise task 的操作优先使用 `mise run <task>`；直接调用工具时，以项目 `mise.toml` 的 `[tools]` 为纳管清单：纳管工具使用 `mise exec -- <命令>`，其他命令直接执行，如 `git`、`gh`、`codex`、`rtk` 和常用 shell 命令。task 内无需重复包装。
