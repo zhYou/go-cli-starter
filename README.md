@@ -250,4 +250,4 @@ task 内由 mise 提供工具环境，无需额外包装。
 | [架构决策](docs/adr/)                 | 客户端边界等难以逆转的架构决策       |
 | [安全报告](SECURITY.md)               | 目标项目须填写的私密报告入口         |
 
-模板版本为 0.5.1；支持 Codex 和 OpenCode，TUI 和 CLI 自身的 MCP 服务暂不在范围内。
+模板版本为 0.5.2；支持 Codex 和 OpenCode，TUI 和 CLI 自身的 MCP 服务暂不在范围内。

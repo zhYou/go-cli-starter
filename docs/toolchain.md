@@ -72,8 +72,9 @@ Go 工具链、应用依赖和 Go 开发工具属于三个不同范围：
 
 ## CI 映射
 
-GitHub Actions 中的 `jdx/mise-action` 负责安装 mise 本体。作业通过 `install_args` 只安装自身需要的
-`[tools]` 子集，随后下载 Go 模块；不再在 action 安装完整工具集后重复调用 `mise run setup`。
+GitHub Actions 中的 `jdx/mise-action` 负责安装 mise 本体。需要工具子集的作业通过 `install_args` 只安装自身需要的
+`[tools]` 子集，随后下载 Go 模块；`platforms` 作业安装全部 `[tools]`。不再在 action 安装完整工具集后重复调用
+`mise run setup`。
 
 | CI 作业               | 主要工具与验收                                                    |
 | --------------------- | ----------------------------------------------------------------- |

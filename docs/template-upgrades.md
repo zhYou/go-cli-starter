@@ -1,6 +1,6 @@
 # 模板升级
 
-模板版本在 `.template-version`，当前为 0.5.1，与应用发布版本独立；同版本内的调整还须按来源提交识别。
+模板版本在 `.template-version`，当前为 0.5.2，与应用发布版本独立；同版本内的调整还须按来源提交识别。
 初始化只对原始模板改名，不升级既有业务。新副本的 `.template-origin.json` 记录原模板、版本、目标身份和可确认的来源提交；
 未知来源使用 unknown，同参数初始化保留来源字节，不拿派生项目 HEAD 冒充来源。无元数据的旧项目仍可构建检查。
 
@@ -177,16 +177,26 @@ setup 继续显式准备 mise 工具与 Go 模块；npx/uvx 可在外部缓存�
 
 此版本保持产品 CLI、配置、诊断协议、机器接口和退出码不变，调整 CI 门禁位置并集中说明工具链所有权。
 
-1. 同步 `.github/workflows/ci.yml`、`security.yml` 和 `release.yml`：各 job 通过 mise action 的
-   `install_args` 只安装所需工具，随后下载 Go 模块，不再重复运行完整 setup。
-2. 采用新的 PR 门禁位置：Linux 运行完整源码检查；macOS/Windows 验证原生命令、integration 和模板；
-   main 与 release 再运行两平台完整测试和 Linux/macOS/Windows 三平台 MCP。
-3. 合并 `UV_TOOL_DIR`、文本工具与 MCP 工具分离缓存、浅 checkout 及契约基准按需获取等配置。
-   MCP 验收中的 Codex Serena、OpenCode Serena 和 Graphify 可并行执行。
-4. 增加并同步 `docs/toolchain.md`，按系统工具、用户工具、项目 mise、npx/uvx、Go 模块和仓库 Go 工具划分职责；
-   不复制用户级客户端、skills、凭据、权限或个人配置。
+1. 同步 `.github/workflows/ci.yml`、`security.yml` 和 `release.yml`：需要工具子集的 job 通过 mise action 的
+   `install_args` 只安装所需工具，随后下载 Go 模块，不再重复运行完整 setup；各 job 的工具范围见
+   [工具链边界](toolchain.md#ci-映射)，`platforms` job 仍安装全部 `[tools]`。
+2. 采用新的 PR 门禁位置，作业分工见[维护清单](maintenance.md#ci-与验收证据)；派生项目须同步
+   macOS/Windows 的 `platform-tests`、`platforms` 作业（doctor、`lint:text` 和构建）和 PR 的 Linux MCP 验收。
+3. 合并 `UV_TOOL_DIR`、文本工具与 MCP 工具分离缓存、浅 checkout 及契约基准按需获取等配置；
+   同步 `tools/mcp` 的并行验收（Codex Serena、OpenCode Serena 和 Graphify）及其测试。
+4. 增加并同步 `docs/toolchain.md`，并在 README 与 `docs/development.md` 登记工具链入口；按系统工具、用户工具、
+   项目 mise、npx/uvx、Go 模块和仓库 Go 工具划分职责；不复制用户级客户端、skills、凭据、权限或个人配置。
 5. 修改后运行 `fmt:text`、`lint:text`、`lint:workflow`、`lint:versions` 和完整 `check`；MCP 变更运行
-   `mcp:check`，实际发布前按维护清单验证 CI、snapshot、归档和来源证明。
+   `mcp:check`。按维护清单在发布前验证 CI、snapshot 和归档；创建并推送标签后由 Release workflow 生成来源证明，
+   发布后再校验。
 
 无需重新运行 `template:init` 或用 `0.5.1` 覆盖业务文件。升级来源以 `v0.5.1` 标签的准确提交为准；
+不把派生项目 HEAD 写作模板来源，也不改写既有 `.template-origin.json`。
+
+## 迁移到 0.5.2：修正 0.5.1 升级说明
+
+此版本不改变产品 CLI、配置和模板生成行为，也未新增迁移步骤，仅修正上一节的工作流与工具链描述。
+
+已按 0.5.1 升级的项目只需重新核对上一节的作业、工具范围和来源证明时序，无需重复迁移、重新运行 `template:init`
+或用 `0.5.2` 覆盖业务文件。从 0.5.0 升级先按「迁移到 0.5.1」执行；升级来源以 `v0.5.2` 标签的准确提交为准，
 不把派生项目 HEAD 写作模板来源，也不改写既有 `.template-origin.json`。

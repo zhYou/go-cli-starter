@@ -32,9 +32,10 @@ PR 在 macOS/Windows 验证原生命令、integration 二进制和模板，main 
 PR 在 Linux 运行真实 Serena、Graphify MCP；main 与 release 在 Linux/macOS/Windows 运行三平台 MCP。
 三平台仍实际验证 npx/uvx、XML/TOML 插件、五类文本与冷/热缓存，不能用命令替换或跨编译代替。
 CI 的 `check` 汇总全部作业，任一失败、取消或跳过都不能通过。平台运行、MCP、漏洞和发布验收独立于本地 `mise run check`。
-基础 CI 无需安装 Codex、OpenCode、RTK 或 Matt Pocock skills。各作业通过 `jdx/mise-action` 的 `install_args`
-只安装所需 mise 工具并下载 Go 模块，不再重复运行统一 setup；MCP job 再通过 uvx 按需准备 Serena、Graphify
-与后台依赖，并用项目 MCP 客户端并行验收 Codex、OpenCode 两个 Serena context 和 Graphify。
+基础 CI 无需安装 Codex、OpenCode、RTK 或 Matt Pocock skills。需要工具子集的作业通过 `jdx/mise-action` 的
+`install_args` 只安装所需 mise 工具并下载 Go 模块，不再重复运行统一 setup；`platforms` 作业安装全部 `[tools]`。
+MCP job 再通过 uvx 按需准备 Serena、Graphify 与后台依赖，并用项目 MCP 客户端并行验收 Codex、OpenCode
+两个 Serena context 和 Graphify。
 源码任务通过统一 lint 运行 actionlint 工作流语义检查，模板副本验收同样复用该入口。
 
 Go 缓存区分 OS、架构、Go 版本和依赖摘要，编译缓存再区分任务及提交；lint 独立缓存，项目工具复用 mise 缓存，npx/uvx 与独立 Python 仅缓存外部工具目录，按 OS、架构及版本声明区分。
